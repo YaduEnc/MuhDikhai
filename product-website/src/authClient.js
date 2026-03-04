@@ -22,6 +22,11 @@ export function clearSession() {
   window.localStorage.removeItem(STORAGE_KEY)
 }
 
+export function saveSession(session) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+}
+
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider()
   const result = await signInWithPopup(auth, provider)

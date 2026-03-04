@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import './App.css'
-import { getStoredSession, signInWithGoogle, clearSession } from './authClient'
+import { getStoredSession, signInWithGoogle, clearSession, saveSession } from './authClient'
 import { io } from 'socket.io-client'
 import Home from './Home'
 import Chat from './Chat'
@@ -192,7 +192,11 @@ function App() {
         {needsOnboarding && (
           <Onboarding
             session={session}
-            onComplete={(updatedUser) => setSession({ ...session, user: updatedUser })}
+            onComplete={(updatedUser) => {
+              const nextSession = { ...session, user: updatedUser }
+              setSession(nextSession)
+              saveSession(nextSession)
+            }}
           />
         )}
 
