@@ -271,7 +271,7 @@ function SettingsView({ onBack, onSignOut, onDeleteRequest }) {
     )
 }
 
-export default function Home({ session, onlineCount, onStartMatch, onSignOut, onDeleteAccount }) {
+export default function Home({ session, onlineCount, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar }) {
     const [view, setView] = useState('home') // 'home' | 'profile' | 'settings'
     const [showDeleteModal, setShowDeleteModal] = useState(false)
 
