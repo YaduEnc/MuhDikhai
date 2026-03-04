@@ -361,10 +361,10 @@ function App() {
         <div className="nav-right">
           {isSignedIn && (
             <div className="nav-user">
-              <span className="online-pill">
+              <div className="online-pill">
                 <span className="online-dot" />
-                {onlineCount} present
-              </span>
+                <span className="online-text">{onlineCount} present</span>
+              </div>
               <button className="nav-signout" onClick={handleSignOut}>Leave</button>
             </div>
           )}

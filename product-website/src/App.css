@@ -139,8 +139,73 @@
   }
 
   .nav-right {
-    display: none;
+    display: flex;
   }
+}
+
+/* ── Navigation Components ────────────────────────────────────────── */
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.online-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.8rem;
+  background: rgba(22, 163, 74, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: #4ade80;
+  white-space: nowrap;
+}
+
+.online-dot {
+  width: 6px;
+  height: 6px;
+  background: #4ade80;
+  border-radius: 99px;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5);
+  }
+
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(74, 222, 128, 0);
+  }
+
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+}
+
+.nav-signout {
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-soft);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 180ms ease;
+  font-weight: 500;
+}
+
+.nav-signout:hover {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.3);
+  color: #f87171;
+  transform: translateY(-1px);
 }
 
 .hero {
