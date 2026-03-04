@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import jwtService from '../services/jwt.service';
@@ -275,14 +276,40 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         }
 
         io.to(currentRoomId).emit('random:message', {
+          id: uuidv4(),
           roomId: currentRoomId,
           fromUserId: userId,
           fromName: name,
           content: trimmed,
+          type: trimmed.startsWith('http') && (trimmed.match(/\.(jpeg|jpg|gif|png)$/) || trimmed.includes('giphy.com')) ? 'image' : 'text',
           sentAt: new Date().toISOString(),
         });
       } catch (error) {
         logger.error('Failed to relay random chat message', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          userId,
+        });
+      }
+    });
+
+    /**
+     * Random chat: mark message as read
+     */
+    socket.on('random:read', (data: { roomId: string; messageId: string }) => {
+      try {
+        const currentRoomId = userToRandomRoom.get(userId);
+        if (!currentRoomId || currentRoomId !== data.roomId) {
+          return;
+        }
+
+        // Notify the partner in the room
+        socket.to(currentRoomId).emit('random:read', {
+          roomId: currentRoomId,
+          messageId: data.messageId,
+          readBy: userId,
+        });
+      } catch (error) {
+        logger.error('Failed to relay random chat read receipt', {
           error: error instanceof Error ? error.message : 'Unknown error',
           userId,
         });

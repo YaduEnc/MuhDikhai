@@ -69,6 +69,12 @@ function App() {
       setChatMessages((prev) => [...prev, msg])
     })
 
+    socket.on('random:read', (payload) => {
+      setChatMessages((prev) =>
+        prev.map(m => m.id === payload.messageId ? { ...m, read: true } : m)
+      )
+    })
+
     socket.on('random:left', () => {
       setSocketState({ status: 'connected', phase: 'idle' })
       setRoom(null)
@@ -113,6 +119,7 @@ function App() {
     if (!room?.roomId || !socketRef.current) return
     socketRef.current.emit(isTyping ? 'typing:start' : 'typing:stop', {
       recipientId: room?.partner?.id,
+      roomId: room?.roomId // Add roomId for context if needed
     })
   }
 

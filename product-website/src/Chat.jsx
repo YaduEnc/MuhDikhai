@@ -149,9 +149,10 @@ function EmojiPicker({ onSelect, onClose }) {
 }
 
 // ─── Single message bubble ────────────────────────────────────────────────────
-function MessageBubble({ msg, isSelf }) {
-    const isGif = msg.content?.startsWith('__GIF__')
-    const gifUrl = isGif ? msg.content.replace('__GIF__', '') : null
+function MessageBubble({ msg, isSelf, session }) {
+    const isGif = msg.content?.startsWith('__GIF__') || msg.type === 'image'
+    const isSelfSent = msg.fromUserId === session?.user?.id
+    const gifUrl = msg.content?.startsWith('__GIF__') ? msg.content.replace('__GIF__', '') : (msg.type === 'image' ? msg.content : null)
     const time = new Date(msg.sentAt).toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
@@ -170,14 +171,17 @@ function MessageBubble({ msg, isSelf }) {
             )}
             <div className="msg-content">
                 {!isSelf && <span className="msg-sender">{msg.fromName || 'Stranger'}</span>}
-                <div className={`msg-bubble${isSelf ? ' msg-bubble--self' : ''}`}>
+                <div className={`msg-bubble${isSelf ? ' msg-bubble--self' : ''}${msg.type === 'image' ? ' msg-bubble--image' : ''}`}>
                     {isGif ? (
-                        <img className="msg-gif" src={gifUrl} alt="GIF" />
+                        <img className="msg-gif" src={gifUrl} alt="Shared media" />
                     ) : (
                         <span>{msg.content}</span>
                     )}
                 </div>
-                <span className={`msg-time${isSelf ? ' msg-time--self' : ''}`}>{time}</span>
+                <div className={`msg-meta${isSelf ? ' msg-meta--self' : ''}`}>
+                    <span className="msg-time">{time}</span>
+                    {isSelfSent && msg.read && <span className="msg-seen">Seen</span>}
+                </div>
             </div>
             {isSelf && (
                 <div className="msg-avatar msg-avatar--self">
@@ -266,14 +270,25 @@ export default function Chat({
     const [showEmoji, setShowEmoji] = useState(false)
     const [showGif, setShowGif] = useState(false)
     const [showProfile, setShowProfile] = useState(false)
+    const [uploading, setUploading] = useState(false)
+    const fileInputRef = useRef(null)
     const messagesEndRef = useRef(null)
     const inputRef = useRef(null)
     const typingTimeoutRef = useRef(null)
 
-    // Auto-scroll to latest message
+    // Auto-scroll to latest message & Emit read receipt
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [chatMessages, partnerTyping])
+
+        // Mark last message as read if it's from partner
+        const lastMsg = chatMessages[chatMessages.length - 1]
+        if (lastMsg && lastMsg.fromUserId !== session?.user?.id && socketState.socket) {
+            socketState.socket.emit('random:read', {
+                roomId: room?.id,
+                messageId: lastMsg.id
+            })
+        }
+    }, [chatMessages, partnerTyping, room?.id, session?.user?.id, socketState.socket])
 
     // Close pickers on Escape
     useEffect(() => {
@@ -325,6 +340,40 @@ export default function Chat({
         setShowGif(false)
     }
 
+    const handleImageUpload = async (e) => {
+        const file = e.target.files?.[0]
+        if (!file || !room?.id) return
+
+        setUploading(true)
+        const formData = new FormData()
+        formData.append('media', file)
+
+        try {
+            const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+            const res = await fetch(`${BACKEND_URL}/api/v1/messages/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${session.accessToken}` },
+                body: formData
+            })
+            const json = await res.json()
+            if (json.success) {
+                onSendMessage(json.data.url) // enhanced socket will handle type detection
+            }
+        } catch (err) {
+            console.error('Upload failed', err)
+            alert('Failed to share image. Keep it gentle.')
+        } finally {
+            setUploading(false)
+            if (fileInputRef.current) fileInputRef.current.value = ''
+        }
+    }
+
+    const iceBreakers = [
+        "What's one thing that made you smile today?",
+        "Listening to any good music lately?",
+        "What's the weather like in your corner of the world?"
+    ]
+
     const isMatched = socketState.phase === 'matched'
     const isMatching = socketState.phase === 'matching'
 
@@ -374,8 +423,21 @@ export default function Chat({
                 )}
 
                 {isMatched && chatMessages.length === 0 && (
-                    <div className="chat-empty-hint">
-                        Say hello, or just sit with the silence for a moment. There&apos;s no timer.
+                    <div className="chat-empty-container">
+                        <div className="chat-empty-hint">
+                            Say hello, or just sit with the silence for a moment. There&apos;s no timer.
+                        </div>
+                        <div className="chat-starters">
+                            {iceBreakers.map((text, i) => (
+                                <button
+                                    key={i}
+                                    className="chat-starter-btn"
+                                    onClick={() => onSendMessage(text)}
+                                >
+                                    {text}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
 
@@ -386,6 +448,7 @@ export default function Chat({
                                 key={`${msg.sentAt}-${idx}`}
                                 msg={msg}
                                 isSelf={msg.fromUserId === session?.user?.id}
+                                session={session}
                             />
                         ))}
                     </ul>
@@ -441,6 +504,22 @@ export default function Chat({
                     >
                         GIF
                     </button>
+                    <button
+                        className="input-action-btn"
+                        type="button"
+                        title="Share image"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={!isMatched || uploading}
+                    >
+                        {uploading ? '...' : '📸'}
+                    </button>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        style={{ display: 'none' }}
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                    />
                 </div>
 
                 <textarea
