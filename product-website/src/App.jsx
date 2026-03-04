@@ -690,26 +690,46 @@ function App() {
       </main>
 
       <footer className="footer">
-        <div className="footer-brand">
-          <div className="footer-brand-row">
-            <span className="footer-mark" />
-            <span className="footer-name">Muhdikhai</span>
+        <div className="footer-main">
+          <div className="footer-brand">
+            <div className="footer-brand-row">
+              <span className="footer-mark" />
+              <span className="footer-name">Muhdikhai</span>
+            </div>
+            <p className="footer-tagline">
+              A privacy‑first random chat experiment. No infinite scroll.
+              Just one stranger and a softer interface.
+            </p>
           </div>
-          <p>
-            A minimal, privacy‑first random chat experiment. No infinite scroll. Just one
-            stranger and a softer interface.
-          </p>
-          <div className="footer-row">
-            <span className="footer-pill">Crafted for late‑night browsers</span>
-            <span className="footer-pill">Built on PlasticWorld backend</span>
+
+          <div className="footer-groups">
+            <div className="footer-group">
+              <span className="footer-group-title">Experiment</span>
+              <div className="footer-links-v2">
+                <span className="footer-link-v2">Changelog</span>
+                <span className="footer-link-v2">Principles</span>
+                <span className="footer-link-v2">Status</span>
+              </div>
+            </div>
+            <div className="footer-group">
+              <span className="footer-group-title">Social</span>
+              <div className="footer-links-v2">
+                <span className="footer-link-v2">Twitter</span>
+                <span className="footer-link-v2">GitHub</span>
+                <span className="footer-link-v2">Contact</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="footer-links">
-          <span className="footer-link">Changelog</span>
-          <span className="footer-link">Principles</span>
-          <span className="footer-link">Contact</span>
-          <span className="footer-link">Status</span>
+        <div className="footer-bottom">
+          <div className="footer-credit">
+            Developed & Maintained by <span className="dev-name">Yaduraj Singh</span>
+          </div>
+          <div className="footer-meta-row">
+            <span className="footer-pill-v2">Built on PlasticWorld</span>
+            <span className="footer-pill-v2">© 2026 Muhdikhai</span>
+          </div>
         </div>
       </footer>
     </div>

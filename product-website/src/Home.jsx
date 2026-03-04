@@ -282,7 +282,14 @@ export default function Home({ session, onlineCount, onStartMatch, onSignOut, on
     const name = session?.user?.name?.split(' ')[0] || 'you'
 
     if (view === 'profile') {
-        return <ProfileView session={session} onBack={() => setView('home')} />
+        return (
+            <ProfileView
+                session={session}
+                onBack={() => setView('home')}
+                onUpdateProfile={onUpdateProfile}
+                onUploadAvatar={onUploadAvatar}
+            />
+        )
     }
 
     if (view === 'settings') {
