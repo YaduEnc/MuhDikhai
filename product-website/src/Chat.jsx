@@ -393,7 +393,8 @@ export default function Chat({
 
     const handleSend = () => {
         const trimmed = input.trim()
-        if (!trimmed || socketState.phase !== 'matched') return
+        if (!trimmed || (socketState.phase !== 'matched' && socketState.phase !== 'friend-chat')) return
+
         onSendMessage(trimmed, replyingTo?.id)
         setInput('')
         setReplyingTo(null)
@@ -653,7 +654,7 @@ export default function Chat({
                         value={input}
                         onChange={handleInput}
                         onKeyDown={handleKeyDown}
-                        disabled={!isMatched && socketState.phase !== 'friend-chat'}
+                        disabled={!isMatched}
                         rows={1}
                     />
 
@@ -662,7 +663,7 @@ export default function Chat({
                         className="chat-send-btn"
                         type="button"
                         onClick={handleSend}
-                        disabled={(!isMatched && socketState.phase !== 'friend-chat') || !input.trim()}
+                        disabled={!isMatched || !input.trim()}
                     >
 
                         <span className="send-icon">↑</span>

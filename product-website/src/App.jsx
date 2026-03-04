@@ -63,8 +63,15 @@ function App() {
     if (!str) return "";
     try {
       // If it's base64, decode it
-      return atob(str);
+      const decoded = atob(str);
+      try {
+        // Try UTF-8 decode
+        return decodeURIComponent(escape(decoded));
+      } catch (e) {
+        return decoded;
+      }
     } catch (e) {
+
       // If it's not base64 or fails, return as is
       return str;
     }
