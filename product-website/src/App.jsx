@@ -59,6 +59,18 @@ function App() {
   // Increment this to force a socket reconnect (e.g. after token refresh)
   const [socketVersion, setSocketVersion] = useState(0)
 
+  const safeDecode = (str) => {
+    if (!str) return "";
+    try {
+      // If it's base64, decode it
+      return atob(str);
+    } catch (e) {
+      // If it's not base64 or fails, return as is
+      return str;
+    }
+  };
+
+
   const socketRef = useRef(null)
   const sessionRef = useRef(session)
   const chatMessagesRef = useRef(chatMessages)
@@ -220,16 +232,7 @@ function App() {
           }
         })
 
-        const safeDecode = (str) => {
-          if (!str) return "";
-          try {
-            // If it's base64, decode it
-            return atob(str);
-          } catch (e) {
-            // If it's not base64 or fails, return as is
-            return str;
-          }
-        };
+
 
         socket.on('message:received', (payload) => {
           if (roomRef.current?.partner?.id === payload.message.senderId) {
