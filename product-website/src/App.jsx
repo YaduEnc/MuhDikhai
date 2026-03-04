@@ -42,10 +42,29 @@ function App() {
     const socket = io(BACKEND_URL, {
       transports: ['websocket'],
       auth: { token: session.accessToken },
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     })
 
     socket.on('connect', () => {
       setSocketState((prev) => ({ ...prev, status: 'connected' }))
+    })
+
+    socket.on('connect_error', async (err) => {
+      // If the error is due to an expired token, try to refresh
+      if (err.message === 'Access token expired' && session?.refreshToken) {
+        try {
+          const next = await refreshSession(session.refreshToken)
+          setSession(next)
+          // The useEffect will re-run with the new accessToken
+        } catch (refreshErr) {
+          handleSignOut()
+        }
+      } else {
+        setSocketState((prev) => ({ ...prev, status: 'error' }))
+        console.error('Socket connection error:', err)
+      }
     })
 
     socket.on('presence:count', (payload) => {
