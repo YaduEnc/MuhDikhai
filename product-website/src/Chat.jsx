@@ -149,7 +149,7 @@ function EmojiPicker({ onSelect, onClose }) {
 }
 
 // ─── Single message bubble ────────────────────────────────────────────────────
-function MessageBubble({ msg, isSelf, session }) {
+function MessageBubble({ msg, isSelf, session, onProfilePeek }) {
     const isGif = msg.content?.startsWith('__GIF__') || msg.type === 'image'
     const isSelfSent = msg.fromUserId === session?.user?.id
     const gifUrl = msg.content?.startsWith('__GIF__') ? msg.content.replace('__GIF__', '') : (msg.type === 'image' ? msg.content : null)
@@ -161,7 +161,11 @@ function MessageBubble({ msg, isSelf, session }) {
     return (
         <li className={`msg-row${isSelf ? ' msg-row--self' : ''}`}>
             {!isSelf && (
-                <div className="msg-avatar">
+                <div
+                    className="msg-avatar clickable"
+                    onClick={() => onProfilePeek(msg.fromUserId)}
+                    title="View profile"
+                >
                     {msg.fromProfilePictureUrl ? (
                         <img src={msg.fromProfilePictureUrl} alt={msg.fromName} />
                     ) : (
@@ -265,11 +269,12 @@ export default function Chat({
     onSendMessage,
     onTyping,
     onLeave,
+    onSearchAgain,
 }) {
     const [input, setInput] = useState('')
     const [showEmoji, setShowEmoji] = useState(false)
     const [showGif, setShowGif] = useState(false)
-    const [showProfile, setShowProfile] = useState(false)
+    const [showProfile, setShowProfile] = useState(null) // null or userId
     const [uploading, setUploading] = useState(false)
     const fileInputRef = useRef(null)
     const messagesEndRef = useRef(null)
@@ -376,12 +381,13 @@ export default function Chat({
 
     const isMatched = socketState.phase === 'matched'
     const isMatching = socketState.phase === 'matching'
+    const hasLeft = socketState.phase === 'partner-left'
 
     return (
         <div className="chat-shell-v2">
             {/* Header */}
             <div className="chat-header-v2">
-                <div className="chat-header-left" onClick={() => isMatched && setShowProfile(true)}>
+                <div className={`chat-header-left${isMatched ? ' clickable' : ''}`} onClick={() => isMatched && setShowProfile(room?.partner?.id)}>
                     <div className="chat-partner-avatar">
                         {room?.partner?.profilePictureUrl ? (
                             <img src={room.partner.profilePictureUrl} alt={room.partner.name} />
@@ -449,9 +455,25 @@ export default function Chat({
                                 msg={msg}
                                 isSelf={msg.fromUserId === session?.user?.id}
                                 session={session}
+                                onProfilePeek={(uid) => setShowProfile(uid)}
                             />
                         ))}
                     </ul>
+                )}
+
+                {/* Partner Left State */}
+                {hasLeft && (
+                    <div className="chat-partner-left-overlay">
+                        <div className="chat-partner-left-card">
+                            <span className="left-icon">☁️</span>
+                            <h3>Stranger has left the room</h3>
+                            <p>The conversation has dissolved like mist. Would you like to reach out again?</p>
+                            <div className="left-actions">
+                                <button className="btn-primary" onClick={onSearchAgain}>Find someone new</button>
+                                <button className="btn-ghost" onClick={onLeave}>Return home</button>
+                            </div>
+                        </div>
+                    </div>
                 )}
 
                 {/* Typing indicator */}
@@ -475,11 +497,11 @@ export default function Chat({
             )}
 
             {/* Profile Modal */}
-            {showProfile && room?.partner?.id && (
+            {showProfile && (
                 <ProfileModal
-                    partnerId={room.partner.id}
+                    partnerId={showProfile}
                     session={session}
-                    onClose={() => setShowProfile(false)}
+                    onClose={() => setShowProfile(null)}
                 />
             )}
 

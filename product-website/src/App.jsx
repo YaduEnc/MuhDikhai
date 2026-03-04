@@ -76,8 +76,7 @@ function App() {
     })
 
     socket.on('random:left', () => {
-      setSocketState({ status: 'connected', phase: 'idle' })
-      setRoom(null)
+      setSocketState((prev) => ({ ...prev, phase: 'partner-left' }))
       setPartnerTyping(false)
     })
 
@@ -102,10 +101,11 @@ function App() {
     }
   }, [session?.accessToken])
 
-  // Handle room joining separately
   useEffect(() => {
     if (showChat && socketRef.current) {
       setSocketState({ status: 'connected', phase: 'matching' })
+      setRoom(null)
+      setChatMessages([])
       socketRef.current.emit('random:join')
     }
   }, [showChat])
@@ -523,6 +523,12 @@ function App() {
             onSendMessage={handleSendMessage}
             onTyping={handleTyping}
             onLeave={() => setShowChat(false)}
+            onSearchAgain={() => {
+              setSocketState({ status: 'connected', phase: 'matching' })
+              setRoom(null)
+              setChatMessages([])
+              socketRef.current?.emit('random:join')
+            }}
           />
         )}
 
