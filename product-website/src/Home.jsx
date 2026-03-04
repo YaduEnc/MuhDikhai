@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import './Home.css'
 
 function DeleteConfirmationModal({ onConfirm, onCancel }) {
@@ -47,7 +47,46 @@ function DeleteConfirmationModal({ onConfirm, onCancel }) {
     );
 }
 
-function ProfileView({ session, onBack }) {
+function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
+    const [bio, setBio] = useState(session?.user?.bio || '')
+    const [gender, setGender] = useState(session?.user?.gender || 'prefer_not_to_say')
+    const [isSaving, setIsSaving] = useState(false)
+    const [error, setError] = useState('')
+    const fileInputRef = useRef(null)
+
+    const handleFileChange = async (e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        if (file.size > 10 * 1024 * 1024) {
+            setError('Photo must be less than 10MB')
+            return
+        }
+
+        setIsSaving(true)
+        setError('')
+        try {
+            const url = await onUploadAvatar(file)
+            await onUpdateProfile({ profilePictureUrl: url })
+        } catch (err) {
+            setError(err.message || 'Failed to upload photo')
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const handleSave = async () => {
+        setIsSaving(true)
+        setError('')
+        try {
+            await onUpdateProfile({ bio, gender })
+        } catch (err) {
+            setError(err.message || 'Failed to update profile')
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
     return (
         <div className="inner-view">
             <button className="back-btn" type="button" onClick={onBack}>
@@ -55,19 +94,73 @@ function ProfileView({ session, onBack }) {
                 <span>Back to home</span>
             </button>
             <div className="profile-card">
-                <div className="profile-avatar">
-                    {session?.user?.photoURL ? (
-                        <img src={session.user.photoURL} alt="avatar" className="profile-avatar-img" />
-                    ) : (
-                        <span className="profile-avatar-initials">
-                            {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
-                        </span>
-                    )}
+                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                    <div className="avatar-upload-wrap" onClick={() => fileInputRef.current?.click()} title="Change photo">
+                        <div className="profile-avatar">
+                            {session?.user?.photoURL ? (
+                                <img src={session.user.photoURL} alt="avatar" className="profile-avatar-img" />
+                            ) : (
+                                <span className="profile-avatar-initials">
+                                    {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
+                                </span>
+                            )}
+                        </div>
+                        <div className="avatar-edit-overlay">✎</div>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{ display: 'none' }}
+                            accept="image/*"
+                            onChange={handleFileChange}
+                        />
+                    </div>
+                    <div className="profile-info">
+                        <span className="profile-name">{session?.user?.name || 'Anonymous'}</span>
+                        <span className="profile-email">{session?.user?.email || ''}</span>
+                    </div>
                 </div>
-                <div className="profile-info">
-                    <span className="profile-name">{session?.user?.name || 'Anonymous'}</span>
-                    <span className="profile-email">{session?.user?.email || ''}</span>
+
+                <div className="profile-edit-section">
+                    <div className="profile-field-group">
+                        <label className="profile-field-label">About you</label>
+                        <textarea
+                            className="profile-textarea"
+                            placeholder="Tell the world something about yourself..."
+                            value={bio}
+                            onChange={(e) => setBio(e.target.value)}
+                            maxLength={500}
+                        />
+                    </div>
+
+                    <div className="profile-field-group">
+                        <label className="profile-field-label">Gender</label>
+                        <div className="gender-selector">
+                            {['male', 'female', 'other', 'prefer_not_to_say'].map((g) => (
+                                <button
+                                    key={g}
+                                    type="button"
+                                    className={`gender-pill ${gender === g ? 'active' : ''}`}
+                                    onClick={() => setGender(g)}
+                                >
+                                    {g.charAt(0).toUpperCase() + g.slice(1).replace(/_/g, ' ')}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {error && <div className="modal-error" style={{ marginBottom: 0 }}>{error}</div>}
+
+                    <div className="profile-save-row">
+                        <button
+                            className="profile-save-btn"
+                            onClick={handleSave}
+                            disabled={isSaving}
+                        >
+                            {isSaving ? 'Updating...' : 'Save Changes'}
+                        </button>
+                    </div>
                 </div>
+
                 <div className="profile-stats">
                     <div className="profile-stat">
                         <span className="profile-stat-value">{session?.user?.roomsEntered || 0}</span>

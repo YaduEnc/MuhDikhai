@@ -156,6 +156,103 @@ function App() {
     setSocketState({ status: 'connected', phase: 'idle' })
   }
 
+  const handleUpdateProfile = async (data) => {
+    if (!session?.accessToken) return;
+
+    try {
+      let res = await fetch(`${BACKEND_URL}/api/v1/users/me`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (res.status === 401 && session.refreshToken) {
+        try {
+          const next = await refreshSession(session.refreshToken);
+          setSession(next);
+          res = await fetch(`${BACKEND_URL}/api/v1/users/me`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${next.accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+          });
+        } catch (err) {
+          handleSignOut();
+          return;
+        }
+      }
+
+      const json = await res.json();
+      if (json.success) {
+        const nextSession = {
+          ...session,
+          user: {
+            ...session.user,
+            ...json.data.user,
+            // Map backend profilePictureUrl to frontend photoURL for consistency
+            photoURL: json.data.user.profilePictureUrl || session.user.photoURL
+          }
+        };
+        setSession(nextSession);
+        saveSession(nextSession);
+      } else {
+        throw new Error(json.error?.message || 'Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Profile update failed:', error);
+      throw error;
+    }
+  }
+
+  const handleUploadAvatar = async (file) => {
+    if (!session?.accessToken) return;
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+      let res = await fetch(`${BACKEND_URL}/api/v1/users/me/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.accessToken}`,
+        },
+        body: formData,
+      });
+
+      if (res.status === 401 && session.refreshToken) {
+        try {
+          const next = await refreshSession(session.refreshToken);
+          setSession(next);
+          res = await fetch(`${BACKEND_URL}/api/v1/users/me/avatar`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${next.accessToken}`,
+            },
+            body: formData,
+          });
+        } catch (err) {
+          handleSignOut();
+          throw err;
+        }
+      }
+
+      const json = await res.json();
+      if (json.success) {
+        return json.data.url;
+      } else {
+        throw new Error(json.error?.message || 'Failed to upload photo');
+      }
+    } catch (error) {
+      console.error('Photo upload failed:', error);
+      throw error;
+    }
+  }
+
   const handleDeleteAccount = async () => {
     if (!session?.accessToken) return;
 
@@ -262,6 +359,8 @@ function App() {
             onStartMatch={() => setShowChat(true)}
             onSignOut={handleSignOut}
             onDeleteAccount={handleDeleteAccount}
+            onUpdateProfile={handleUpdateProfile}
+            onUploadAvatar={handleUploadAvatar}
           />
         )}
 
