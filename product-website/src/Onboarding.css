@@ -138,6 +138,7 @@
     border: 4px solid transparent;
     background: var(--avatar-color);
     cursor: pointer;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
