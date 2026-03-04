@@ -1,0 +1,107 @@
+---
+config:
+  layout: fixed
+---
+flowchart TB
+ subgraph subGraph0["BASE URL: https://api.yourdomain.com"]
+        API_ROOT["/api/v1"]
+  end
+ subgraph subGraph1["🔐 AUTHENTICATION ENDPOINTS"]
+        AUTH_ROOT["/auth"]
+        AUTH_GOOGLE["POST /auth/google-signin<br>───────────────<br>Body: {idToken}<br>Response: {accessToken, refreshToken, user}<br>Status: 200 OK / 401 Unauthorized"]
+        AUTH_PROFILE["POST /auth/complete-profile<br>───────────────<br>Headers: Authorization Bearer<br>Body: {username, phone, age}<br>Response: {user}<br>Status: 201 Created / 409 Conflict"]
+        AUTH_REFRESH["POST /auth/refresh<br>───────────────<br>Body: {refreshToken}<br>Response: {accessToken}<br>Status: 200 OK / 401 Unauthorized"]
+        AUTH_LOGOUT["POST /auth/logout<br>───────────────<br>Headers: Authorization Bearer<br>Response: {success: true}<br>Status: 200 OK"]
+        AUTH_SESSIONS["GET /auth/sessions<br>───────────────<br>Headers: Authorization Bearer<br>Response: {sessions: [...]}<br>Status: 200 OK"]
+        AUTH_REVOKE["DELETE /auth/sessions/:deviceId<br>───────────────<br>Headers: Authorization Bearer<br>Response: {success: true}<br>Status: 200 OK / 404 Not Found"]
+  end
+ subgraph subGraph2["👤 USER ENDPOINTS"]
+        USER_ROOT["/users"]
+        USER_ME["GET /users/me<br>───────────────<br>Headers: Authorization Bearer<br>Response: {id, username, email, phone, name, age, profile_picture, bio, status}<br>Status: 200 OK"]
+        USER_UPDATE["PUT /users/me<br>───────────────<br>Headers: Authorization Bearer<br>Body: {name?, bio?, profile_picture?}<br>Response: {user}<br>Status: 200 OK / 400 Bad Request"]
+        USER_BY_ID["GET /users/:userId<br>───────────────<br>Headers: Authorization Bearer<br>Response: {id, username, name, profile_picture, bio, status}<br>Status: 200 OK / 404 Not Found"]
+        USER_SEARCH["GET /users/search?q=query&amp;type=username|email|phone<br>───────────────<br>Headers: Authorization Bearer<br>Query: q (search term), type (optional)<br>Response: {users: [...], total, page}<br>Status: 200 OK"]
+        USER_STATUS@{ label: "PUT /users/me/status<br>───────────────<br>Headers: Authorization Bearer<br>Body: {status: 'online'|'away'|'offline'}<br>Response: {status}<br>Status: 200 OK" }
+        USER_DELETE["DELETE /users/me<br>───────────────<br>Headers: Authorization Bearer<br>Body: {password}<br>Response: {success: true}<br>Status: 200 OK / 401 Unauthorized"]
+  end
+ subgraph subGraph3["👥 FRIENDSHIP ENDPOINTS"]
+        FRIEND_ROOT["/friends"]
+        FRIEND_LIST["GET /friends<br>───────────────<br>Headers: Authorization Bearer<br>Query: status=accepted|pending|blocked<br>Response: {friends: [...], total}<br>Status: 200 OK"]
+        FRIEND_REQUEST@{ label: "POST /friends/request<br>───────────────<br>Headers: Authorization Bearer<br>Body: {userId}<br>Response: {friendship: {id, status: 'pending', requested_at}}<br>Status: 201 Created / 400 Already Sent" }
+        FRIEND_ACCEPT@{ label: "POST /friends/:friendshipId/accept<br>───────────────<br>Headers: Authorization Bearer<br>Response: {friendship: {status: 'accepted'}}<br>Status: 200 OK / 403 Forbidden" }
+        FRIEND_DENY@{ label: "POST /friends/:friendshipId/deny<br>───────────────<br>Headers: Authorization Bearer<br>Response: {friendship: {status: 'denied'}}<br>Status: 200 OK / 403 Forbidden" }
+        FRIEND_UNFRIEND["DELETE /friends/:friendshipId<br>───────────────<br>Headers: Authorization Bearer<br>Response: {success: true}<br>Status: 200 OK / 404 Not Found"]
+        FRIEND_BLOCK["POST /friends/:userId/block<br>───────────────<br>Headers: Authorization Bearer<br>Body: {reason?}<br>Response: {block: {id, blocked_id}}<br>Status: 201 Created"]
+        FRIEND_UNBLOCK["DELETE /friends/:userId/unblock<br>───────────────<br>Headers: Authorization Bearer<br>Response: {success: true}<br>Status: 200 OK"]
+        FRIEND_PENDING["GET /friends/requests/pending<br>───────────────<br>Headers: Authorization Bearer<br>Response: {sent: [...], received: [...]}<br>Status: 200 OK"]
+  end
+ subgraph subGraph4["💬 MESSAGE ENDPOINTS"]
+        MSG_ROOT["/messages"]
+        MSG_SEND@{ label: "POST /messages<br>───────────────<br>Headers: Authorization Bearer<br>Body: {recipientId, encryptedContent, encryptedKey, messageType: 'text'|'image'|'video'|'audio'|'file', replyToMessageId?}<br>Response: {message: {id, status: 'sent', sent_at}}<br>Status: 201 Created / 403 Not Friends" }
+        MSG_HISTORY["GET /messages/conversation/:userId<br>───────────────<br>Headers: Authorization Bearer<br>Query: limit=50, before=messageId, after=messageId<br>Response: {messages: [...], hasMore, total}<br>Status: 200 OK"]
+        MSG_UNREAD["GET /messages/unread<br>───────────────<br>Headers: Authorization Bearer<br>Response: {conversations: [{userId, count, lastMessage}]}<br>Status: 200 OK"]
+        MSG_MARK_READ@{ label: "PUT /messages/:messageId/read<br>───────────────<br>Headers: Authorization Bearer<br>Response: {message: {status: 'read', read_at}}<br>Status: 200 OK" }
+        MSG_EDIT["PUT /messages/:messageId<br>───────────────<br>Headers: Authorization Bearer<br>Body: {encryptedContent, encryptedKey}<br>Response: {message: {is_edited: true, edited_at}}<br>Status: 200 OK / 403 Not Sender"]
+        MSG_DELETE["DELETE /messages/:messageId<br>───────────────<br>Headers: Authorization Bearer<br>Query: deleteFor=me|everyone<br>Response: {success: true}<br>Status: 200 OK / 403 Forbidden"]
+        MSG_SEARCH["GET /messages/search?q=query&amp;userId=userId<br>───────────────<br>Headers: Authorization Bearer<br>Query: q (search term), userId (optional)<br>Response: {messages: [...], total}<br>Status: 200 OK"]
+  end
+ subgraph subGraph5["📁 MEDIA ENDPOINTS"]
+        MEDIA_ROOT["/media"]
+        MEDIA_UPLOAD["POST /media/upload<br>───────────────<br>Headers: Authorization Bearer, Content-Type: multipart/form-data<br>Body: {file, encryptedKey, messageId?}<br>Response: {media: {id, url, thumbnail_url, size, type}}<br>Status: 201 Created / 413 File Too Large"]
+        MEDIA_GET["GET /media/:mediaId<br>───────────────<br>Headers: Authorization Bearer<br>Response: Binary file or redirect to CDN<br>Status: 200 OK / 403 Forbidden"]
+        MEDIA_DELETE["DELETE /media/:mediaId<br>───────────────<br>Headers: Authorization Bearer<br>Response: {success: true}<br>Status: 200 OK / 403 Not Owner"]
+  end
+ subgraph subGraph6["🔑 ENCRYPTION KEY ENDPOINTS"]
+        KEY_ROOT["/keys"]
+        KEY_REGISTER["POST /keys/register<br>───────────────<br>Headers: Authorization Bearer<br>Body: {deviceId, identityKeyPublic, signedPrekeyPublic, signedPrekeySignature, oneTimePrekeys: [...]}<br>Response: {keySet: {id, device_id, prekey_count}}<br>Status: 201 Created"]
+        KEY_GET_USER["GET /keys/:userId<br>───────────────<br>Headers: Authorization Bearer<br>Response: {devices: [{deviceId, identityKey, signedPrekey, oneTimePrekey}]}<br>Status: 200 OK / 404 No Keys"]
+        KEY_PREKEY_BUNDLE["GET /keys/:userId/prekey-bundle<br>───────────────<br>Headers: Authorization Bearer<br>Response: {identityKey, signedPrekey, oneTimePrekey?}<br>Status: 200 OK"]
+        KEY_REFRESH["POST /keys/refresh<br>───────────────<br>Headers: Authorization Bearer<br>Body: {deviceId, oneTimePrekeys: [...]}<br>Response: {prekey_count}<br>Status: 200 OK"]
+  end
+ subgraph subGraph7["📊 HEALTH & MONITORING"]
+        HEALTH_ROOT["/health"]
+        HEALTH_CHECK@{ label: "GET /health<br>───────────────<br>No auth required<br>Response: {status: 'ok', uptime, timestamp}<br>Status: 200 OK" }
+        HEALTH_DB@{ label: "GET /health/database<br>───────────────<br>Headers: Authorization Bearer (Admin)<br>Response: {postgres: 'connected', redis: 'connected'}<br>Status: 200 OK / 503 Service Unavailable" }
+        HEALTH_METRICS["GET /health/metrics<br>───────────────<br>Headers: Authorization Bearer (Admin)<br>Response: {activeConnections, messagesPerSecond, apiLatency}<br>Status: 200 OK"]
+  end
+ subgraph subGraph8["⚡ WEBSOCKET EVENTS"]
+        WS_ROOT["WebSocket: wss://ws.yourdomain.com"]
+        WS_CONNECT@{ label: "CONNECT<br>───────────────<br>Query: ?token=accessToken<br>Response: {event: 'connected', userId}<br>On Error: {event: 'error', message}" }
+        WS_MESSAGE["EVENT: message.new<br>───────────────<br>Payload: {message: {id, senderId, encryptedContent, timestamp}}<br>Direction: Server → Client"]
+        WS_TYPING_START["EVENT: typing.start<br>───────────────<br>Payload: {conversationId, userId}<br>Direction: Client → Server → Other Client"]
+        WS_TYPING_STOP["EVENT: typing.stop<br>───────────────<br>Payload: {conversationId, userId}<br>Direction: Client → Server → Other Client"]
+        WS_STATUS@{ label: "EVENT: user.status<br>───────────────<br>Payload: {userId, status: 'online'|'away'|'offline'}<br>Direction: Server → Client" }
+        WS_DELIVERED["EVENT: message.delivered<br>───────────────<br>Payload: {messageId, deliveredAt}<br>Direction: Client → Server → Sender"]
+        WS_READ["EVENT: message.read<br>───────────────<br>Payload: {messageId, readAt}<br>Direction: Client → Server → Sender"]
+        WS_FRIEND_REQUEST["EVENT: friend.request<br>───────────────<br>Payload: {friendshipId, requester: {...}}<br>Direction: Server → Client"]
+        WS_FRIEND_ACCEPTED["EVENT: friend.accepted<br>───────────────<br>Payload: {friendshipId, accepter: {...}}<br>Direction: Server → Client"]
+        WS_DISCONNECT["DISCONNECT<br>───────────────<br>Response: Connection closed<br>Auto-reconnect with exponential backoff"]
+  end
+    API_ROOT --> AUTH_ROOT & USER_ROOT & FRIEND_ROOT & MSG_ROOT & MEDIA_ROOT & KEY_ROOT & HEALTH_ROOT
+    AUTH_ROOT --> AUTH_GOOGLE & AUTH_PROFILE & AUTH_REFRESH & AUTH_LOGOUT & AUTH_SESSIONS & AUTH_REVOKE
+    USER_ROOT --> USER_ME & USER_UPDATE & USER_BY_ID & USER_SEARCH & USER_STATUS & USER_DELETE
+    FRIEND_ROOT --> FRIEND_LIST & FRIEND_REQUEST & FRIEND_ACCEPT & FRIEND_DENY & FRIEND_UNFRIEND & FRIEND_BLOCK & FRIEND_UNBLOCK & FRIEND_PENDING
+    MSG_ROOT --> MSG_SEND & MSG_HISTORY & MSG_UNREAD & MSG_MARK_READ & MSG_EDIT & MSG_DELETE & MSG_SEARCH
+    MEDIA_ROOT --> MEDIA_UPLOAD & MEDIA_GET & MEDIA_DELETE
+    KEY_ROOT --> KEY_REGISTER & KEY_GET_USER & KEY_PREKEY_BUNDLE & KEY_REFRESH
+    HEALTH_ROOT --> HEALTH_CHECK & HEALTH_DB & HEALTH_METRICS
+    WS_ROOT --> WS_CONNECT & WS_MESSAGE & WS_TYPING_START & WS_TYPING_STOP & WS_STATUS & WS_DELIVERED & WS_READ & WS_FRIEND_REQUEST & WS_FRIEND_ACCEPTED & WS_DISCONNECT
+
+    USER_STATUS@{ shape: rect}
+    FRIEND_REQUEST@{ shape: rect}
+    FRIEND_ACCEPT@{ shape: rect}
+    FRIEND_DENY@{ shape: rect}
+    MSG_SEND@{ shape: rect}
+    MSG_MARK_READ@{ shape: rect}
+    HEALTH_CHECK@{ shape: rect}
+    HEALTH_DB@{ shape: rect}
+    WS_CONNECT@{ shape: rect}
+    WS_STATUS@{ shape: rect}
+    style AUTH_ROOT fill:#ff6b6b
+    style USER_ROOT fill:#4ecdc4
+    style FRIEND_ROOT fill:#45b7d1
+    style MSG_ROOT fill:#96ceb4
+    style MEDIA_ROOT fill:#ffeaa7
+    style KEY_ROOT fill:#dfe6e9
+    style HEALTH_ROOT fill:#a29bfe
+    style WS_ROOT fill:#fd79a8

@@ -1,0 +1,165 @@
+erDiagram
+    USERS ||--o{ FRIENDSHIPS_REQUESTER : "sends requests"
+    USERS ||--o{ FRIENDSHIPS_ADDRESSEE : "receives requests"
+    USERS ||--o{ MESSAGES_SENDER : "sends messages"
+    USERS ||--o{ MESSAGES_RECIPIENT : "receives messages"
+    USERS ||--o{ ENCRYPTION_KEYS : "owns keys"
+    USERS ||--o{ DEVICES : "has devices"
+    USERS ||--o{ SESSIONS : "has sessions"
+    USERS ||--o{ BLOCKS : "blocks users"
+    USERS ||--o{ BLOCKED_BY : "blocked by users"
+    MESSAGES ||--o{ MESSAGE_RECEIPTS : "has receipts"
+    MESSAGES ||--o{ MESSAGE_MEDIA : "contains media"
+
+    USERS {
+        uuid id PK "Primary Key"
+        string firebase_uid UK "Unique, indexed"
+        string username UK "Unique, indexed, 3-30 chars"
+        string email UK "Unique, indexed"
+        string phone_number UK "Unique, indexed, E.164 format"
+        string name "Full name, 1-100 chars"
+        int age "Must be 13+"
+        string profile_picture_url "Optional, S3/CDN URL"
+        string bio "Optional, max 500 chars"
+        enum status "online, offline, away"
+        timestamp last_seen "Last active timestamp"
+        boolean is_active "Soft delete flag"
+        timestamp created_at "Account creation"
+        timestamp updated_at "Last profile update"
+    }
+
+    FRIENDSHIPS {
+        uuid id PK "Primary Key"
+        uuid requester_id FK "User who sent request"
+        uuid addressee_id FK "User who received request"
+        enum status "pending, accepted, denied, blocked"
+        timestamp requested_at "When request was sent"
+        timestamp responded_at "When accepted/denied"
+        timestamp created_at
+        timestamp updated_at
+        unique requester_addressee "Unique constraint"
+    }
+
+    MESSAGES {
+        uuid id PK "Primary Key"
+        uuid sender_id FK "Who sent the message"
+        uuid recipient_id FK "Who receives the message"
+        bytea encrypted_content "E2E encrypted payload"
+        bytea encrypted_key "Per-message encryption key"
+        enum message_type "text, image, video, audio, file, system"
+        string media_url "Optional, for media messages"
+        int media_size_bytes "Size if media"
+        enum status "sent, delivered, read"
+        timestamp sent_at "When message was sent"
+        timestamp delivered_at "When delivered to recipient"
+        timestamp read_at "When read by recipient"
+        uuid reply_to_message_id "Optional, for threading"
+        boolean is_edited "Was message edited"
+        timestamp edited_at "When edited"
+        boolean is_deleted "Soft delete"
+        timestamp deleted_at "When deleted"
+        timestamp created_at
+        index sender_recipient "Composite index"
+        index recipient_status "For unread count"
+    }
+
+    ENCRYPTION_KEYS {
+        uuid id PK "Primary Key"
+        uuid user_id FK "Owner of keys"
+        uuid device_id FK "Specific device"
+        bytea identity_key_public "X25519 public key"
+        bytea signed_prekey_public "Signed prekey"
+        bytea signed_prekey_signature "Signature"
+        json one_time_prekeys "Array of prekeys"
+        int prekey_count "Remaining prekeys"
+        timestamp key_created_at "When keys generated"
+        timestamp key_expires_at "Key rotation date"
+        boolean is_active "Active key set"
+        timestamp created_at
+        timestamp updated_at
+        unique user_device "One keyset per device"
+    }
+
+    DEVICES {
+        uuid id PK "Primary Key"
+        uuid user_id FK "Device owner"
+        string device_name "User-friendly name"
+        string device_type "ios, android, web, desktop"
+        string device_token "FCM/APNS push token"
+        string user_agent "Browser/app info"
+        string ip_address "Last known IP"
+        timestamp last_active "Last seen timestamp"
+        boolean is_active "Device still in use"
+        timestamp created_at "First registered"
+        timestamp updated_at
+    }
+
+    SESSIONS {
+        uuid id PK "Primary Key"
+        uuid user_id FK "Session owner"
+        uuid device_id FK "Which device"
+        string access_token_hash "Hashed JWT"
+        string refresh_token_hash "Hashed refresh token"
+        timestamp access_expires_at "15 minutes"
+        timestamp refresh_expires_at "7 days"
+        string ip_address "Session IP"
+        string user_agent "Client info"
+        boolean is_active "Valid session"
+        timestamp created_at "Login time"
+        timestamp last_used_at "Last activity"
+        index user_active "Find active sessions"
+    }
+
+    MESSAGE_RECEIPTS {
+        uuid id PK "Primary Key"
+        uuid message_id FK "Which message"
+        uuid user_id FK "Who acknowledged"
+        enum receipt_type "delivered, read, played"
+        timestamp received_at "When acknowledged"
+        timestamp created_at
+        unique message_user_type "One receipt per user per type"
+    }
+
+    MESSAGE_MEDIA {
+        uuid id PK "Primary Key"
+        uuid message_id FK "Parent message"
+        string media_type "image/jpeg, video/mp4, etc"
+        string storage_url "S3/CDN URL"
+        string thumbnail_url "Thumbnail if applicable"
+        int file_size_bytes "Size in bytes"
+        int width "For images/videos"
+        int height "For images/videos"
+        int duration_seconds "For audio/video"
+        bytea encryption_key "Media encryption key"
+        string checksum_sha256 "File integrity"
+        timestamp created_at
+    }
+
+    BLOCKS {
+        uuid id PK "Primary Key"
+        uuid blocker_id FK "User who blocked"
+        uuid blocked_id FK "User who is blocked"
+        string reason "Optional, user note"
+        timestamp created_at "When blocked"
+        unique blocker_blocked "Can't block twice"
+    }
+
+    TYPING_INDICATORS {
+        uuid conversation_id "sender_id-recipient_id hash"
+        uuid user_id "Who is typing"
+        timestamp started_typing_at
+        timestamp expires_at "TTL 3 seconds"
+    }
+
+    ONLINE_STATUS {
+        uuid user_id "User ID"
+        enum status "online, away, offline"
+        timestamp last_seen
+        timestamp expires_at "TTL 30 seconds"
+    }
+
+    MESSAGE_QUEUE {
+        uuid user_id "Recipient ID"
+        json message_payload "Queued messages"
+        timestamp queued_at
+    }

@@ -1,0 +1,267 @@
+.friends-list {
+  width: 100%;
+}
+
+.friends-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e5e5e5;
+  margin-bottom: 32px;
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #666666;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab:hover {
+  color: #000000;
+}
+
+.tab-active {
+  background: transparent;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #000000;
+  cursor: pointer;
+  border-bottom: 2px solid #000000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge {
+  background: #000000;
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.friends-content {
+  min-height: 200px;
+}
+
+.friends-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.friend-card {
+  border: 1px solid #e5e5e5;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.friend-info {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.friend-avatar,
+.request-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.friend-avatar img,
+.request-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #000000;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.friend-details,
+.request-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.friend-details h3,
+.request-details h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #000000;
+}
+
+.friend-details p,
+.request-details p {
+  font-size: 14px;
+  color: #666666;
+  margin: 0;
+}
+
+.friend-details .bio {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #999999;
+}
+
+.friend-actions,
+.request-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-accept,
+.btn-deny,
+.btn-unfriend,
+.btn-block {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid #000000;
+}
+
+.btn-accept {
+  background: #000000;
+  color: #ffffff;
+}
+
+.btn-accept:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.btn-deny,
+.btn-unfriend {
+  background: transparent;
+  color: #000000;
+}
+
+.btn-deny:hover:not(:disabled),
+.btn-unfriend:hover:not(:disabled) {
+  background: #000000;
+  color: #ffffff;
+}
+
+.btn-block {
+  background: transparent;
+  color: #cc0000;
+  border-color: #cc0000;
+}
+
+.btn-block:hover:not(:disabled) {
+  background: #cc0000;
+  color: #ffffff;
+}
+
+.btn-accept:disabled,
+.btn-deny:disabled,
+.btn-unfriend:disabled,
+.btn-block:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.requests-section {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.requests-group h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #000000;
+}
+
+.request-card {
+  border: 1px solid #e5e5e5;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.request-info {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex: 1;
+}
+
+.request-status {
+  display: flex;
+  align-items: center;
+}
+
+.status-pending {
+  padding: 6px 12px;
+  background: #f5f5f5;
+  color: #666666;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px;
+  color: #999999;
+  font-size: 16px;
+}
+
+.friends-loading {
+  text-align: center;
+  padding: 48px;
+  color: #666666;
+}
+
+@media (max-width: 768px) {
+  .friends-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .request-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .request-actions {
+    width: 100%;
+  }
+
+  .btn-accept,
+  .btn-deny {
+    flex: 1;
+  }
+}
