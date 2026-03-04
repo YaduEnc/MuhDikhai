@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import './App.css'
-import { getStoredSession, signInWithGoogle, clearSession, saveSession } from './authClient'
+import { getStoredSession, signInWithGoogle, clearSession, saveSession, refreshSession } from './authClient'
 import { io } from 'socket.io-client'
 import Home from './Home'
 import Chat from './Chat'
@@ -147,12 +147,31 @@ function App() {
     if (!session?.accessToken) return;
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/v1/users/me`, {
+      let res = await fetch(`${BACKEND_URL}/api/v1/users/me`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${session.accessToken}`,
         },
       });
+
+      if (res.status === 401 && session.refreshToken) {
+        // try to refresh
+        try {
+          const next = await refreshSession(session.refreshToken);
+          setSession(next);
+          // retry
+          res = await fetch(`${BACKEND_URL}/api/v1/users/me`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${next.accessToken}`,
+            },
+          });
+        } catch (err) {
+          // refresh failed - logout
+          handleSignOut();
+          return;
+        }
+      }
 
       const json = await res.json();
       if (json.success) {

@@ -76,3 +76,39 @@ export async function signInWithGoogle() {
   return session
 }
 
+export async function refreshSession(refreshToken) {
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refreshToken }),
+  })
+
+  if (!response.ok) {
+    let message = 'Token refresh failed'
+    try {
+      const payload = await response.json()
+      if (payload?.error?.message) {
+        message = payload.error.message
+      }
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message)
+  }
+
+  const payload = await response.json()
+  const oldSession = getStoredSession()
+  const nextSession = {
+    ...oldSession,
+    accessToken: payload.data.accessToken,
+    refreshToken: payload.data.refreshToken,
+    accessExpiresAt: payload.data.accessExpiresAt,
+    refreshExpiresAt: payload.data.refreshExpiresAt,
+  }
+
+  saveSession(nextSession)
+  return nextSession
+}
+
