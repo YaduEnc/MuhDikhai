@@ -223,18 +223,25 @@ function App() {
         socket.on('message:received', (payload) => {
           // payload.message has sender info
           if (roomRef.current?.partner?.id === payload.message.senderId) {
+            let content = "Encrypted Message";
+            try {
+              content = payload.message.encryptedContent ? atob(payload.message.encryptedContent) : "";
+            } catch (e) {
+              console.error("Failed to decode message", e);
+            }
             const msg = {
               id: payload.message.id,
               fromUserId: payload.message.senderId,
               fromName: payload.message.sender.name,
               fromProfilePictureUrl: payload.message.sender.profilePictureUrl,
-              content: payload.message.encryptedContent ? atob(payload.message.encryptedContent) : "Encrypted Message",
+              content,
               type: payload.message.messageType,
               sentAt: payload.message.sentAt,
             }
             setChatMessages((prev) => [...prev, msg])
           }
         })
+
 
 
       } catch (err) {
@@ -304,17 +311,26 @@ function App() {
       const json = await res.json()
       if (json.success) {
         // Map persistent messages to UI format
-        const msgs = json.data.messages.map(m => ({
-          id: m.id,
-          fromUserId: m.senderId,
-          fromName: m.sender.name,
-          fromProfilePictureUrl: m.sender.profilePictureUrl,
-          content: m.encryptedContent ? atob(m.encryptedContent) : '', // Decode base64
-          type: m.messageType,
-          sentAt: m.sentAt,
-          read: m.status === 'read'
-        })).reverse() // history is DESC
+        const msgs = json.data.messages.map(m => {
+          let content = "";
+          try {
+            content = m.encryptedContent ? atob(m.encryptedContent) : "";
+          } catch (e) {
+            console.error("History decode failed", e);
+          }
+          return {
+            id: m.id,
+            fromUserId: m.senderId,
+            fromName: m.sender.name,
+            fromProfilePictureUrl: m.sender.profilePictureUrl,
+            content,
+            type: m.messageType,
+            sentAt: m.sentAt,
+            read: m.status === 'read'
+          }
+        }).reverse() // history is DESC
         setChatMessages(msgs)
+
       }
     } catch (err) {
       console.error('Failed to fetch history', err)
@@ -349,13 +365,14 @@ function App() {
   }
 
   const handleLeaveChat = () => {
-    if (socketRef.current) {
+    if (socketRef.current && socketState.phase !== 'friend-chat') {
       socketRef.current.emit('random:leave')
     }
     setShowChat(false)
     setRoom(null)
     setSocketState((prev) => ({ ...prev, phase: 'idle' }))
   }
+
 
   // Reusable authed fetch with auto-refresh on 401
   const authedFetch = useCallback(async (url, opts = {}) => {
@@ -447,10 +464,12 @@ function App() {
             <span className="brand-word">Muhdikhai</span>
             <span className="brand-sub">
               {isInChat
-                ? 'You are in a gentle room'
+                ? (socketState.phase === 'friend-chat' ? 'Private conversation' : 'You are in a gentle room')
                 : isHome
-                  ? 'Your quiet room key is ready'
-                  : 'A softer way to meet strangers'}
+                  ? `Welcome back to the quiet place`
+                  : needsOnboarding
+                    ? 'Take a moment to define yourself'
+                    : 'Anonymous, but unexpectedly tender.'}
             </span>
           </div>
         </div>

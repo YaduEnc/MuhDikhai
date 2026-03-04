@@ -454,7 +454,7 @@ export default function Chat({
         "What's the weather like in your corner of the world?"
     ]
 
-    const isMatched = socketState.phase === 'matched'
+    const isMatched = socketState.phase === 'matched' || socketState.phase === 'friend-chat'
     const isMatching = socketState.phase === 'matching'
     const hasLeft = socketState.phase === 'partner-left'
 
@@ -537,16 +537,14 @@ export default function Chat({
                                 onProfilePeek={(uid) => setShowProfile(uid)}
                                 onReply={(m) => { setReplyingTo(m); inputRef.current?.focus(); }}
                                 onReact={(mid, emoji) => {
-                                    if (socketState.phase === 'friend-chat') {
-                                        // Friend chat reactions might need different handling if backend supports them
-                                        // For now, let's keep it consistent or use random:reaction if shared
-                                        socketState.socket?.emit('random:reaction', { roomId: room.roomId || room.id, messageId: mid, emoji })
-                                    } else {
-                                        socketState.socket?.emit('random:reaction', { roomId: room.roomId || room.id, messageId: mid, emoji })
+                                    const targetRoomId = room.roomId || room.id;
+                                    if (targetRoomId) {
+                                        socketState.socket?.emit('random:reaction', { roomId: targetRoomId, messageId: mid, emoji })
+                                    } else if (socketState.phase === 'friend-chat' && room.partner?.id) {
+                                        // Potential future: socketState.socket?.emit('message:reaction', { recipientId: room.partner.id, ... })
                                     }
                                 }}
                                 partnerName={room?.partner?.name}
-
                             />
                         ))}
                     </ul>
