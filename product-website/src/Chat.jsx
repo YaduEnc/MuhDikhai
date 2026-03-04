@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import './Chat.css'
 
 // ─── Emoji data ──────────────────────────────────────────────────────────────
@@ -32,7 +32,7 @@ const EMOJI_CATEGORIES = [
 const GIPHY_KEY = import.meta.env.VITE_GIPHY_API_KEY || 'dc6zaTOxFJmzC'
 
 // ─── Typing dots animation ────────────────────────────────────────────────────
-function TypingDots({ name }) {
+const TypingDots = memo(function TypingDots({ name }) {
     return (
         <div className="typing-indicator">
             <span className="typing-name">{name}</span>
@@ -42,10 +42,10 @@ function TypingDots({ name }) {
             <span className="typing-label">is typing</span>
         </div>
     )
-}
+})
 
 // ─── GIF Picker ───────────────────────────────────────────────────────────────
-function GifPicker({ onSelect, onClose }) {
+const GifPicker = memo(function GifPicker({ onSelect, onClose }) {
     const [query, setQuery] = useState('')
     const [gifs, setGifs] = useState([])
     const [loading, setLoading] = useState(false)
@@ -107,10 +107,10 @@ function GifPicker({ onSelect, onClose }) {
             <div className="gif-powered">Powered by GIPHY</div>
         </div>
     )
-}
+})
 
 // ─── Emoji Picker ─────────────────────────────────────────────────────────────
-function EmojiPicker({ onSelect, onClose }) {
+const EmojiPicker = memo(function EmojiPicker({ onSelect, onClose }) {
     const [activeTab, setActiveTab] = useState(0)
 
     return (
@@ -149,10 +149,10 @@ function EmojiPicker({ onSelect, onClose }) {
             </div>
         </div>
     )
-}
+})
 
 // ─── Single message bubble ────────────────────────────────────────────────────
-function MessageBubble({ msg, isSelf, session, onProfilePeek }) {
+const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProfilePeek }) {
     const isGif = msg.content?.startsWith('__GIF__') || msg.type === 'image'
     const isSelfSent = msg.fromUserId === session?.user?.id
     const gifUrl = msg.content?.startsWith('__GIF__') ? msg.content.replace('__GIF__', '') : (msg.type === 'image' ? msg.content : null)
@@ -201,10 +201,10 @@ function MessageBubble({ msg, isSelf, session, onProfilePeek }) {
             )}
         </li>
     )
-}
+})
 
 // ─── Profile Modal ───────────────────────────────────────────────────
-function ProfileModal({ partnerId, session, onClose }) {
+const ProfileModal = memo(function ProfileModal({ partnerId, session, onClose }) {
     const [profile, setProfile] = useState(null)
     const [loading, setLoading] = useState(true)
 
@@ -260,7 +260,7 @@ function ProfileModal({ partnerId, session, onClose }) {
             </div>
         </div>
     )
-}
+})
 
 // ─── Chat shell ───────────────────────────────────────────────────────────────
 export default function Chat({
