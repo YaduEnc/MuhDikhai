@@ -322,14 +322,14 @@ router.delete(
     // Revoke all active sessions
     await sessionService.revokeAllSessions(userId);
 
-    // Soft delete user account in database
-    await userService.deleteUser(userId);
+    // Hard delete user account and all related data (messages, sessions, etc.) from database
+    await userService.hardDeleteUser(userId);
 
     // Delete user from Firebase Authentication
     try {
-      const deleted = await deleteFirebaseUser(firebaseUid);
-      if (deleted) {
-        logger.info('User deleted from Firebase', {
+      const deletedFromFirebase = await deleteFirebaseUser(firebaseUid);
+      if (deletedFromFirebase) {
+        logger.info('User hard-deleted from Firebase', {
           firebaseUid,
           userId,
         });
@@ -340,17 +340,15 @@ router.delete(
         });
       }
     } catch (error) {
-      // Only log as error if it's an unexpected error (not user-not-found)
-      // User is already soft deleted in DB, so we continue anyway
-      logger.warn('Unexpected error deleting Firebase user (user already soft deleted in DB)', {
+      // Log as warning because DB is already wiped, but Firebase might need manual attention
+      logger.error('CRITICAL: Failed to delete user from Firebase after database wipe', {
         error: error instanceof Error ? error.message : 'Unknown error',
         firebaseUid,
         userId,
       });
-      // Continue - user is already soft deleted in our database
     }
 
-    logger.info('User account deleted', {
+    logger.info('User account completely wiped from system', {
       userId,
       email: user.email,
       firebaseUid,
@@ -358,7 +356,7 @@ router.delete(
 
     res.status(200).json({
       success: true,
-      message: 'Account deleted successfully',
+      message: 'Account and all associated data deleted permanently',
     });
   })
 );

@@ -619,13 +619,14 @@ class UserService {
   }
 
   /**
-   * Soft delete user account
+   * Hard delete user account and all related data
    */
-  async deleteUser(userId: string): Promise<void> {
+  async hardDeleteUser(userId: string): Promise<void> {
     try {
-      // Soft delete: set is_active = false
+      // Hard delete: actually remove the row
+      // Foreign keys with ON DELETE CASCADE will handle related data
       const result = await database.query(
-        'UPDATE users SET is_active = false WHERE id = $1 AND is_active = true',
+        'DELETE FROM users WHERE id = $1',
         [userId]
       );
 
@@ -633,9 +634,9 @@ class UserService {
         throw new Error('User not found or already deleted');
       }
 
-      logger.info('User account deleted', { userId });
+      logger.info('User account hard-deleted from database', { userId });
     } catch (error) {
-      logger.error('Failed to delete user', {
+      logger.error('Failed to hard-delete user from database', {
         error: error instanceof Error ? error.message : 'Unknown error',
         userId,
       });
