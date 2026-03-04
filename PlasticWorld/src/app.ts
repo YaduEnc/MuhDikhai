@@ -19,6 +19,14 @@ app.set('trust proxy', 1);
 app.use(helmet({
   crossOriginOpenerPolicy: { policy: 'unsafe-none' }, // Allow Firebase popup windows
   crossOriginEmbedderPolicy: false, // Allow embedding
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow images from this origin
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "img-src": ["'self'", "data:", "*.yaduraj.me"],
+      "connect-src": ["'self'", "*.yaduraj.me", "https://*.yaduraj.me", "wss://*.yaduraj.me"],
+    },
+  },
 }));
 
 // CORS configuration
