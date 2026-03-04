@@ -3,6 +3,7 @@ import { io } from 'socket.io-client'
 import Home from './Home'
 import Chat from './Chat'
 import Onboarding from './Onboarding'
+import Landing from './Landing'
 import {
   signInWithGoogle,
   refreshSession,
@@ -455,23 +456,13 @@ function App() {
         )}
 
         {!isSignedIn && (
-          <div className="landing">
-            <section className="landing-hero">
-              <div className="landing-content">
-                <h1>Anonymous, but unexpectedly tender.</h1>
-                {authError && <p className="auth-error">{authError}</p>}
-                <button
-                  className="btn-primary landing-btn"
-                  onClick={handleAuth}
-                  disabled={authLoading}
-                >
-                  <span className="btn-primary-dot" />
-                  {authLoading ? 'Signing in…' : 'Start a gentle match'}
-                </button>
-              </div>
-            </section>
-          </div>
+          <Landing
+            onStartMatch={handleAuth}
+            authLoading={authLoading}
+            authError={authError}
+          />
         )}
+
 
 
         {isInChat && (
@@ -495,10 +486,49 @@ function App() {
       </main>
 
       <footer className="footer">
-        <div className="footer-credit">
-          Developed &amp; Maintained by <span className="dev-name">Yaduraj Singh</span>
+        <div className="footer-main">
+          <div className="footer-brand">
+            <div className="footer-brand-row">
+              <span className="footer-mark" />
+              <span className="footer-name">Muhdikhai</span>
+            </div>
+            <p className="footer-tagline">
+              A privacy‑first random chat experiment. No infinite scroll.
+              Just one stranger and a softer interface.
+            </p>
+          </div>
+
+          <div className="footer-groups">
+            <div className="footer-group">
+              <span className="footer-group-title">Experiment</span>
+              <div className="footer-links-v2">
+                <span className="footer-link-v2">Changelog</span>
+                <span className="footer-link-v2">Principles</span>
+                <span className="footer-link-v2">Status</span>
+              </div>
+            </div>
+            <div className="footer-group">
+              <span className="footer-group-title">Social</span>
+              <div className="footer-links-v2">
+                <span className="footer-link-v2">Twitter</span>
+                <span className="footer-link-v2">GitHub</span>
+                <span className="footer-link-v2">Contact</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="footer-bottom">
+          <div className="footer-credit">
+            Developed &amp; Maintained by <span className="dev-name">Yaduraj Singh</span>
+          </div>
+          <div className="footer-meta-row">
+            <span className="footer-pill-v2">Built on PlasticWorld</span>
+            <span className="footer-pill-v2">© 2026 Muhdikhai</span>
+          </div>
         </div>
       </footer>
+
     </div>
   )
 }
