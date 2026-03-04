@@ -188,23 +188,25 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
             <div className="msg-content">
                 {!isSelf && <span className="msg-sender">{msg.fromName || 'Stranger'}</span>}
 
-                {/* Quoted Reply */}
-                {msg.replyTo && (
-                    <div className="msg-quote">
-                        <span className="quote-sender">{msg.replyTo.fromName === session?.user?.name ? 'You' : msg.replyTo.fromName}</span>
-                        <p className="quote-text">{msg.replyTo.content.startsWith('__GIF__') ? '📷 Media' : msg.replyTo.content}</p>
-                    </div>
-                )}
 
                 <div
                     className={`msg-bubble${isSelf ? ' msg-bubble--self' : ''}${msg.type === 'image' ? ' msg-bubble--image' : ''}`}
                     onContextMenu={(e) => { e.preventDefault(); setShowReactions(!showReactions); }}
                 >
+                    {/* Quoted Reply */}
+                    {msg.replyTo && (
+                        <div className="msg-quote">
+                            <span className="quote-sender">{msg.replyTo.fromName === session?.user?.name ? 'You' : msg.replyTo.fromName}</span>
+                            <p className="quote-text">{msg.replyTo.content.startsWith('__GIF__') ? '📷 Media' : msg.replyTo.content}</p>
+                        </div>
+                    )}
+
                     {isGif ? (
                         <img className="msg-gif" src={gifUrl} alt="Shared media" />
                     ) : (
                         <span>{msg.content}</span>
                     )}
+
 
                     {/* Reaction Overlay */}
                     {showReactions && (
