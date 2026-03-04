@@ -1,6 +1,52 @@
 import { useState } from 'react'
 import './Home.css'
 
+function DeleteConfirmationModal({ onConfirm, onCancel }) {
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleConfirm = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            await onConfirm();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to delete account');
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay delete-modal-overlay">
+            <div className="modal-card delete-modal-card">
+                <div className="delete-modal-icon">⬡</div>
+                <h3>Delete account forever?</h3>
+                <p>
+                    This will permanently remove your profile, preferences, and all history.
+                    This action is irreversible. Are you sure you want to disappear?
+                </p>
+                {error && <div className="modal-error">{error}</div>}
+                <div className="modal-actions-v2">
+                    <button
+                        className="btn-danger-v2"
+                        onClick={handleConfirm}
+                        disabled={loading}
+                    >
+                        {loading ? 'Deleting...' : 'Delete my account'}
+                    </button>
+                    <button
+                        className="btn-ghost-v2"
+                        onClick={onCancel}
+                        disabled={loading}
+                    >
+                        Keep my account
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function ProfileView({ session, onBack }) {
     return (
         <div className="inner-view">
@@ -56,7 +102,7 @@ function ProfileView({ session, onBack }) {
     )
 }
 
-function SettingsView({ onBack, onSignOut }) {
+function SettingsView({ onBack, onSignOut, onDeleteRequest }) {
     return (
         <div className="inner-view">
             <button className="back-btn" type="button" onClick={onBack}>
@@ -115,13 +161,26 @@ function SettingsView({ onBack, onSignOut }) {
                         <span className="settings-badge safe">Active</span>
                     </div>
                 </div>
+
+                <div className="settings-group danger-zone">
+                    <div className="settings-group-label">Danger Zone</div>
+                    <button className="settings-row danger" type="button" onClick={onDeleteRequest}>
+                        <span className="settings-row-icon">⬡</span>
+                        <div className="settings-row-body">
+                            <span className="settings-row-title">Delete account forever</span>
+                            <span className="settings-row-desc">Permanently remove all your data and disappear from Muhdikhai.</span>
+                        </div>
+                        <span className="settings-row-arrow">→</span>
+                    </button>
+                </div>
             </div>
         </div>
     )
 }
 
-export default function Home({ session, onlineCount, onStartMatch, onSignOut }) {
+export default function Home({ session, onlineCount, onStartMatch, onSignOut, onDeleteAccount }) {
     const [view, setView] = useState('home') // 'home' | 'profile' | 'settings'
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
 
     const hour = new Date().getHours()
     const greeting =
@@ -134,7 +193,21 @@ export default function Home({ session, onlineCount, onStartMatch, onSignOut }) 
     }
 
     if (view === 'settings') {
-        return <SettingsView onBack={() => setView('home')} onSignOut={onSignOut} />
+        return (
+            <>
+                <SettingsView
+                    onBack={() => setView('home')}
+                    onSignOut={onSignOut}
+                    onDeleteRequest={() => setShowDeleteModal(true)}
+                />
+                {showDeleteModal && (
+                    <DeleteConfirmationModal
+                        onConfirm={onDeleteAccount}
+                        onCancel={() => setShowDeleteModal(false)}
+                    />
+                )}
+            </>
+        )
     }
 
     return (

@@ -143,6 +143,29 @@ function App() {
     setRoom(null)
   }
 
+  const handleDeleteAccount = async () => {
+    if (!session?.accessToken) return;
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/users/me`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.accessToken}`,
+        },
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        handleSignOut();
+      } else {
+        throw new Error(json.error?.message || 'Failed to delete account');
+      }
+    } catch (error) {
+      console.error('Account deletion failed:', error);
+      throw error;
+    }
+  }
+
   const isSignedIn = Boolean(session?.user)
   const isHome = Boolean(isSignedIn && !showChat && session.user.gender)
   const isInChat = Boolean(showChat && isSignedIn && session.user.gender)
@@ -206,6 +229,7 @@ function App() {
             onlineCount={onlineCount}
             onStartMatch={() => setShowChat(true)}
             onSignOut={handleSignOut}
+            onDeleteAccount={handleDeleteAccount}
           />
         )}
 
