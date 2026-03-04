@@ -161,7 +161,11 @@ function MessageBubble({ msg, isSelf }) {
         <li className={`msg-row${isSelf ? ' msg-row--self' : ''}`}>
             {!isSelf && (
                 <div className="msg-avatar">
-                    {(msg.fromName || 'S')[0].toUpperCase()}
+                    {msg.fromProfilePictureUrl ? (
+                        <img src={msg.fromProfilePictureUrl} alt={msg.fromName} />
+                    ) : (
+                        (msg.fromName || 'S')[0].toUpperCase()
+                    )}
                 </div>
             )}
             <div className="msg-content">
@@ -177,7 +181,11 @@ function MessageBubble({ msg, isSelf }) {
             </div>
             {isSelf && (
                 <div className="msg-avatar msg-avatar--self">
-                    You
+                    {session?.user?.profilePictureUrl ? (
+                        <img src={session.user.profilePictureUrl} alt="You" />
+                    ) : (
+                        'You'
+                    )}
                 </div>
             )}
         </li>
@@ -266,7 +274,11 @@ export default function Chat({
             <div className="chat-header-v2">
                 <div className="chat-header-left">
                     <div className="chat-partner-avatar">
-                        {(room?.partner?.name || '?')[0].toUpperCase()}
+                        {room?.partner?.profilePictureUrl ? (
+                            <img src={room.partner.profilePictureUrl} alt={room.partner.name} />
+                        ) : (
+                            (room?.partner?.name || '?')[0].toUpperCase()
+                        )}
                     </div>
                     <div className="chat-partner-info">
                         <span className="chat-partner-name">

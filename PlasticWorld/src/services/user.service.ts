@@ -12,6 +12,7 @@ export interface User {
   profilePictureUrl?: string;
   bio?: string;
   status: 'online' | 'offline' | 'away';
+  gender?: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
   lastSeen: Date;
   isActive: boolean;
   createdAt: Date;
@@ -23,6 +24,7 @@ export interface CreateUserData {
   email: string;
   name: string;
   profilePictureUrl?: string;
+  gender?: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
 }
 
 export interface UpdateUserData {
@@ -33,6 +35,7 @@ export interface UpdateUserData {
   profilePictureUrl?: string | null;
   bio?: string | null;
   status?: 'online' | 'offline' | 'away';
+  gender?: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
 }
 
 class UserService {
@@ -43,27 +46,27 @@ class UserService {
   private async generateUniqueUsername(email: string, name: string): Promise<string> {
     // Extract base username from email (before @) or name
     let baseUsername = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-    
+
     // If email-based username is too short or empty, use name
     if (baseUsername.length < 3) {
       baseUsername = name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 20);
     }
-    
+
     // Ensure minimum length
     if (baseUsername.length < 3) {
       baseUsername = 'user' + Math.random().toString(36).substring(2, 8);
     }
-    
+
     // Ensure maximum length
     if (baseUsername.length > 27) {
       baseUsername = baseUsername.substring(0, 27);
     }
-    
+
     // Try base username first (most common case)
     if (await this.isUsernameAvailable(baseUsername)) {
       return baseUsername;
     }
-    
+
     // If taken, find next available with single query
     const result = await database.query<{ username: string }>(
       `SELECT username FROM users 
@@ -72,7 +75,7 @@ class UserService {
        LIMIT 1`,
       [`${baseUsername}%`]
     );
-    
+
     let counter = 1;
     if (result.rows.length > 0) {
       const lastUsername = result.rows[0].username;
@@ -81,19 +84,19 @@ class UserService {
         counter = parseInt(match[1], 10) + 1;
       }
     }
-    
+
     // Generate username with counter
     let username = `${baseUsername}${counter}`;
     while (!(await this.isUsernameAvailable(username)) && counter < 1000) {
       counter++;
       username = `${baseUsername}${counter}`;
     }
-    
+
     // Fallback if still not available
     if (counter >= 1000) {
       username = 'user' + Date.now().toString().substring(7);
     }
-    
+
     return username;
   }
 
@@ -104,22 +107,22 @@ class UserService {
     try {
       // Generate a unique username
       const username = await this.generateUniqueUsername(data.email, data.name);
-      
+
       // Default age to 18 (user can update later via complete-profile)
       // Database requires age >= 13, so we use 18 as a safe default
       const defaultAge = 18;
-      
+
       const result = await database.query<User>(
         `INSERT INTO users (
-          firebase_uid, username, email, name, age, profile_picture_url, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          firebase_uid, username, email, name, age, profile_picture_url, gender, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING 
           id, firebase_uid as "firebaseUid", username, email,
           phone_number as "phoneNumber", name, age,
-          profile_picture_url as "profilePictureUrl", bio,
+          profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
           created_at as "createdAt", updated_at as "updatedAt"`,
-        [data.firebaseUid, username, data.email, data.name, defaultAge, data.profilePictureUrl || null, 'offline']
+        [data.firebaseUid, username, data.email, data.name, defaultAge, data.profilePictureUrl || null, data.gender || 'prefer_not_to_say', 'offline']
       );
 
       const user = result.rows[0];
@@ -145,15 +148,15 @@ class UserService {
    */
   async getUserByFirebaseUidOrEmail(firebaseUid: string, email: string | undefined, includeInactive: boolean = false): Promise<User | null> {
     try {
-      const whereClause = includeInactive 
+      const whereClause = includeInactive
         ? '(firebase_uid = $1 OR email = $2)'
         : '(firebase_uid = $1 OR email = $2) AND is_active = true';
-      
+
       const result = await database.query<User>(
         `SELECT 
           id, firebase_uid as "firebaseUid", username, email,
           phone_number as "phoneNumber", name, age,
-          profile_picture_url as "profilePictureUrl", bio,
+          profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
           created_at as "createdAt", updated_at as "updatedAt"
         FROM users
@@ -181,10 +184,10 @@ class UserService {
    */
   async getUserByFirebaseUid(firebaseUid: string, includeInactive: boolean = false): Promise<User | null> {
     try {
-      const whereClause = includeInactive 
-        ? 'firebase_uid = $1' 
+      const whereClause = includeInactive
+        ? 'firebase_uid = $1'
         : 'firebase_uid = $1 AND is_active = true';
-      
+
       const result = await database.query<User>(
         `SELECT 
           id, firebase_uid as "firebaseUid", username, email,
@@ -213,10 +216,10 @@ class UserService {
    */
   async getUserByEmail(email: string, includeInactive: boolean = false): Promise<User | null> {
     try {
-      const whereClause = includeInactive 
-        ? 'email = $1' 
+      const whereClause = includeInactive
+        ? 'email = $1'
         : 'email = $1 AND is_active = true';
-      
+
       const result = await database.query<User>(
         `SELECT 
           id, firebase_uid as "firebaseUid", username, email,
@@ -252,7 +255,7 @@ class UserService {
         RETURNING 
           id, firebase_uid as "firebaseUid", username, email,
           phone_number as "phoneNumber", name, age,
-          profile_picture_url as "profilePictureUrl", bio,
+          profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
           created_at as "createdAt", updated_at as "updatedAt"`,
         [userId]
@@ -283,7 +286,7 @@ class UserService {
         `SELECT 
           id, firebase_uid as "firebaseUid", username, email,
           phone_number as "phoneNumber", name, age,
-          profile_picture_url as "profilePictureUrl", bio,
+          profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
           created_at as "createdAt", updated_at as "updatedAt"
         FROM users
@@ -393,6 +396,12 @@ class UserService {
         paramIndex++;
       }
 
+      if (data.gender !== undefined) {
+        updates.push(`gender = $${paramIndex}`);
+        values.push(data.gender);
+        paramIndex++;
+      }
+
       if (updates.length === 0) {
         return (await this.getUserById(userId))!;
       }
@@ -406,7 +415,7 @@ class UserService {
         RETURNING 
           id, firebase_uid as "firebaseUid", username, email,
           phone_number as "phoneNumber", name, age,
-          profile_picture_url as "profilePictureUrl", bio,
+          profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
           created_at as "createdAt", updated_at as "updatedAt"`,
         values
@@ -451,7 +460,7 @@ class UserService {
       const result = await database.query<Omit<User, 'email' | 'phoneNumber' | 'age' | 'firebaseUid'>>(
         `SELECT 
           id, username, name,
-          profile_picture_url as "profilePictureUrl", bio,
+          profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
           created_at as "createdAt", updated_at as "updatedAt"
         FROM users
@@ -532,14 +541,14 @@ class UserService {
       const limitParam = paramIndex;
       const offsetParam = paramIndex + 1;
       queryParams.push(limit, offset);
-      
+
       // Find the search pattern parameter index (first search param after excludeUserId)
       const searchParamIndex = excludeUserId ? 2 : 1;
-      
+
       const usersResult = await database.query<Omit<User, 'email' | 'phoneNumber' | 'age' | 'firebaseUid'>>(
         `SELECT 
           id, username, name,
-          profile_picture_url as "profilePictureUrl", bio,
+          profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
           created_at as "createdAt", updated_at as "updatedAt"
         FROM users
@@ -581,7 +590,7 @@ class UserService {
         RETURNING 
           id, firebase_uid as "firebaseUid", username, email,
           phone_number as "phoneNumber", name, age,
-          profile_picture_url as "profilePictureUrl", bio,
+          profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
           created_at as "createdAt", updated_at as "updatedAt"`,
         [status, userId]

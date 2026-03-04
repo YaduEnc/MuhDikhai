@@ -12,6 +12,7 @@ import {
   searchUsersQuerySchema,
 } from '../utils/validation';
 import { deleteFirebaseUser } from '../config/firebase';
+import { upload } from '../middleware/multer';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -45,6 +46,7 @@ router.get(
           age: user.age,
           profilePictureUrl: user.profilePictureUrl,
           bio: user.bio,
+          gender: user.gender,
           status: user.status,
           lastSeen: user.lastSeen,
           createdAt: user.createdAt,
@@ -65,7 +67,7 @@ router.put(
   validateBody(updateProfileSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user!.id;
-    const { username, phoneNumber, name, bio, profilePictureUrl } = req.body;
+    const { username, phoneNumber, name, bio, profilePictureUrl, gender } = req.body;
 
     // Check if user exists
     const existingUser = await userService.getUserById(userId);
@@ -98,6 +100,7 @@ router.put(
       name?: string;
       bio?: string;
       profilePictureUrl?: string | null;
+      gender?: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
     } = {};
 
     if (username !== undefined) {
@@ -114,6 +117,9 @@ router.put(
     }
     if (profilePictureUrl !== undefined) {
       updateData.profilePictureUrl = profilePictureUrl || null; // Allow empty string to clear
+    }
+    if (gender !== undefined) {
+      updateData.gender = gender;
     }
 
     // Update user
@@ -137,11 +143,38 @@ router.put(
           age: updatedUser.age,
           profilePictureUrl: updatedUser.profilePictureUrl,
           bio: updatedUser.bio,
+          gender: updatedUser.gender,
           status: updatedUser.status,
           lastSeen: updatedUser.lastSeen,
           createdAt: updatedUser.createdAt,
           updatedAt: updatedUser.updatedAt,
         },
+      },
+    });
+  })
+);
+
+/**
+ * POST /api/v1/users/me/avatar
+ * Upload profile picture
+ */
+router.post(
+  '/me/avatar',
+  authenticate,
+  upload.single('avatar'),
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.file) {
+      throw new AppError('No file uploaded', 400, 'NO_FILE');
+    }
+
+    // Return the URL to the uploaded file
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const avatarUrl = `${baseUrl}/uploads/${req.file.filename}`;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        url: avatarUrl,
       },
     });
   })

@@ -4,6 +4,7 @@ import { getStoredSession, signInWithGoogle, clearSession } from './authClient'
 import { io } from 'socket.io-client'
 import Home from './Home'
 import Chat from './Chat'
+import Onboarding from './Onboarding'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
 
@@ -123,8 +124,9 @@ function App() {
   }
 
   const isSignedIn = Boolean(session?.user)
-  const isHome = Boolean(isSignedIn && !showChat)
-  const isInChat = Boolean(showChat && isSignedIn)
+  const isHome = Boolean(isSignedIn && !showChat && session.user.gender)
+  const isInChat = Boolean(showChat && isSignedIn && session.user.gender)
+  const needsOnboarding = Boolean(isSignedIn && !session.user.gender)
 
   return (
     <div className="page">
@@ -183,6 +185,14 @@ function App() {
             session={session}
             onStartMatch={() => setShowChat(true)}
             onSignOut={handleSignOut}
+          />
+        )}
+
+        {/* ── Onboarding flow ─────────────────── */}
+        {needsOnboarding && (
+          <Onboarding
+            session={session}
+            onComplete={(updatedUser) => setSession({ ...session, user: updatedUser })}
           />
         )}
 

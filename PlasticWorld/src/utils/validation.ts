@@ -78,6 +78,11 @@ export const updateProfileSchema = z.object({
       z.literal('').transform(() => undefined),
     ])
     .optional(),
+  gender: z
+    .enum(['male', 'female', 'non-binary', 'other', 'prefer_not_to_say'], {
+      errorMap: () => ({ message: 'Invalid gender value' }),
+    })
+    .optional(),
 });
 
 // Update Status

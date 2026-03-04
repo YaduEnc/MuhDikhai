@@ -35,3 +35,7 @@ docker-compose.override.yml
 PlasticWorld/dist/
 PlasticWorld/node_modules/
 PlasticWorld/.env
+
+# Uploads
+PlasticWorld/public/uploads/*
+!PlasticWorld/public/uploads/.gitkeep
