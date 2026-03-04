@@ -192,6 +192,65 @@ function MessageBubble({ msg, isSelf }) {
     )
 }
 
+// ─── Profile Modal ───────────────────────────────────────────────────
+function ProfileModal({ partnerId, session, onClose }) {
+    const [profile, setProfile] = useState(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+                const res = await fetch(`${BACKEND_URL}/api/v1/users/${partnerId}`, {
+                    headers: { 'Authorization': `Bearer ${session.accessToken}` }
+                })
+                const json = await res.json()
+                if (json.success) setProfile(json.data.user)
+            } catch (err) {
+                console.error('Failed to fetch profile', err)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchProfile()
+    }, [partnerId, session.accessToken])
+
+    return (
+        <div className="profile-modal-overlay" onClick={onClose}>
+            <div className="profile-modal-card" onClick={e => e.stopPropagation()}>
+                <button className="profile-close-btn" onClick={onClose}>✕</button>
+
+                {loading ? (
+                    <div className="profile-loading">Reading the vibes...</div>
+                ) : profile ? (
+                    <>
+                        <div className="profile-large-avatar">
+                            {profile.profilePictureUrl ? (
+                                <img src={profile.profilePictureUrl} alt={profile.name} />
+                            ) : (
+                                (profile.name || '?')[0].toUpperCase()
+                            )}
+                        </div>
+                        <h3 className="profile-name-full">{profile.name}</h3>
+
+                        <div className="profile-badge-row">
+                            {profile.gender && <span className="profile-badge">{profile.gender}</span>}
+                            {profile.age && <span className="profile-badge">{profile.age} years old</span>}
+                        </div>
+
+                        <span className="profile-label">About</span>
+                        <div className="profile-bio-box">
+                            {profile.bio || "This stranger hasn't written a bio yet."}
+                        </div>
+                    </>
+                ) : (
+                    <div className="profile-error">Couldn't find this stranger.</div>
+                )}
+            </div>
+        </div>
+    )
+}
+
 // ─── Chat shell ───────────────────────────────────────────────────────────────
 export default function Chat({
     session,
@@ -206,6 +265,7 @@ export default function Chat({
     const [input, setInput] = useState('')
     const [showEmoji, setShowEmoji] = useState(false)
     const [showGif, setShowGif] = useState(false)
+    const [showProfile, setShowProfile] = useState(false)
     const messagesEndRef = useRef(null)
     const inputRef = useRef(null)
     const typingTimeoutRef = useRef(null)
@@ -272,7 +332,7 @@ export default function Chat({
         <div className="chat-shell-v2">
             {/* Header */}
             <div className="chat-header-v2">
-                <div className="chat-header-left">
+                <div className="chat-header-left" onClick={() => isMatched && setShowProfile(true)}>
                     <div className="chat-partner-avatar">
                         {room?.partner?.profilePictureUrl ? (
                             <img src={room.partner.profilePictureUrl} alt={room.partner.name} />
@@ -349,6 +409,15 @@ export default function Chat({
                 <div className="picker-overlay">
                     <GifPicker onSelect={handleGifSelect} onClose={() => setShowGif(false)} />
                 </div>
+            )}
+
+            {/* Profile Modal */}
+            {showProfile && room?.partner?.id && (
+                <ProfileModal
+                    partnerId={room.partner.id}
+                    session={session}
+                    onClose={() => setShowProfile(false)}
+                />
             )}
 
             {/* Input bar */}

@@ -455,11 +455,11 @@ class UserService {
   /**
    * Get public user profile (limited fields, no sensitive data)
    */
-  async getPublicUserProfile(userId: string): Promise<Omit<User, 'email' | 'phoneNumber' | 'age' | 'firebaseUid'> | null> {
+  async getPublicUserProfile(userId: string): Promise<Omit<User, 'email' | 'phoneNumber' | 'firebaseUid'> | null> {
     try {
-      const result = await database.query<Omit<User, 'email' | 'phoneNumber' | 'age' | 'firebaseUid'>>(
+      const result = await database.query<Omit<User, 'email' | 'phoneNumber' | 'firebaseUid'>>(
         `SELECT 
-          id, username, name,
+          id, username, name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
           created_at as "createdAt", updated_at as "updatedAt"
