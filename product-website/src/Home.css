@@ -1025,7 +1025,8 @@
 }
 
 .btn-accept,
-.btn-add {
+.btn-add,
+.btn-message {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: white;
@@ -1033,7 +1034,20 @@
   border-radius: 8px;
   font-size: 0.85rem;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
+
+.btn-message:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.friend-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 
 .btn-add {
   width: 32px;

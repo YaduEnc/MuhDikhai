@@ -271,7 +271,8 @@ function SettingsView({ onBack, onSignOut, onDeleteRequest }) {
     )
 }
 
-function FriendsView({ session, onBack }) {
+function FriendsView({ session, onBack, onStartChat }) {
+
     const [friends, setFriends] = useState([])
     const [pendingReceived, setPendingReceived] = useState([])
     const [searchResults, setSearchResults] = useState([])
@@ -410,7 +411,11 @@ function FriendsView({ session, onBack }) {
                                             <span className="friend-status">{f.user.status || 'offline'}</span>
                                         </div>
                                     </div>
-                                    <button className="btn-unfriend" onClick={() => unfriend(f.id)}>Remove</button>
+                                    <div className="friend-actions">
+                                        <button className="btn-message" onClick={() => onStartChat(f.user)}>Message</button>
+                                        <button className="btn-unfriend" onClick={() => unfriend(f.id)}>Remove</button>
+                                    </div>
+
                                 </div>
                             ))}
                         </div>
@@ -472,7 +477,8 @@ function FriendsView({ session, onBack }) {
     )
 }
 
-export default function Home({ session, onlineCount, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar }) {
+export default function Home({ session, onlineCount, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onStartChat }) {
+
     const [view, setView] = useState('home') // 'home' | 'profile' | 'settings' | 'friends'
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [pendingReceived, setPendingReceived] = useState([])
@@ -501,7 +507,11 @@ export default function Home({ session, onlineCount, onStartMatch, onSignOut, on
             <FriendsView
                 session={session}
                 onBack={() => setView('home')}
+                onStartChat={(friend) => {
+                    onStartChat(friend);
+                }}
             />
+
         )
     }
 

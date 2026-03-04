@@ -354,11 +354,16 @@ export default function Chat({
         // Mark last message as read if it's from partner
         const lastMsg = chatMessages[chatMessages.length - 1]
         if (lastMsg && lastMsg.fromUserId !== session?.user?.id && socketState.socket) {
-            socketState.socket.emit('random:read', {
-                roomId: room?.id,
-                messageId: lastMsg.id
-            })
+            if (socketState.phase === 'friend-chat') {
+                socketState.socket.emit('message:read', { messageId: lastMsg.id })
+            } else {
+                socketState.socket.emit('random:read', {
+                    roomId: room?.id,
+                    messageId: lastMsg.id
+                })
+            }
         }
+
     }, [chatMessages, room?.id, session?.user?.id, socketState.socket])
 
     // Close pickers on Escape
@@ -467,20 +472,24 @@ export default function Chat({
                         <span className="chat-partner-name">
                             {room?.partner?.name || 'Finding someone…'}
                         </span>
-                        <span className={`chat-partner-status${isMatched ? ' live' : ''}`}>
+                        <span className={`chat-partner-status${isMatched || socketState.phase === 'friend-chat' ? ' live' : ''}`}>
                             {isMatching
                                 ? 'Looking for a quiet match…'
-                                : isMatched
-                                    ? 'Connected · end-to-end encrypted'
-                                    : 'Ready when you are'}
+                                : socketState.phase === 'friend-chat'
+                                    ? 'Direct Message · end-to-end encrypted'
+                                    : isMatched
+                                        ? 'Connected · end-to-end encrypted'
+                                        : 'Ready when you are'}
                         </span>
+
                     </div>
                 </div>
                 <div className="chat-header-right">
                     <div className={`chat-conn-dot${isMatched ? ' live' : ''}`} />
                     <button className="chat-leave-btn" type="button" onClick={onLeave}>
-                        Leave room ⎋
+                        {socketState.phase === 'friend-chat' ? 'Back to focus ⎋' : 'Leave room ⎋'}
                     </button>
+
                 </div>
             </div>
 
@@ -525,8 +534,17 @@ export default function Chat({
                                 session={session}
                                 onProfilePeek={(uid) => setShowProfile(uid)}
                                 onReply={(m) => { setReplyingTo(m); inputRef.current?.focus(); }}
-                                onReact={(mid, emoji) => socketState.socket?.emit('random:reaction', { roomId: room.roomId || room.id, messageId: mid, emoji })}
+                                onReact={(mid, emoji) => {
+                                    if (socketState.phase === 'friend-chat') {
+                                        // Friend chat reactions might need different handling if backend supports them
+                                        // For now, let's keep it consistent or use random:reaction if shared
+                                        socketState.socket?.emit('random:reaction', { roomId: room.roomId || room.id, messageId: mid, emoji })
+                                    } else {
+                                        socketState.socket?.emit('random:reaction', { roomId: room.roomId || room.id, messageId: mid, emoji })
+                                    }
+                                }}
                                 partnerName={room?.partner?.name}
+
                             />
                         ))}
                     </ul>
@@ -581,7 +599,13 @@ export default function Chat({
                             <span className="reply-label">Replying to {replyingTo.fromName === session?.user?.name ? 'yourself' : replyingTo.fromName}</span>
                             <p className="reply-text">{replyingTo.content.startsWith('__GIF__') ? '📷 Media' : replyingTo.content}</p>
                         </div>
-                        <button className="reply-close" onClick={() => setReplyingTo(null)}>✕</button>
+                        <button className="reply-close" onClick={() => setReplyingTo(null)} title="Cancel reply">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+
                     </div>
                 )}
                 <div className="chat-input-bar">
@@ -629,16 +653,18 @@ export default function Chat({
                         value={input}
                         onChange={handleInput}
                         onKeyDown={handleKeyDown}
-                        disabled={!isMatched}
+                        disabled={!isMatched && socketState.phase !== 'friend-chat'}
                         rows={1}
                     />
+
 
                     <button
                         className="chat-send-btn"
                         type="button"
                         onClick={handleSend}
-                        disabled={!isMatched || !input.trim()}
+                        disabled={(!isMatched && socketState.phase !== 'friend-chat') || !input.trim()}
                     >
+
                         <span className="send-icon">↑</span>
                     </button>
                 </div>

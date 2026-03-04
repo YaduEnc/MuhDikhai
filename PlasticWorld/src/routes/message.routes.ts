@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import messageService from '../services/message.service';
 import { authenticate } from '../middleware/auth.middleware';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { upload } from '../middleware/multer';
@@ -6,6 +7,69 @@ import { trackRoomMedia } from '../config/socket';
 import logger from '../utils/logger';
 
 const router = Router();
+
+/**
+ * GET /api/v1/messages/conversations
+ * Get all conversations for the current user
+ */
+router.get(
+  '/conversations',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const conversations = await messageService.getConversations(userId);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        conversations,
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/messages/:userId
+ * Get conversation history with a specific user
+ */
+router.get(
+  '/:userId',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const currentUserId = req.user!.id;
+    const { userId: otherUserId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const beforeMessageId = req.query.beforeMessageId as string;
+
+    const { messages, total } = await messageService.getConversation(
+      currentUserId,
+      otherUserId,
+      limit,
+      offset,
+      beforeMessageId
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        messages: messages.map(m => ({
+          ...m,
+          encryptedContent: m.encryptedContent ? Buffer.from(m.encryptedContent as any).toString('base64') : undefined,
+          encryptedKey: m.encryptedKey ? Buffer.from(m.encryptedKey as any).toString('base64') : undefined,
+        })),
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total,
+        },
+      },
+    });
+
+
+  })
+);
 
 /**
  * POST /api/v1/messages/upload

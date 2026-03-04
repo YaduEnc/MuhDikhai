@@ -474,8 +474,11 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             sentAt: fullMessage.sentAt,
             replyToMessageId: fullMessage.replyToMessageId,
             sender: fullMessage.sender,
+            encryptedContent: fullMessage.encryptedContent ? fullMessage.encryptedContent.toString('base64') : undefined,
+            encryptedKey: fullMessage.encryptedKey ? fullMessage.encryptedKey.toString('base64') : undefined,
           },
         });
+
 
         // Mark as delivered if recipient is online
         const recipientSockets = activeUsers.get(data.recipientId);

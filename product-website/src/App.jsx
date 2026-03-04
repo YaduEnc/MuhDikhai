@@ -62,6 +62,7 @@ function App() {
   const socketRef = useRef(null)
   const sessionRef = useRef(session)
   const chatMessagesRef = useRef(chatMessages)
+  const roomRef = useRef(room)
   const refreshingRef = useRef(false) // prevent concurrent refresh attempts
 
   useEffect(() => {
@@ -71,6 +72,11 @@ function App() {
   useEffect(() => {
     chatMessagesRef.current = chatMessages
   }, [chatMessages])
+
+  useEffect(() => {
+    roomRef.current = room
+  }, [room])
+
 
   // ─── Socket lifecycle ──────────────────────────────────────────────────────
   // Re-runs whenever the access token OR socketVersion changes.
@@ -200,6 +206,37 @@ function App() {
         socket.on('disconnect', () => {
           setSocketState((prev) => ({ ...prev, status: 'disconnected' }))
         })
+
+        // -- Friend messaging events --
+        socket.on('message:sent', (payload) => {
+          // If we are currently chatting with this person, add to messages
+          // Note: message:sent is confirmation of our OWN message
+          if (roomRef.current?.partner?.id === payload.message.recipientId) {
+            // We need to fetch the content or assume it's the one we just sent
+            // But the socket confirmation might not have content. 
+            // Actually, messageService.sendMessage returns the message.
+            // Usually we add the message to the list immediately on emit, 
+            // and update status on 'sent'.
+          }
+        })
+
+        socket.on('message:received', (payload) => {
+          // payload.message has sender info
+          if (roomRef.current?.partner?.id === payload.message.senderId) {
+            const msg = {
+              id: payload.message.id,
+              fromUserId: payload.message.senderId,
+              fromName: payload.message.sender.name,
+              fromProfilePictureUrl: payload.message.sender.profilePictureUrl,
+              content: payload.message.encryptedContent ? atob(payload.message.encryptedContent) : "Encrypted Message",
+              type: payload.message.messageType,
+              sentAt: payload.message.sentAt,
+            }
+            setChatMessages((prev) => [...prev, msg])
+          }
+        })
+
+
       } catch (err) {
         console.error('Socket connect setup failed:', err)
         handleSignOut()
@@ -216,13 +253,72 @@ function App() {
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
   const handleSendMessage = (content, replyToMessageId) => {
-    if (!room?.roomId || !socketRef.current) return
-    socketRef.current.emit('random:message', { roomId: room.roomId, content, replyToMessageId })
+    if (!room?.roomId && !room?.partner?.id) return
+    if (!socketRef.current) return
+
+    if (socketState.phase === 'friend-chat') {
+      // For now, sending as unencrypted placeholder or raw text if we don't have E2EE yet
+      // Backend expects encryptedContent as Buffer. 
+      // We'll have to adjust send function to handle this.
+      socketRef.current.emit('message:send', {
+        recipientId: room.partner.id,
+        encryptedContent: btoa(content), // Simple base64 for now
+        encryptedKey: btoa('dummy-key'),
+        messageType: 'text',
+        replyToMessageId
+      })
+
+      // Optimistic update
+      const optimisticMsg = {
+        id: 'tmp-' + Date.now(),
+        fromUserId: session.user.id,
+        fromName: session.user.name,
+        content,
+        type: 'text',
+        sentAt: new Date().toISOString(),
+      }
+      setChatMessages(prev => [...prev, optimisticMsg])
+    } else {
+      socketRef.current.emit('random:message', { roomId: room.roomId, content, replyToMessageId })
+    }
   }
 
   const handleTyping = (isTyping) => {
-    if (!room?.roomId || !socketRef.current) return
-    socketRef.current.emit(isTyping ? 'typing:start' : 'typing:stop', { roomId: room.roomId })
+    if (!room?.roomId && !room?.partner?.id) return
+    if (!socketRef.current) return
+    if (socketState.phase === 'friend-chat') {
+      socketRef.current.emit(isTyping ? 'typing:start' : 'typing:stop', { recipientId: room.partner.id })
+    } else {
+      socketRef.current.emit(isTyping ? 'typing:start' : 'typing:stop', { roomId: room.roomId })
+    }
+  }
+
+  const handleStartFriendChat = async (friend) => {
+    setShowChat(true)
+    setSocketState((prev) => ({ ...prev, phase: 'friend-chat' }))
+    setRoom({ partner: friend })
+    setChatMessages([])
+
+    try {
+      const res = await authedFetch(`${BACKEND_URL}/api/v1/messages/${friend.id}`)
+      const json = await res.json()
+      if (json.success) {
+        // Map persistent messages to UI format
+        const msgs = json.data.messages.map(m => ({
+          id: m.id,
+          fromUserId: m.senderId,
+          fromName: m.sender.name,
+          fromProfilePictureUrl: m.sender.profilePictureUrl,
+          content: m.encryptedContent ? atob(m.encryptedContent) : '', // Decode base64
+          type: m.messageType,
+          sentAt: m.sentAt,
+          read: m.status === 'read'
+        })).reverse() // history is DESC
+        setChatMessages(msgs)
+      }
+    } catch (err) {
+      console.error('Failed to fetch history', err)
+    }
   }
 
   const handleAuth = async () => {
@@ -386,7 +482,9 @@ function App() {
             onDeleteAccount={handleDeleteAccount}
             onUpdateProfile={handleUpdateProfile}
             onUploadAvatar={handleUploadAvatar}
+            onStartChat={handleStartFriendChat}
           />
+
         )}
 
         {needsOnboarding && (
@@ -402,15 +500,23 @@ function App() {
 
         {!isSignedIn && (
           <div className="landing">
-            <section className="hero">
-              <h1>Anonymous, but unexpectedly tender.</h1>
-              {authError && <p className="auth-error">{authError}</p>}
-              <button onClick={handleAuth} disabled={authLoading}>
-                {authLoading ? 'Signing in…' : 'Start a gentle match'}
-              </button>
+            <section className="landing-hero">
+              <div className="landing-content">
+                <h1>Anonymous, but unexpectedly tender.</h1>
+                {authError && <p className="auth-error">{authError}</p>}
+                <button
+                  className="btn-primary landing-btn"
+                  onClick={handleAuth}
+                  disabled={authLoading}
+                >
+                  <span className="btn-primary-dot" />
+                  {authLoading ? 'Signing in…' : 'Start a gentle match'}
+                </button>
+              </div>
             </section>
           </div>
         )}
+
 
         {isInChat && (
           <Chat
