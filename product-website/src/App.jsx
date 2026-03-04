@@ -220,15 +220,20 @@ function App() {
           }
         })
 
+        const safeDecode = (str) => {
+          if (!str) return "";
+          try {
+            // If it's base64, decode it
+            return atob(str);
+          } catch (e) {
+            // If it's not base64 or fails, return as is
+            return str;
+          }
+        };
+
         socket.on('message:received', (payload) => {
-          // payload.message has sender info
           if (roomRef.current?.partner?.id === payload.message.senderId) {
-            let content = "Encrypted Message";
-            try {
-              content = payload.message.encryptedContent ? atob(payload.message.encryptedContent) : "";
-            } catch (e) {
-              console.error("Failed to decode message", e);
-            }
+            const content = safeDecode(payload.message.encryptedContent);
             const msg = {
               id: payload.message.id,
               fromUserId: payload.message.senderId,
@@ -241,6 +246,8 @@ function App() {
             setChatMessages((prev) => [...prev, msg])
           }
         })
+
+
 
 
 
@@ -269,11 +276,13 @@ function App() {
       // We'll have to adjust send function to handle this.
       socketRef.current.emit('message:send', {
         recipientId: room.partner.id,
-        encryptedContent: btoa(content), // Simple base64 for now
+        // btoa doesn't like UTF-8, use this trick
+        encryptedContent: btoa(unescape(encodeURIComponent(content))),
         encryptedKey: btoa('dummy-key'),
         messageType: 'text',
         replyToMessageId
       })
+
 
       // Optimistic update
       const optimisticMsg = {
@@ -312,12 +321,7 @@ function App() {
       if (json.success) {
         // Map persistent messages to UI format
         const msgs = json.data.messages.map(m => {
-          let content = "";
-          try {
-            content = m.encryptedContent ? atob(m.encryptedContent) : "";
-          } catch (e) {
-            console.error("History decode failed", e);
-          }
+          const content = safeDecode(m.encryptedContent);
           return {
             id: m.id,
             fromUserId: m.senderId,
@@ -329,6 +333,8 @@ function App() {
             read: m.status === 'read'
           }
         }).reverse() // history is DESC
+
+
         setChatMessages(msgs)
 
       }
