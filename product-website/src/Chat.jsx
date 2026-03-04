@@ -281,10 +281,13 @@ export default function Chat({
     const inputRef = useRef(null)
     const typingTimeoutRef = useRef(null)
 
-    // Auto-scroll to latest message & Emit read receipt
+    // Auto-scroll to latest message
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, [chatMessages])
 
+    // Emit read receipt
+    useEffect(() => {
         // Mark last message as read if it's from partner
         const lastMsg = chatMessages[chatMessages.length - 1]
         if (lastMsg && lastMsg.fromUserId !== session?.user?.id && socketState.socket) {
@@ -293,7 +296,7 @@ export default function Chat({
                 messageId: lastMsg.id
             })
         }
-    }, [chatMessages, partnerTyping, room?.id, session?.user?.id, socketState.socket])
+    }, [chatMessages, room?.id, session?.user?.id, socketState.socket])
 
     // Close pickers on Escape
     useEffect(() => {
