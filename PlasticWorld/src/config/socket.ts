@@ -112,6 +112,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         'http://localhost:5173',
         'https://yaduraj.me',
         'https://muhdikhai.yaduraj.me',
+        'https://batchit.yaduraj.me',
       ],
       credentials: true,
       methods: ['GET', 'POST'],

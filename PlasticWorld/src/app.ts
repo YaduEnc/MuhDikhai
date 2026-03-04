@@ -31,6 +31,7 @@ const getCorsOrigins = () => {
     'http://localhost:5173', // Vite dev server
     'https://yaduraj.me',
     'https://muhdikhai.yaduraj.me',
+    'https://batchit.yaduraj.me',
   ];
 
   // In production, merge CORS_ORIGIN with default localhost origins
