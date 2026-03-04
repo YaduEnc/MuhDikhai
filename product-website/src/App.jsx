@@ -182,15 +182,23 @@ function App() {
         })
 
         socket.on('random:message', (msg) => {
-          let processedMsg = { ...msg, reactions: [] }
-          if (msg.replyToMessageId) {
-            const parent = chatMessagesRef.current.find((m) => m.id === msg.replyToMessageId)
-            if (parent) {
-              processedMsg.replyTo = { fromName: parent.fromName, content: parent.content }
+          console.log("Random message received:", msg);
+          // Decouple from refs for real-time reliable updates
+          setChatMessages((prev) => {
+            let processedMsg = { ...msg, reactions: [] }
+            // If the content looks like it might be encoded (placeholder for when random chat also uses encryption)
+            processedMsg.content = safeDecode(msg.content);
+
+            if (msg.replyToMessageId) {
+              const parent = prev.find((m) => m.id === msg.replyToMessageId)
+              if (parent) {
+                processedMsg.replyTo = { fromName: parent.fromName, content: parent.content }
+              }
             }
-          }
-          setChatMessages((prev) => [...prev, processedMsg])
+            return [...prev, processedMsg];
+          })
         })
+
 
         socket.on('random:reaction', (data) => {
           setChatMessages((prev) =>
@@ -242,20 +250,26 @@ function App() {
 
 
         socket.on('message:received', (payload) => {
-          if (roomRef.current?.partner?.id === payload.message.senderId) {
-            const content = safeDecode(payload.message.encryptedContent);
-            const msg = {
-              id: payload.message.id,
-              fromUserId: payload.message.senderId,
-              fromName: payload.message.sender.name,
-              fromProfilePictureUrl: payload.message.sender.profilePictureUrl,
-              content,
-              type: payload.message.messageType,
-              sentAt: payload.message.sentAt,
+          console.log("Friend message received:", payload);
+          // Always use functional update to avoid stale closure issues
+          setChatMessages((prev) => {
+            if (roomRef.current?.partner?.id === payload.message.senderId) {
+              const content = safeDecode(payload.message.encryptedContent);
+              const msg = {
+                id: payload.message.id,
+                fromUserId: payload.message.senderId,
+                fromName: payload.message.sender.name,
+                fromProfilePictureUrl: payload.message.sender.profilePictureUrl,
+                content,
+                type: payload.message.messageType,
+                sentAt: payload.message.sentAt,
+              }
+              return [...prev, msg]
             }
-            setChatMessages((prev) => [...prev, msg])
-          }
+            return prev;
+          })
         })
+
 
 
 
