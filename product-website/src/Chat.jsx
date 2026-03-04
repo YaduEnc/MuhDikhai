@@ -29,7 +29,7 @@ const EMOJI_CATEGORIES = [
     },
 ]
 
-const GIPHY_KEY = 'dc6zaTOxFJmzC' // public beta key
+const GIPHY_KEY = import.meta.env.VITE_GIPHY_API_KEY || 'dc6zaTOxFJmzC'
 
 // ─── Typing dots animation ────────────────────────────────────────────────────
 function TypingDots({ name }) {
@@ -143,6 +143,9 @@ function EmojiPicker({ onSelect, onClose }) {
                         {e}
                     </button>
                 ))}
+            </div>
+            <div className="gif-attribution">
+                Powered by GIPHY
             </div>
         </div>
     )
