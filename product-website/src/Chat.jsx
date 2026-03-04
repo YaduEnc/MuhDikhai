@@ -277,13 +277,15 @@ export default function Chat({
     const [showProfile, setShowProfile] = useState(null) // null or userId
     const [uploading, setUploading] = useState(false)
     const fileInputRef = useRef(null)
-    const messagesEndRef = useRef(null)
+    const messagesAreaRef = useRef(null)
     const inputRef = useRef(null)
     const typingTimeoutRef = useRef(null)
 
     // Auto-scroll to latest message
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        if (messagesAreaRef.current) {
+            messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight
+        }
     }, [chatMessages])
 
     // Emit read receipt
@@ -420,7 +422,7 @@ export default function Chat({
             </div>
 
             {/* Messages area */}
-            <div className="chat-messages-area">
+            <div className="chat-messages-area" ref={messagesAreaRef}>
                 {isMatching && (
                     <div className="chat-waiting">
                         <div className="chat-waiting-glow" />
@@ -479,12 +481,9 @@ export default function Chat({
                     </div>
                 )}
 
-                {/* Typing indicator */}
                 {partnerTyping && room?.partner?.name && (
                     <TypingDots name={room.partner.name} />
                 )}
-
-                <div ref={messagesEndRef} />
             </div>
 
             {/* Pickers (emoji / gif) */}
