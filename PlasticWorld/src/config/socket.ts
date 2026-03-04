@@ -142,8 +142,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     // Join user's personal room
     socket.join(`user:${userId}`);
 
-    // Notify friends that user is online
+    // Notify everyone that user is online and total count
     io.emit('user:online', { userId, name });
+    io.emit('presence:count', { count: activeUsers.size });
 
     /**
      * Random chat: join the gentle queue
@@ -230,6 +231,12 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             userA: userId,
             userB: candidateId,
           });
+
+          // Increment rooms_entered for both users
+          await Promise.all([
+            userService.incrementRoomsEntered(userId),
+            userService.incrementRoomsEntered(candidateId),
+          ]);
 
           return;
         }
@@ -586,6 +593,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             activeUsers.delete(userId);
             await userService.updateStatus(userId, 'offline');
             io.emit('user:offline', { userId, name });
+            io.emit('presence:count', { count: activeUsers.size });
           }
         }
 

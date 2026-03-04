@@ -24,7 +24,7 @@ function ProfileView({ session, onBack }) {
                 </div>
                 <div className="profile-stats">
                     <div className="profile-stat">
-                        <span className="profile-stat-value">0</span>
+                        <span className="profile-stat-value">{session?.user?.roomsEntered || 0}</span>
                         <span className="profile-stat-label">Rooms entered</span>
                     </div>
                     <div className="profile-stat">
@@ -120,7 +120,7 @@ function SettingsView({ onBack, onSignOut }) {
     )
 }
 
-export default function Home({ session, onStartMatch, onSignOut }) {
+export default function Home({ session, onlineCount, onStartMatch, onSignOut }) {
     const [view, setView] = useState('home') // 'home' | 'profile' | 'settings'
 
     const hour = new Date().getHours()
@@ -149,7 +149,10 @@ export default function Home({ session, onStartMatch, onSignOut }) {
                     {greeting}, <span>{name}.</span>
                 </h1>
                 <p className="home-greeting-sub">
-                    One stranger is waiting to be found. Or take your time — there&apos;s no rush here.
+                    {onlineCount > 1
+                        ? `${onlineCount - 1} stranger${onlineCount === 2 ? '' : 's'} waiting to be found. Or take your time — there's no rush here.`
+                        : "The rooms are quiet right now. You're the first one here — take a moment for yourself."
+                    }
                 </p>
             </div>
 
@@ -216,8 +219,8 @@ export default function Home({ session, onStartMatch, onSignOut }) {
                             <span>E2E encryption active</span>
                         </div>
                         <div className="home-status-row">
-                            <span className="home-status-dot amber" />
-                            <span>Pool growing quietly</span>
+                            <span className="home-status-dot green" />
+                            <span>{onlineCount} {onlineCount === 1 ? 'soul' : 'souls'} online now</span>
                         </div>
                     </div>
                 </div>

@@ -14,6 +14,7 @@ export interface User {
   status: 'online' | 'offline' | 'away';
   gender?: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
   lastSeen: Date;
+  roomsEntered: number;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -25,6 +26,7 @@ export interface CreateUserData {
   name: string;
   profilePictureUrl?: string;
   gender?: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
+  roomsEntered?: number;
 }
 
 export interface UpdateUserData {
@@ -36,6 +38,7 @@ export interface UpdateUserData {
   bio?: string | null;
   status?: 'online' | 'offline' | 'away';
   gender?: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
+  roomsEntered?: number;
 }
 
 class UserService {
@@ -114,15 +117,16 @@ class UserService {
 
       const result = await database.query<User>(
         `INSERT INTO users (
-          firebase_uid, username, email, name, age, profile_picture_url, gender, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          firebase_uid, username, email, name, age, profile_picture_url, gender, status, rooms_entered
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING 
           id, firebase_uid as "firebaseUid", username, email,
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt"`,
-        [data.firebaseUid, username, data.email, data.name, defaultAge, data.profilePictureUrl || null, data.gender || 'prefer_not_to_say', 'offline']
+          created_at as "createdAt", updated_at as "updatedAt",
+          rooms_entered as "roomsEntered"`,
+        [data.firebaseUid, username, data.email, data.name, defaultAge, data.profilePictureUrl || null, data.gender || 'prefer_not_to_say', 'offline', data.roomsEntered || 0]
       );
 
       const user = result.rows[0];
@@ -550,7 +554,8 @@ class UserService {
           id, username, name,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt"
+          created_at as "createdAt", updated_at as "updatedAt",
+          rooms_entered as "roomsEntered"
         FROM users
         WHERE ${whereClause}
         ORDER BY 
@@ -635,6 +640,20 @@ class UserService {
         userId,
       });
       throw error;
+    }
+  }
+
+  /**
+   * Increment rooms_entered count for a user
+   */
+  async incrementRoomsEntered(userId: string): Promise<void> {
+    try {
+      await database.query(
+        'UPDATE users SET rooms_entered = rooms_entered + 1 WHERE id = $1',
+        [userId]
+      );
+    } catch (error) {
+      logger.error('Failed to increment rooms_entered', { error, userId });
     }
   }
 }

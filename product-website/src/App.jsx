@@ -20,6 +20,7 @@ function App() {
   const [room, setRoom] = useState(null)
   const [chatMessages, setChatMessages] = useState([])
   const [partnerTyping, setPartnerTyping] = useState(false)
+  const [onlineCount, setOnlineCount] = useState(1)
   const socketRef = useRef(null)
 
   useEffect(() => {
@@ -30,7 +31,11 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!showChat || !session?.accessToken) {
+    if (!session?.accessToken) {
+      if (socketRef.current) {
+        socketRef.current.disconnect()
+        socketRef.current = null
+      }
       return
     }
 
@@ -39,11 +44,12 @@ function App() {
       auth: { token: session.accessToken },
     })
 
-    setSocketState({ status: 'connecting', phase: 'matching' })
-    socket.emit('random:join')
-
     socket.on('connect', () => {
-      setSocketState({ status: 'connected', phase: 'matching' })
+      setSocketState((prev) => ({ ...prev, status: 'connected' }))
+    })
+
+    socket.on('presence:count', (payload) => {
+      setOnlineCount(payload.count)
     })
 
     socket.on('random:waiting', () => {
@@ -85,11 +91,18 @@ function App() {
     socketRef.current = socket
 
     return () => {
-      socket.emit('random:leave')
       socket.disconnect()
       socketRef.current = null
     }
-  }, [showChat, session?.accessToken])
+  }, [session?.accessToken])
+
+  // Handle room joining separately
+  useEffect(() => {
+    if (showChat && socketRef.current) {
+      setSocketState({ status: 'connected', phase: 'matching' })
+      socketRef.current.emit('random:join')
+    }
+  }, [showChat])
 
   const handleSendMessage = (content) => {
     if (!room?.roomId || !socketRef.current) return
@@ -183,6 +196,7 @@ function App() {
         {isHome && (
           <Home
             session={session}
+            onlineCount={onlineCount}
             onStartMatch={() => setShowChat(true)}
             onSignOut={handleSignOut}
           />
