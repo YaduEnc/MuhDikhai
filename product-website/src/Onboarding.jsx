@@ -62,7 +62,7 @@ export default function Onboarding({ session, onComplete }) {
 
             const result = await response.json()
             setProfile({ ...profile, customAvatarUrl: result.data.url, avatar: 'custom' })
-        } catch (err) {
+        } catch {
             setError('Could not upload image. Try a smaller file.')
         } finally {
             setUploading(false)
@@ -109,7 +109,7 @@ export default function Onboarding({ session, onComplete }) {
             const result = await response.json()
             onComplete(result.data.user)
         } catch (err) {
-            setError(err.message)
+            setError(err?.message || 'Could not save profile. Please try again.')
         } finally {
             setLoading(false)
         }

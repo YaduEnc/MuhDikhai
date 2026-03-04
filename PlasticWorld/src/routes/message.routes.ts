@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { upload } from '../middleware/multer';
+import { trackRoomMedia } from '../config/socket';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -23,10 +24,17 @@ router.post(
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const mediaUrl = `${baseUrl}/uploads/${req.file.filename}`;
 
+    // Track media for ephemeral room cleanup if roomId is provided
+    const roomId = req.body.roomId;
+    if (roomId) {
+      trackRoomMedia(roomId, req.file.filename);
+    }
+
     logger.info('Chat media uploaded', {
       userId: req.user!.id,
       filename: req.file.filename,
       size: req.file.size,
+      roomId,
     });
 
     res.status(200).json({

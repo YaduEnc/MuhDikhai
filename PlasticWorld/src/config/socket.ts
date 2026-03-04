@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
@@ -39,6 +41,46 @@ const userToRandomRoom = new Map<string, string>();
 
 // Map roomId -> room metadata
 const randomRooms = new Map<string, RandomRoom>();
+
+// Ephemeral media tracking (roomId -> Set of filenames)
+const roomMedia = new Map<string, Set<string>>();
+
+/**
+ * Track a file uploaded to a specific room
+ */
+export function trackRoomMedia(roomId: string, filename: string) {
+  if (!roomMedia.has(roomId)) {
+    roomMedia.set(roomId, new Set());
+  }
+  roomMedia.get(roomId)!.add(filename);
+}
+
+/**
+ * Clean up all media files for a room
+ */
+async function cleanupRoomMedia(roomId: string) {
+  try {
+    const files = roomMedia.get(roomId);
+    if (!files || files.size === 0) return;
+
+    logger.info(`Cleaning up ephemeral media for room ${roomId}`, { count: files.size });
+
+    const uploadsDir = path.join(__dirname, '../../public/uploads');
+
+    for (const filename of files) {
+      const filePath = path.join(uploadsDir, filename);
+      if (fs.existsSync(filePath)) {
+        await fs.promises.unlink(filePath);
+      }
+    }
+
+    roomMedia.delete(roomId);
+  } catch (error) {
+    logger.error(`Failed to cleanup room media for ${roomId}`, {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
 
 /**
  * Socket authentication middleware
@@ -281,8 +323,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           fromUserId: userId,
           fromName: name,
           content: trimmed,
-          type: trimmed.startsWith('http') && (trimmed.match(/\.(jpeg|jpg|gif|png)$/) || trimmed.includes('giphy.com')) ? 'image' : 'text',
+          type: trimmed.startsWith('http') && (trimmed.match(/\.(jpeg|jpg|gif|png|webp)$/) || trimmed.includes('giphy.com')) ? 'image' : 'text',
           sentAt: new Date().toISOString(),
+          replyToMessageId: (data as any).replyToMessageId, // Support replies
         });
       } catch (error) {
         logger.error('Failed to relay random chat message', {
@@ -293,23 +336,23 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     });
 
     /**
-     * Random chat: mark message as read
+     * Random chat: handle message reaction
      */
-    socket.on('random:read', (data: { roomId: string; messageId: string }) => {
+    socket.on('random:reaction', (data: { roomId: string; messageId: string; emoji: string }) => {
       try {
         const currentRoomId = userToRandomRoom.get(userId);
         if (!currentRoomId || currentRoomId !== data.roomId) {
           return;
         }
 
-        // Notify the partner in the room
-        socket.to(currentRoomId).emit('random:read', {
+        io.to(currentRoomId).emit('random:reaction', {
           roomId: currentRoomId,
           messageId: data.messageId,
-          readBy: userId,
+          userId,
+          emoji: data.emoji,
         });
       } catch (error) {
-        logger.error('Failed to relay random chat read receipt', {
+        logger.error('Failed to relay random chat reaction', {
           error: error instanceof Error ? error.message : 'Unknown error',
           userId,
         });
@@ -357,6 +400,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
               if (s) s.leave(roomId);
             }
           }
+
+          // Trigger ephemeral media cleanup
+          cleanupRoomMedia(roomId);
         }
 
         socket.leave(roomId);
@@ -612,6 +658,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
                 if (s) s.leave(roomId);
               }
             }
+
+            // Trigger ephemeral media cleanup
+            cleanupRoomMedia(roomId);
           }
         }
 

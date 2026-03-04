@@ -1,34 +1,7 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import './Chat.css'
 
-// ─── Emoji data ──────────────────────────────────────────────────────────────
-const EMOJI_CATEGORIES = [
-    {
-        label: '😊 Smileys',
-        emojis: ['😀', '😁', '😂', '🤣', '😃', '😄', '😅', '😆', '😉', '😊', '😋', '😎', '😍', '🥰', '😘', '😗', '😙', '😚', '🙂', '🤗', '🤩', '🤔', '🤨', '😐', '😑', '😶', '🙄', '😏', '😣', '😥', '😮', '🤐', '😯', '😪', '😫', '🥱', '😴', '😌', '😛', '😜', '😝', '🤤', '😒', '😓', '😔', '😕', '🙃', '🤑', '😲', '☹️', '🙁', '😖', '😞', '😟', '😤', '😢', '😭', '😦', '😧', '😨', '😩', '🤯', '😬', '😰', '😱', '🥵', '🥶', '😳', '🤪', '😵', '🥴', '😠', '😡', '🤬', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥳', '🥸', '🤠', '🤡', '🤥', '🤫', '🤭', '🧐', '🤓'],
-    },
-    {
-        label: '👋 Gestures',
-        emojis: ['👋', '🤚', '🖐', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦵', '🦶', '👂', '🦻', '👃', '👀', '👁', '👄', '🫦', '👅', '🦷', '👣'],
-    },
-    {
-        label: '❤️ Hearts',
-        emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️', '☯️', '🔥', '💥', '✨', '⭐', '🌟', '💫', '⚡', '🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '💎'],
-    },
-    {
-        label: '🐶 Animals',
-        emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🙈', '🙉', '🙊', '🐔', '🐧', '🐦', '🐤', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🪱', '🐛', '🦋', '🐌', '🐞', '🐜', '🦟', '🦗', '🕷', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🦣', '🐘', '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🦬', '🐃', '🐄', '🐎', '🐖', '🐏', '🐑', '🦙', '🐐', '🦌', '🐕', '🐩', '🦮', '🐕‍🦺', '🐈', '🐈‍⬛', '🐓', '🦃', '🦤', '🦚', '🦜', '🦢', '🦩', '🕊', '🐇', '🦝', '🦨', '🦡', '🦫', '🦦', '🦥', '🐁', '🐀', '🐿', '🦔'],
-    },
-    {
-        label: '🍕 Food',
-        emojis: ['🍕', '🍔', '🍟', '🌭', '🍿', '🧂', '🥓', '🥚', '🍳', '🧇', '🥞', '🧈', '🍞', '🥐', '🥖', '🫓', '🥨', '🥯', '🧀', '🥗', '🥙', '🥪', '🌮', '🌯', '🫔', '🥫', '🍱', '🍘', '🍙', '🍚', '🍛', '🍜', '🍝', '🍠', '🍢', '🍣', '🍤', '🍥', '🥮', '🍡', '🥟', '🥠', '🥡', '🦪', '🍦', '🍧', '🍨', '🍩', '🍪', '🎂', '🍰', '🧁', '🥧', '🍫', '🍬', '🍭', '🍮', '🍯', '☕', '🫖', '🍵', '🧃', '🥤', '🧋', '🍶', '🍾', '🍷', '🍸', '🍹', '🍺', '🍻', '🥂', '🥃', '🫗'],
-    },
-    {
-        label: '⚽ Sports',
-        emojis: ['⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🥊', '🎯', '🏹', '🎣', '🤿', '🎽', '🛹', '🛷', '⛸', '🥅', '⛳', '🎿', '🛷', '🏋️', '🤼', '🤸', '🏊', '🚵', '🧘', '🪂', '🏇'],
-    },
-]
-
+// ─── Constants ──────────────────────────────────────────────────────────────
 const GIPHY_KEY = import.meta.env.VITE_GIPHY_API_KEY || 'dc6zaTOxFJmzC'
 
 // ─── Typing dots animation ────────────────────────────────────────────────────
@@ -110,6 +83,14 @@ const GifPicker = memo(function GifPicker({ onSelect, onClose }) {
 })
 
 // ─── Emoji Picker ─────────────────────────────────────────────────────────────
+const EMOJI_CATEGORIES = [
+    { label: 'Smileys', emojis: ['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖'] },
+    { label: 'Gestures', emojis: ['👋', '🤚', '🖐', '✋', '🖖', '👌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦵', '🦿', '🦶', '👂', '🦻', '👃', '🧠', '🦷', '🦴', '👀', '👁', '👅', '👄', '💋', '🩸'] },
+    { label: 'Hearts', emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟'] },
+    { label: 'Nature', emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜', '🦟', '🦗', '🕷', '🕸', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🐃', '🐂', '🐄', '🐎', '🐖', '🐏', '🐑', '🐐', '🦌', '🐕', '🐩', '🦮', '🐕‍🦺', '🐈', '🐓', '🦃', '🦚', '🦜', '🦢', '🦩', '🕊', '🐇', '🦝', '🦨', '🦡', '🦦', '🦥', '🐁', '🐀', '🐿', '🦔', '🐾', '🐉', '🐲', '🌵', '🎄', '🌲', '🌳', '🌴', '🌱', '🌿', '☘️', '🍀', '🎍', '🎋', '🍃', '🍂', '🍁', '🍄', '🐚', '🌾', '💐', '🌷', '🌹', '🥀', '🌺', '🌸', '🌼', '🌻', '🌞', '🌝', '🌛', '🌜', '🌚', '🌕', '🌖', '🌗', '🌘', '🌑', '🌒', '🌓', '🌔', '🌙', '🌎', '🌍', '🌏', '🪐', '💫', '⭐️', '🌟', '✨', '⚡️', '☄️', '💥', '🔥', '🌪', '🌈', '☀️', '🌤', '⛅️', '🌥', '☁️', '🌦', '🌧', '⛈', '🌩', '🌨', '❄️', '☃️', '⛄️', '🌬', '💨', '💧', '💦', '☔️', '☂️', '🌊', '🌫'] },
+    { label: 'Food', emojis: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', 'トマト', '茄子', 'アボカド', 'ブロッコリー', '🥬', '胡瓜', '玉蜀黍', '人参', '大蒜', ' onion', '🍄', 'ピーナッツ', '栗', 'パン', 'クロワッサン', 'バゲット', 'プレッツェル', 'ベーグル', 'パンケーキ', 'ワッフル', 'チーズ', '肉', '骨付き肉', 'ステーキ', 'ベーコン', 'ハンバーガー', 'フライドポテト', 'ピザ', 'ホットドッグ', 'サンドイッチ', 'タコス', 'ブリトー', 'ケバブ', 'ファラフェル', '目玉焼き', '鍋', 'シチュー', '器', 'サラダ', 'ポップコーン', 'バター', '塩', '缶詰', '弁当', '煎餅', 'おにぎり', 'ご飯', 'カレー', 'ラーメン', 'パスタ', '薩摩芋', 'おでん', '寿司', '天ぷら', 'なると', '牡蠣', 'ソフトクリーム', 'かき氷', 'アイスクリーム', 'ドーナツ', 'クッキー', 'バースデーケーキ', 'ショートケーキ', 'カップケーキ', 'パイ', 'チョコレート', '飴', 'ペロペロキャンディ', 'プリン', '蜂蜜', '哺乳瓶', 'ミルク', 'コーヒー', 'お茶', 'マテ茶', 'ジュース', 'コップ', '酒', 'ビール', '乾杯', 'ワイン', 'カクテル', 'マテ茶', 'シャンパン', '氷', 'スプーン', 'フォーク', 'ナイフ', 'ボウル', 'テイクアウト', '箸', '塩'] }
+]
+
 const EmojiPicker = memo(function EmojiPicker({ onSelect, onClose }) {
     const [activeTab, setActiveTab] = useState(0)
 
@@ -151,15 +132,43 @@ const EmojiPicker = memo(function EmojiPicker({ onSelect, onClose }) {
     )
 })
 
+// ─── Reaction Picker ─────────────────────────────────────────────────────────
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '🎉']
+
+const ReactionPicker = memo(function ReactionPicker({ onSelect, onClose }) {
+    return (
+        <div className="reaction-picker">
+            {REACTION_EMOJIS.map((emoji) => (
+                <button
+                    key={emoji}
+                    className="reaction-option"
+                    type="button"
+                    onClick={() => { onSelect(emoji); onClose(); }}
+                >
+                    {emoji}
+                </button>
+            ))}
+        </div>
+    )
+})
+
 // ─── Single message bubble ────────────────────────────────────────────────────
-const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProfilePeek }) {
+const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProfilePeek, onReply, onReact }) {
     const isGif = msg.content?.startsWith('__GIF__') || msg.type === 'image'
     const isSelfSent = msg.fromUserId === session?.user?.id
     const gifUrl = msg.content?.startsWith('__GIF__') ? msg.content.replace('__GIF__', '') : (msg.type === 'image' ? msg.content : null)
+    const [showReactions, setShowReactions] = useState(false)
+
     const time = new Date(msg.sentAt).toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
     })
+
+    // Group reactions by emoji
+    const reactionCounts = (msg.reactions || []).reduce((acc, r) => {
+        acc[r.emoji] = (acc[r.emoji] || 0) + 1
+        return acc
+    }, {})
 
     return (
         <li className={`msg-row${isSelf ? ' msg-row--self' : ''}`}>
@@ -178,13 +187,61 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
             )}
             <div className="msg-content">
                 {!isSelf && <span className="msg-sender">{msg.fromName || 'Stranger'}</span>}
-                <div className={`msg-bubble${isSelf ? ' msg-bubble--self' : ''}${msg.type === 'image' ? ' msg-bubble--image' : ''}`}>
+
+                {/* Quoted Reply */}
+                {msg.replyTo && (
+                    <div className="msg-quote">
+                        <span className="quote-sender">{msg.replyTo.fromName === session?.user?.name ? 'You' : msg.replyTo.fromName}</span>
+                        <p className="quote-text">{msg.replyTo.content.startsWith('__GIF__') ? '📷 Media' : msg.replyTo.content}</p>
+                    </div>
+                )}
+
+                <div
+                    className={`msg-bubble${isSelf ? ' msg-bubble--self' : ''}${msg.type === 'image' ? ' msg-bubble--image' : ''}`}
+                    onContextMenu={(e) => { e.preventDefault(); setShowReactions(!showReactions); }}
+                >
                     {isGif ? (
                         <img className="msg-gif" src={gifUrl} alt="Shared media" />
                     ) : (
                         <span>{msg.content}</span>
                     )}
+
+                    {/* Reaction Overlay */}
+                    {showReactions && (
+                        <ReactionPicker
+                            onSelect={(emoji) => onReact(msg.id, emoji)}
+                            onClose={() => setShowReactions(false)}
+                        />
+                    )}
+
+                    {/* Quick Actions (Reply) */}
+                    <button
+                        className="msg-action-btn reply"
+                        onClick={() => onReply(msg)}
+                        title="Reply"
+                    >
+                        ↩
+                    </button>
+                    <button
+                        className="msg-action-btn react"
+                        onClick={() => setShowReactions(!showReactions)}
+                        title="React"
+                    >
+                        ☺
+                    </button>
                 </div>
+
+                {/* Rendered Reactions */}
+                {Object.keys(reactionCounts).length > 0 && (
+                    <div className={`msg-reactions-list${isSelf ? ' self' : ''}`}>
+                        {Object.entries(reactionCounts).map(([emoji, count]) => (
+                            <span key={emoji} className="msg-reaction-pill">
+                                {emoji} {count > 1 && <span className="react-count">{count}</span>}
+                            </span>
+                        ))}
+                    </div>
+                )}
+
                 <div className={`msg-meta${isSelf ? ' msg-meta--self' : ''}`}>
                     <span className="msg-time">{time}</span>
                     {isSelfSent && msg.read && <span className="msg-seen">Seen</span>}
@@ -279,6 +336,7 @@ export default function Chat({
     const [showGif, setShowGif] = useState(false)
     const [showProfile, setShowProfile] = useState(null) // null or userId
     const [uploading, setUploading] = useState(false)
+    const [replyingTo, setReplyingTo] = useState(null)
     const fileInputRef = useRef(null)
     const messagesAreaRef = useRef(null)
     const inputRef = useRef(null)
@@ -329,8 +387,9 @@ export default function Chat({
     const handleSend = () => {
         const trimmed = input.trim()
         if (!trimmed || socketState.phase !== 'matched') return
-        onSendMessage(trimmed)
+        onSendMessage(trimmed, replyingTo?.id)
         setInput('')
+        setReplyingTo(null)
         if (onTyping) onTyping(false)
         inputRef.current?.focus()
     }
@@ -360,6 +419,7 @@ export default function Chat({
         setUploading(true)
         const formData = new FormData()
         formData.append('media', file)
+        formData.append('roomId', room.roomId || room.id) // Ensure roomId is passed for tracking
 
         try {
             const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
@@ -464,6 +524,9 @@ export default function Chat({
                                 isSelf={msg.fromUserId === session?.user?.id}
                                 session={session}
                                 onProfilePeek={(uid) => setShowProfile(uid)}
+                                onReply={(m) => { setReplyingTo(m); inputRef.current?.focus(); }}
+                                onReact={(mid, emoji) => socketState.socket?.emit('random:reaction', { roomId: room.roomId || room.id, messageId: mid, emoji })}
+                                partnerName={room?.partner?.name}
                             />
                         ))}
                     </ul>
@@ -511,63 +574,74 @@ export default function Chat({
             )}
 
             {/* Input bar */}
-            <div className="chat-input-bar">
-                <div className="chat-input-actions">
-                    <button
-                        className={`input-action-btn${showEmoji ? ' active' : ''}`}
-                        type="button"
-                        title="Emoji"
-                        onClick={() => { setShowEmoji((v) => !v); setShowGif(false) }}
+            <div className="chat-input-container">
+                {replyingTo && (
+                    <div className="reply-bar">
+                        <div className="reply-info">
+                            <span className="reply-label">Replying to {replyingTo.fromName === session?.user?.name ? 'yourself' : replyingTo.fromName}</span>
+                            <p className="reply-text">{replyingTo.content.startsWith('__GIF__') ? '📷 Media' : replyingTo.content}</p>
+                        </div>
+                        <button className="reply-close" onClick={() => setReplyingTo(null)}>✕</button>
+                    </div>
+                )}
+                <div className="chat-input-bar">
+                    <div className="chat-input-actions">
+                        <button
+                            className={`input-action-btn${showEmoji ? ' active' : ''}`}
+                            type="button"
+                            title="Emoji"
+                            onClick={() => { setShowEmoji((v) => !v); setShowGif(false) }}
+                            disabled={!isMatched}
+                        >
+                            😊
+                        </button>
+                        <button
+                            className={`input-action-btn${showGif ? ' active' : ''}`}
+                            type="button"
+                            title="GIF"
+                            onClick={() => { setShowGif((v) => !v); setShowEmoji(false) }}
+                            disabled={!isMatched}
+                        >
+                            GIF
+                        </button>
+                        <button
+                            className="input-action-btn"
+                            type="button"
+                            title="Share image"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={!isMatched || uploading}
+                        >
+                            {uploading ? '...' : '📸'}
+                        </button>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{ display: 'none' }}
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                        />
+                    </div>
+
+                    <textarea
+                        ref={inputRef}
+                        className="chat-textarea"
+                        placeholder={isMatched ? 'Type something small and honest…' : 'Waiting for someone to arrive…'}
+                        value={input}
+                        onChange={handleInput}
+                        onKeyDown={handleKeyDown}
                         disabled={!isMatched}
-                    >
-                        😊
-                    </button>
-                    <button
-                        className={`input-action-btn${showGif ? ' active' : ''}`}
-                        type="button"
-                        title="GIF"
-                        onClick={() => { setShowGif((v) => !v); setShowEmoji(false) }}
-                        disabled={!isMatched}
-                    >
-                        GIF
-                    </button>
-                    <button
-                        className="input-action-btn"
-                        type="button"
-                        title="Share image"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={!isMatched || uploading}
-                    >
-                        {uploading ? '...' : '📸'}
-                    </button>
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        style={{ display: 'none' }}
-                        accept="image/*"
-                        onChange={handleImageUpload}
+                        rows={1}
                     />
+
+                    <button
+                        className="chat-send-btn"
+                        type="button"
+                        onClick={handleSend}
+                        disabled={!isMatched || !input.trim()}
+                    >
+                        <span className="send-icon">↑</span>
+                    </button>
                 </div>
-
-                <textarea
-                    ref={inputRef}
-                    className="chat-textarea"
-                    placeholder={isMatched ? 'Type something small and honest…' : 'Waiting for someone to arrive…'}
-                    value={input}
-                    onChange={handleInput}
-                    onKeyDown={handleKeyDown}
-                    disabled={!isMatched}
-                    rows={1}
-                />
-
-                <button
-                    className="chat-send-btn"
-                    type="button"
-                    onClick={handleSend}
-                    disabled={!isMatched || !input.trim()}
-                >
-                    <span className="send-icon">↑</span>
-                </button>
             </div>
         </div>
     )
