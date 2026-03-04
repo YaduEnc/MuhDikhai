@@ -234,41 +234,7 @@ function App() {
           setSocketState((prev) => ({ ...prev, status: 'disconnected' }))
         })
 
-        // -- Friend messaging events --
-        socket.on('message:sent', (payload) => {
-          // If we are currently chatting with this person, add to messages
-          // Note: message:sent is confirmation of our OWN message
-          if (roomRef.current?.partner?.id === payload.message.recipientId) {
-            // We need to fetch the content or assume it's the one we just sent
-            // But the socket confirmation might not have content. 
-            // Actually, messageService.sendMessage returns the message.
-            // Usually we add the message to the list immediately on emit, 
-            // and update status on 'sent'.
-          }
-        })
 
-
-
-        socket.on('message:received', (payload) => {
-          console.log("Friend message received:", payload);
-          // Always use functional update to avoid stale closure issues
-          setChatMessages((prev) => {
-            if (roomRef.current?.partner?.id === payload.message.senderId) {
-              const content = safeDecode(payload.message.encryptedContent);
-              const msg = {
-                id: payload.message.id,
-                fromUserId: payload.message.senderId,
-                fromName: payload.message.sender.name,
-                fromProfilePictureUrl: payload.message.sender.profilePictureUrl,
-                content,
-                type: payload.message.messageType,
-                sentAt: payload.message.sentAt,
-              }
-              return [...prev, msg]
-            }
-            return prev;
-          })
-        })
 
 
 
@@ -294,78 +260,18 @@ function App() {
     if (!room?.roomId && !room?.partner?.id) return
     if (!socketRef.current) return
 
-    if (socketState.phase === 'friend-chat') {
-      // For now, sending as unencrypted placeholder or raw text if we don't have E2EE yet
-      // Backend expects encryptedContent as Buffer. 
-      // We'll have to adjust send function to handle this.
-      socketRef.current.emit('message:send', {
-        recipientId: room.partner.id,
-        // btoa doesn't like UTF-8, use this trick
-        encryptedContent: btoa(unescape(encodeURIComponent(content))),
-        encryptedKey: btoa('dummy-key'),
-        messageType: 'text',
-        replyToMessageId
-      })
+    socketRef.current.emit('random:message', { roomId: room.roomId, content, replyToMessageId })
 
-
-      // Optimistic update
-      const optimisticMsg = {
-        id: 'tmp-' + Date.now(),
-        fromUserId: session.user.id,
-        fromName: session.user.name,
-        content,
-        type: 'text',
-        sentAt: new Date().toISOString(),
-      }
-      setChatMessages(prev => [...prev, optimisticMsg])
-    } else {
-      socketRef.current.emit('random:message', { roomId: room.roomId, content, replyToMessageId })
-    }
   }
 
   const handleTyping = (isTyping) => {
     if (!room?.roomId && !room?.partner?.id) return
     if (!socketRef.current) return
-    if (socketState.phase === 'friend-chat') {
-      socketRef.current.emit(isTyping ? 'typing:start' : 'typing:stop', { recipientId: room.partner.id })
-    } else {
-      socketRef.current.emit(isTyping ? 'typing:start' : 'typing:stop', { roomId: room.roomId })
-    }
+    socketRef.current.emit(isTyping ? 'typing:start' : 'typing:stop', { roomId: room.roomId })
+
   }
 
-  const handleStartFriendChat = async (friend) => {
-    setShowChat(true)
-    setSocketState((prev) => ({ ...prev, phase: 'friend-chat' }))
-    setRoom({ partner: friend })
-    setChatMessages([])
 
-    try {
-      const res = await authedFetch(`${BACKEND_URL}/api/v1/messages/${friend.id}`)
-      const json = await res.json()
-      if (json.success) {
-        // Map persistent messages to UI format
-        const msgs = json.data.messages.map(m => {
-          const content = safeDecode(m.encryptedContent);
-          return {
-            id: m.id,
-            fromUserId: m.senderId,
-            fromName: m.sender.name,
-            fromProfilePictureUrl: m.sender.profilePictureUrl,
-            content,
-            type: m.messageType,
-            sentAt: m.sentAt,
-            read: m.status === 'read'
-          }
-        }).reverse() // history is DESC
-
-
-        setChatMessages(msgs)
-
-      }
-    } catch (err) {
-      console.error('Failed to fetch history', err)
-    }
-  }
 
   const handleAuth = async () => {
     setAuthError('')
@@ -395,13 +301,14 @@ function App() {
   }
 
   const handleLeaveChat = () => {
-    if (socketRef.current && socketState.phase !== 'friend-chat') {
+    if (socketRef.current) {
       socketRef.current.emit('random:leave')
     }
     setShowChat(false)
     setRoom(null)
     setSocketState((prev) => ({ ...prev, phase: 'idle' }))
   }
+
 
 
   // Reusable authed fetch with auto-refresh on 401
@@ -494,7 +401,7 @@ function App() {
             <span className="brand-word">Muhdikhai</span>
             <span className="brand-sub">
               {isInChat
-                ? (socketState.phase === 'friend-chat' ? 'Private conversation' : 'You are in a gentle room')
+                ? 'You are in a gentle room'
                 : isHome
                   ? `Welcome back to the quiet place`
                   : needsOnboarding

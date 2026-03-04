@@ -455,7 +455,8 @@ export default function Chat({
         "What's the weather like in your corner of the world?"
     ]
 
-    const isMatched = socketState.phase === 'matched' || socketState.phase === 'friend-chat'
+    const isMatched = socketState.phase === 'matched'
+
     const isMatching = socketState.phase === 'matching'
     const hasLeft = socketState.phase === 'partner-left'
 
@@ -475,22 +476,22 @@ export default function Chat({
                         <span className="chat-partner-name">
                             {room?.partner?.name || 'Finding someone…'}
                         </span>
-                        <span className={`chat-partner-status${isMatched || socketState.phase === 'friend-chat' ? ' live' : ''}`}>
+                        <span className={`chat-partner-status${isMatched ? ' live' : ''}`}>
                             {isMatching
                                 ? 'Looking for a quiet match…'
-                                : socketState.phase === 'friend-chat'
-                                    ? 'Direct Message · end-to-end encrypted'
-                                    : isMatched
-                                        ? 'Connected · end-to-end encrypted'
-                                        : 'Ready when you are'}
+                                : isMatched
+                                    ? 'Connected · end-to-end encrypted'
+                                    : 'Ready when you are'}
                         </span>
+
 
                     </div>
                 </div>
                 <div className="chat-header-right">
                     <div className={`chat-conn-dot${isMatched ? ' live' : ''}`} />
                     <button className="chat-leave-btn" type="button" onClick={onLeave}>
-                        {socketState.phase === 'friend-chat' ? 'Back to focus ⎋' : 'Leave room ⎋'}
+                        Leave room ⎋
+
                     </button>
 
                 </div>
@@ -541,9 +542,8 @@ export default function Chat({
                                     const targetRoomId = room.roomId || room.id;
                                     if (targetRoomId) {
                                         socketState.socket?.emit('random:reaction', { roomId: targetRoomId, messageId: mid, emoji })
-                                    } else if (socketState.phase === 'friend-chat' && room.partner?.id) {
-                                        // Potential future: socketState.socket?.emit('message:reaction', { recipientId: room.partner.id, ... })
                                     }
+
                                 }}
                                 partnerName={room?.partner?.name}
                             />
