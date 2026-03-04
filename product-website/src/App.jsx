@@ -10,6 +10,12 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
 
 function App() {
   const [session, setSession] = useState(null)
+  const sessionRef = useRef(null)
+
+  useEffect(() => {
+    sessionRef.current = session
+  }, [session])
+
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState('')
   const [showChat, setShowChat] = useState(false)
@@ -176,21 +182,22 @@ function App() {
   }
 
   const handleUpdateProfile = async (data) => {
-    if (!session?.accessToken) return;
+    const currentSession = sessionRef.current;
+    if (!currentSession?.accessToken) return;
 
     try {
       let res = await fetch(`${BACKEND_URL}/api/v1/users/me`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${session.accessToken}`,
+          'Authorization': `Bearer ${currentSession.accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
       });
 
-      if (res.status === 401 && session.refreshToken) {
+      if (res.status === 401 && currentSession.refreshToken) {
         try {
-          const next = await refreshSession(session.refreshToken);
+          const next = await refreshSession(currentSession.refreshToken);
           setSession(next);
           res = await fetch(`${BACKEND_URL}/api/v1/users/me`, {
             method: 'PUT',
@@ -209,12 +216,12 @@ function App() {
       const json = await res.json();
       if (json.success) {
         const nextSession = {
-          ...session,
+          ...sessionRef.current,
           user: {
-            ...session.user,
+            ...sessionRef.current.user,
             ...json.data.user,
             // Map backend profilePictureUrl to frontend photoURL for consistency
-            photoURL: json.data.user.profilePictureUrl || session.user.photoURL
+            photoURL: json.data.user.profilePictureUrl || sessionRef.current.user.photoURL
           }
         };
         setSession(nextSession);
@@ -229,7 +236,8 @@ function App() {
   }
 
   const handleUploadAvatar = async (file) => {
-    if (!session?.accessToken) return;
+    const currentSession = sessionRef.current;
+    if (!currentSession?.accessToken) return;
 
     const formData = new FormData();
     formData.append('avatar', file);
@@ -238,14 +246,14 @@ function App() {
       let res = await fetch(`${BACKEND_URL}/api/v1/users/me/avatar`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.accessToken}`,
+          'Authorization': `Bearer ${currentSession.accessToken}`,
         },
         body: formData,
       });
 
-      if (res.status === 401 && session.refreshToken) {
+      if (res.status === 401 && currentSession.refreshToken) {
         try {
-          const next = await refreshSession(session.refreshToken);
+          const next = await refreshSession(currentSession.refreshToken);
           setSession(next);
           res = await fetch(`${BACKEND_URL}/api/v1/users/me/avatar`, {
             method: 'POST',
