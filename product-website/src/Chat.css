@@ -380,9 +380,9 @@
     width: 28px;
     height: 28px;
     border-radius: 8px;
-    background: rgba(15, 20, 45, 0.85);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(15, 20, 45, 0.9);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     color: var(--text-soft);
     display: flex;
     align-items: center;
@@ -393,6 +393,13 @@
     transform: translateY(4px);
     transition: all 220ms cubic-bezier(.22, 1, .36, 1);
     z-index: 10;
+    /* Robust resets */
+    padding: 0;
+    margin: 0;
+    outline: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .msg-bubble:hover .msg-action-btn {
@@ -401,26 +408,29 @@
 }
 
 .msg-action-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.12);
     color: var(--text-main);
-    border-color: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
 }
 
+/* Position on the RIGHT for received messages (bubble on left) */
 .msg-action-btn.reply {
-    right: 36px;
+    right: 32px;
 }
 
 .msg-action-btn.react {
-    right: 4px;
+    right: 0px;
 }
 
+/* Position on the LEFT for sent messages (bubble on right) */
 .msg-row--self .msg-action-btn.reply {
-    left: 4px;
+    left: 0px;
     right: auto;
 }
 
 .msg-row--self .msg-action-btn.react {
-    left: 36px;
+    left: 32px;
     right: auto;
 }
 
