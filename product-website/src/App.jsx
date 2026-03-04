@@ -137,10 +137,23 @@ function App() {
   }
 
   const handleSignOut = () => {
+    if (socketRef.current) {
+      socketRef.current.emit('random:leave')
+    }
     clearSession()
     setSession(null)
     setShowChat(false)
     setRoom(null)
+    setSocketState({ status: 'connected', phase: 'idle' })
+  }
+
+  const handleLeaveChat = () => {
+    if (socketRef.current) {
+      socketRef.current.emit('random:leave')
+    }
+    setShowChat(false)
+    setRoom(null)
+    setSocketState({ status: 'connected', phase: 'idle' })
   }
 
   const handleDeleteAccount = async () => {
@@ -565,7 +578,7 @@ function App() {
             partnerTyping={partnerTyping}
             onSendMessage={handleSendMessage}
             onTyping={handleTyping}
-            onLeave={() => setShowChat(false)}
+            onLeave={handleLeaveChat}
             onSearchAgain={() => {
               setSocketState({ status: 'connected', phase: 'matching' })
               setRoom(null)

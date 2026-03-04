@@ -338,20 +338,23 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
 
         if (room) {
           const otherUserId = room.users.find((id) => id !== userId);
+
+          // Notify the room that somebody left
+          io.to(roomId).emit('random:left', {
+            roomId,
+            userId,
+          });
+
           randomRooms.delete(roomId);
 
           if (otherUserId) {
             userToRandomRoom.delete(otherUserId);
+            // Sockets will leave automatically when the next join happens or on disconnect
+            // but we can explicitly clear them from the room for cleanliness
             const otherSockets = activeUsers.get(otherUserId) ?? new Set<string>();
             for (const id of otherSockets) {
               const s = io.sockets.sockets.get(id);
-              if (s) {
-                s.leave(roomId);
-                s.emit('random:left', {
-                  roomId,
-                  userId,
-                });
-              }
+              if (s) s.leave(roomId);
             }
           }
         }
@@ -594,18 +597,19 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
 
           if (room) {
             const otherUserId = room.users.find((id) => id !== userId);
+
+            // Notify the room that somebody left/disconnected
+            io.to(roomId).emit('random:left', {
+              roomId,
+              userId,
+            });
+
             if (otherUserId) {
               userToRandomRoom.delete(otherUserId);
               const otherSockets = activeUsers.get(otherUserId) ?? new Set<string>();
               for (const id of otherSockets) {
                 const s = io.sockets.sockets.get(id);
-                if (s) {
-                  s.leave(roomId);
-                  s.emit('random:left', {
-                    roomId,
-                    userId,
-                  });
-                }
+                if (s) s.leave(roomId);
               }
             }
           }
