@@ -330,68 +330,97 @@
     border-color: rgba(239, 68, 68, 0.5);
 }
 
-/* ── Reveal Button ─────────────────────────────────────────────────── */
-.reveal-trigger-area {
-    position: absolute;
-    bottom: -1.8rem;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 20;
-    width: auto;
-}
-
-.reveal-btn {
-    position: relative;
+/* ── Video Call Request ────────────────────────────────────────────── */
+.video-request-btn {
     background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 0.8rem 2.2rem;
+    padding: 0.5rem 1rem;
     border-radius: 999px;
     color: #fff;
-    font-size: 0.9rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-size: 0.8rem;
+    font-weight: 500;
     cursor: pointer;
-    overflow: hidden;
-    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    min-width: 220px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
 }
 
-.reveal-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: translateY(-4px);
-    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.6);
-    border-color: rgba(255, 255, 255, 0.4);
-}
-
-.reveal-btn.holding {
-    transform: scale(0.96) translateY(0);
+.video-request-btn:hover {
     background: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+    transform: translateY(-1px);
 }
 
-.reveal-btn-glow {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle, var(--accent-strong) 0%, transparent 80%);
-    pointer-events: none;
-    mix-blend-mode: soft-light;
+.video-request-status {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+    animation: pulse-op 1.5s infinite;
 }
 
-.reveal-progress {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, var(--accent-strong), transparent);
-    transition: width 0.1s linear;
+@keyframes pulse-op {
+
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 1;
+    }
 }
 
-.reveal-btn-text {
-    position: relative;
-    z-index: 2;
+.video-incoming-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(90deg, rgba(29, 36, 82, 0.9), rgba(15, 20, 50, 0.9));
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.8rem 1.5rem;
+    z-index: 20;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.banner-text {
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+.banner-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.banner-btn {
+    padding: 0.4rem 1.2rem;
+    border-radius: 99px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.banner-btn.accept {
+    background: #4ade80;
+    color: #000;
+}
+
+.banner-btn.accept:hover {
+    background: #22c55e;
+    transform: scale(1.05);
+}
+
+.banner-btn.decline {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.banner-btn.decline:hover {
+    background: rgba(239, 68, 68, 0.4);
 }
 
 @media (max-width: 768px) {

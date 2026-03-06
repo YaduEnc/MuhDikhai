@@ -12,8 +12,6 @@ export function useWebRTC(socket, roomId, userId) {
     const [remoteStream, setRemoteStream] = useState(null)
     const [isMuted, setIsMuted] = useState(false)
     const [isVideoOff, setIsVideoOff] = useState(false)
-    const [revealFactor, setRevealFactor] = useState(0) // 0 to 1 (local intent)
-    const [remoteRevealFactor, setRemoteRevealFactor] = useState(0) // 0 to 1 (partner intent)
 
     const pcRef = useRef(null)
     const pendingCandidates = useRef([])
@@ -102,19 +100,10 @@ export function useWebRTC(socket, roomId, userId) {
                 console.error('WebRTC Signaling Error:', err)
             }
         }
-
-        const handleRevealSync = (data) => {
-            if (data.fromUserId !== userId) {
-                setRemoteRevealFactor(data.factor)
-            }
-        }
-
         socket.on('webrtc:signal', handleSignal)
-        socket.on('webrtc:reveal-sync', handleRevealSync)
 
         return () => {
             socket.off('webrtc:signal', handleSignal)
-            socket.off('webrtc:reveal-sync', handleRevealSync)
         }
     }, [socket, roomId, userId, startCall])
 
@@ -132,12 +121,6 @@ export function useWebRTC(socket, roomId, userId) {
             setIsVideoOff(!isVideoOff)
         }
     }
-
-    const updateRevealFactor = (factor) => {
-        setRevealFactor(factor)
-        socket.emit('webrtc:reveal-sync', { roomId, factor })
-    }
-
     // Cleanup
     useEffect(() => {
         return () => {
@@ -151,11 +134,8 @@ export function useWebRTC(socket, roomId, userId) {
         remoteStream,
         isMuted,
         isVideoOff,
-        revealFactor,
-        remoteRevealFactor,
         toggleMute,
         toggleVideo,
-        updateRevealFactor,
         startCall
     }
 }

@@ -475,20 +475,40 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     });
 
     /**
-     * WebRTC: Synchronize the "Reveal Factor" (0 to 1)
+     * WebRTC: Call Request (Initiate a call)
      */
-    socket.on('webrtc:reveal-sync', (data: { roomId: string; factor: number }) => {
+    socket.on('webrtc:call-request', (data: { roomId: string }) => {
       try {
         const currentRoomId = userToRandomRoom.get(userId);
         if (!currentRoomId || currentRoomId !== data.roomId) return;
 
-        // Relay to everyone else in the room
-        socket.to(currentRoomId).emit('webrtc:reveal-sync', {
-          fromUserId: userId,
-          factor: data.factor
+        // Notify the partner of the incoming call
+        socket.to(currentRoomId).emit('webrtc:call-request', {
+          fromUserId: userId
         });
       } catch (error) {
-        logger.error('Failed to sync Reveal Factor', {
+        logger.error('Failed to relay WebRTC call request', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          userId
+        });
+      }
+    });
+
+    /**
+     * WebRTC: Call Response (Accept or Decline)
+     */
+    socket.on('webrtc:call-response', (data: { roomId: string, status: 'accepted' | 'declined' }) => {
+      try {
+        const currentRoomId = userToRandomRoom.get(userId);
+        if (!currentRoomId || currentRoomId !== data.roomId) return;
+
+        // Relay the response back to the caller
+        socket.to(currentRoomId).emit('webrtc:call-response', {
+          fromUserId: userId,
+          status: data.status
+        });
+      } catch (error) {
+        logger.error('Failed to relay WebRTC call response', {
           error: error instanceof Error ? error.message : 'Unknown error',
           userId
         });

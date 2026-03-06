@@ -433,59 +433,66 @@ export default function Chat({
     const isMatching = socketState.phase === 'matching'
     const hasLeft = socketState.phase === 'partner-left'
 
+    const [callState, setCallState] = useState('idle') // idle, requesting, incoming, active
+
     // ─── WebRTC Hook ───
     const {
         localStream,
         remoteStream,
         isMuted,
         isVideoOff,
-        revealFactor,
-        remoteRevealFactor,
         toggleMute,
         toggleVideo,
-        updateRevealFactor,
         startCall
     } = useWebRTC(socketState.socket, room?.roomId || room?.id, session?.user?.id)
 
-    const [isHoldingReveal, setIsHoldingReveal] = useState(false)
-    const revealIntervalRef = useRef(null)
-
-    // Handle initial call setup when matched
+    // Call Request Flow Listeners
     useEffect(() => {
-        if (isMatched && socketState.socket) {
-            const isInitiator = session?.user?.id < (room?.partner?.id || '')
-            if (isInitiator) {
-                startCall(true)
+        if (!socketState.socket || !room?.id) return
+
+        const handleCallRequest = (data) => {
+            if (data.fromUserId !== session?.user?.id) {
+                setCallState('incoming')
+                playIncomingDrop()
             }
         }
-    }, [isMatched, startCall, socketState.socket, session?.user?.id, room?.partner?.id])
 
-    // Reveal increment logic
-    useEffect(() => {
-        if (isHoldingReveal) {
-            revealIntervalRef.current = setInterval(() => {
-                setRevealFactor(prev => {
-                    const next = Math.min(prev + 0.02, 1)
-                    updateRevealFactor(next)
-                    return next
-                })
-            }, 50)
-        } else {
-            clearInterval(revealIntervalRef.current)
-            revealIntervalRef.current = setInterval(() => {
-                setRevealFactor(prev => {
-                    const next = Math.max(prev - 0.01, 0)
-                    updateRevealFactor(next)
-                    return next
-                })
-            }, 100)
+        const handleCallResponse = (data) => {
+            if (data.fromUserId !== session?.user?.id) {
+                if (data.status === 'accepted') {
+                    setCallState('active')
+                    startCall(true) // Caller initiates P2P connection after acceptance
+                } else {
+                    setCallState('idle')
+                    alert(`${room?.partner?.name || 'Partner'} declined the video request.`)
+                }
+            }
         }
-        return () => clearInterval(revealIntervalRef.current)
-    }, [isHoldingReveal, updateRevealFactor])
 
-    // Effective blur factor (requires both to be high for full clarity)
-    const combinedReveal = (revealFactor + remoteRevealFactor) / 2
-    const currentBlur = 90 - (combinedReveal * 90)
+        socketState.socket.on('webrtc:call-request', handleCallRequest)
+        socketState.socket.on('webrtc:call-response', handleCallResponse)
+
+        return () => {
+            socketState.socket.off('webrtc:call-request', handleCallRequest)
+            socketState.socket.off('webrtc:call-response', handleCallResponse)
+        }
+    }, [socketState.socket, room?.id, session?.user?.id, startCall, room?.partner?.name])
+
+    const initiateCall = () => {
+        setCallState('requesting')
+        socketState.socket.emit('webrtc:call-request', { roomId: room?.roomId || room?.id })
+    }
+
+    const acceptCall = () => {
+        setCallState('active')
+        socketState.socket.emit('webrtc:call-response', { roomId: room?.roomId || room?.id, status: 'accepted' })
+        // Callee waits for offer, starts media in handleSignal automatically on offer receipt
+    }
+
+    const declineCall = () => {
+        setCallState('idle')
+        socketState.socket.emit('webrtc:call-response', { roomId: room?.roomId || room?.id, status: 'declined' })
+    }
 
     // Auto-scroll to latest message and play sound for incoming messages
     useEffect(() => {
@@ -641,17 +648,35 @@ export default function Chat({
                     </div>
                 </div>
                 <div className="chat-header-right">
+                    {isMatched && callState === 'idle' && (
+                        <button className="video-request-btn" onClick={initiateCall}>
+                            🎥 Switch to Video
+                        </button>
+                    )}
+                    {isMatched && callState === 'requesting' && (
+                        <span className="video-request-status">Calling...</span>
+                    )}
                     <div className={`chat-conn-dot${isMatched ? ' live' : ''}`} />
                     <button className="chat-leave-btn" type="button" onClick={onLeave}>
                         Leave room ⎋
-
                     </button>
-
                 </div>
             </div>
 
             {/* Video Portals (The Reveal) */}
-            {isMatched && (
+            {/* Incoming Video Request Banner */}
+            {callState === 'incoming' && (
+                <div className="video-incoming-banner">
+                    <span className="banner-text">🎥 <strong>{room?.partner?.name}</strong> is inviting you to a video call.</span>
+                    <div className="banner-actions">
+                        <button className="banner-btn accept" onClick={acceptCall}>Accept</button>
+                        <button className="banner-btn decline" onClick={declineCall}>Decline</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Video Portals (Active Call) */}
+            {callState === 'active' && (
                 <div className="video-portals">
                     <div className="video-portal remote-portal">
                         {remoteStream ? (
@@ -659,12 +684,11 @@ export default function Chat({
                                 autoPlay
                                 playsInline
                                 ref={el => { if (el) el.srcObject = remoteStream }}
-                                style={{ filter: `blur(${currentBlur}px)` }}
                             />
                         ) : (
                             <div className="video-placeholder">
                                 <div className="placeholder-aura" />
-                                <span>Waiting for presence…</span>
+                                <span>Connecting video...</span>
                             </div>
                         )}
                         <div className="video-overlay">
@@ -691,24 +715,6 @@ export default function Chat({
                                 {isVideoOff ? '🙈' : '👁️'}
                             </button>
                         </div>
-                    </div>
-
-                    {/* Reveal Button Overlay */}
-                    <div className="reveal-trigger-area">
-                        <button
-                            className={`reveal-btn ${isHoldingReveal ? 'holding' : ''}`}
-                            onMouseDown={() => setIsHoldingReveal(true)}
-                            onMouseUp={() => setIsHoldingReveal(false)}
-                            onMouseLeave={() => setIsHoldingReveal(false)}
-                            onTouchStart={() => setIsHoldingReveal(true)}
-                            onTouchEnd={() => setIsHoldingReveal(false)}
-                        >
-                            <div className="reveal-btn-glow" style={{ opacity: combinedReveal }} />
-                            <span className="reveal-btn-text">
-                                {combinedReveal > 0.9 ? 'Fully Revealed' : 'Hold to Reveal'}
-                            </span>
-                            <div className="reveal-progress" style={{ width: `${combinedReveal * 100}%` }} />
-                        </button>
                     </div>
                 </div>
             )}
