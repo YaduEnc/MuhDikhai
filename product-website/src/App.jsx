@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { io } from 'socket.io-client'
-import Home from './Home'
-import Chat from './Chat'
-import Onboarding from './Onboarding'
-import Landing from './Landing'
+import Home from './components/Home'
+import Chat from './components/Chat'
+import Onboarding from './components/Onboarding'
+import Landing from './components/Landing'
 import AdminDashboard from './admin/AdminDashboard'
 
 import {

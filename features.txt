@@ -1,0 +1,35 @@
+# Muhdikhai - Features List (March 2026)
+
+## 1. Core Experience
+- **Privacy-First Landing Page**: A premium, editorial-style landing page with custom typography, parallax animations, and a focus on "tender anonymity."
+- **Anonymous Entry**: Fast Google Authentication with auto-generated, unique usernames to protect user identity.
+- **Ambient Sound Engine**: Real-time synthesized audio (Heartbeat thumps, glass drops, tactile ticks) using the native Web Audio API — No external audio files needed.
+
+## 2. Matching & Connection
+- **Topic-Based Matching**: Smart matching engine that prioritizes users with overlapping interests (predefined or custom tags).
+- **Random Video Chat**: High-fidelity WebRTC video calling with adaptive layouts:
+    - **Desktop**: Side-by-side squared tiles for a cinematic look.
+    - **Mobile**: Picture-in-Picture (PiP) layering for ergonomic use.
+- **E2E Encrypted Messaging**: Secure text chat available within every random room.
+- **Match History (Recents)**: Dashboard view of your last 10 chat partners, allowing you to see shared topics from past encounters.
+- **Post-Match Friending**: Quick-action "Add Friend" buttons in the recents list to re-connect with people you enjoyed talking to.
+
+## 3. Advanced UI/UX
+- **"Liquid" Parallax Hero**: Background elements that respond to cursor movement in real-time.
+- **Seamless Transitions**: Native app-like animations where the match button expands to fill the screen when starting a search.
+- **Spring Animations**: Tactile, physics-based chat bubble and UI reveals.
+- **Responsive Dashboard**: Fully optimized home screen for desktop and mobile browsers.
+
+## 4. Safety & Administration
+- **Reporting System**: Anonymous reporting tool for users to flag harassment or inappropriate content.
+- **Admin Dashboard**: Secure `/admin` terminal for real-time monitoring:
+    - Live user counter (via Redis).
+    - User growth metrics and "Vibe" analysis.
+    - Safety report management (Resolve/Dismiss/Ban).
+- **Moderation Tools**: Internal capability to ban disruptive users and deactivate sessions.
+
+## 5. Technical Infrastructure
+- **E2E Encryption**: Multi-layered encryption for all real-time communications.
+- **Auto-Refresh Sessions**: Robust JWT handling with automatic background token renewal.
+- **Redis Integration**: High-speed live status tracking.
+- **Database Architecture**: PostgreSQL-based persistence for users, friends, matches, and reports.

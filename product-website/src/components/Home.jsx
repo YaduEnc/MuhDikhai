@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { getSoundEnabled, toggleSound, initAudio } from './utils/soundEngine'
+import { getSoundEnabled, toggleSound, initAudio } from '../utils/soundEngine'
 import './Home.css'
 
 function DeleteConfirmationModal({ onConfirm, onCancel }) {

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
-import { playIncomingDrop, playOutgoingTick } from './utils/soundEngine'
-import { useWebRTC } from './hooks/useWebRTC'
+import { playIncomingDrop, playOutgoingTick } from '../utils/soundEngine'
+import { useWebRTC } from '../hooks/useWebRTC'
 import './Chat.css'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
