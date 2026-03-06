@@ -429,6 +429,10 @@ export default function Chat({
     const inputRef = useRef(null)
     const typingTimeoutRef = useRef(null)
 
+    const isMatched = socketState.phase === 'matched'
+    const isMatching = socketState.phase === 'matching'
+    const hasLeft = socketState.phase === 'partner-left'
+
     // ─── WebRTC Hook ───
     const {
         localStream,
@@ -604,11 +608,6 @@ export default function Chat({
         "Listening to any good music lately?",
         "What's the weather like in your corner of the world?"
     ]
-
-    const isMatched = socketState.phase === 'matched'
-
-    const isMatching = socketState.phase === 'matching'
-    const hasLeft = socketState.phase === 'partner-left'
 
     return (
         <div className="chat-shell-v2">
