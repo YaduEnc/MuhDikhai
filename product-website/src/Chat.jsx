@@ -611,6 +611,45 @@ export default function Chat({
 
     return (
         <div className="chat-shell-v2">
+            {/* Header */}
+            <div className="chat-header-v2">
+                <div className={`chat-header-left${isMatched ? ' clickable' : ''}`} onClick={() => isMatched && setShowProfile(room?.partner?.id)}>
+                    <div className="chat-partner-avatar">
+                        {room?.partner?.profilePictureUrl ? (
+                            <img src={room.partner.profilePictureUrl} alt={room.partner.name} />
+                        ) : (
+                            (room?.partner?.name || '?')[0].toUpperCase()
+                        )}
+                    </div>
+                    <div className="chat-partner-info">
+                        <span className="chat-partner-name">
+                            {room?.partner?.name || 'Finding someone…'}
+                        </span>
+                        <span className={`chat-partner-status${isMatched ? ' live' : ''}`}>
+                            {isMatching
+                                ? 'Looking for a quiet match…'
+                                : isMatched
+                                    ? 'Connected · end-to-end encrypted'
+                                    : 'Ready when you are'}
+                        </span>
+                        {isMatched && room?.topic && (
+                            <span className="chat-shared-topic">
+                                Shared interest: {room.topic}
+                            </span>
+                        )}
+
+                    </div>
+                </div>
+                <div className="chat-header-right">
+                    <div className={`chat-conn-dot${isMatched ? ' live' : ''}`} />
+                    <button className="chat-leave-btn" type="button" onClick={onLeave}>
+                        Leave room ⎋
+
+                    </button>
+
+                </div>
+            </div>
+
             {/* Video Portals (The Reveal) */}
             {isMatched && (
                 <div className="video-portals">
@@ -673,45 +712,6 @@ export default function Chat({
                     </div>
                 </div>
             )}
-
-            {/* Header */}
-            <div className="chat-header-v2">
-                <div className={`chat-header-left${isMatched ? ' clickable' : ''}`} onClick={() => isMatched && setShowProfile(room?.partner?.id)}>
-                    <div className="chat-partner-avatar">
-                        {room?.partner?.profilePictureUrl ? (
-                            <img src={room.partner.profilePictureUrl} alt={room.partner.name} />
-                        ) : (
-                            (room?.partner?.name || '?')[0].toUpperCase()
-                        )}
-                    </div>
-                    <div className="chat-partner-info">
-                        <span className="chat-partner-name">
-                            {room?.partner?.name || 'Finding someone…'}
-                        </span>
-                        <span className={`chat-partner-status${isMatched ? ' live' : ''}`}>
-                            {isMatching
-                                ? 'Looking for a quiet match…'
-                                : isMatched
-                                    ? 'Connected · end-to-end encrypted'
-                                    : 'Ready when you are'}
-                        </span>
-                        {isMatched && room?.topic && (
-                            <span className="chat-shared-topic">
-                                Shared interest: {room.topic}
-                            </span>
-                        )}
-
-                    </div>
-                </div>
-                <div className="chat-header-right">
-                    <div className={`chat-conn-dot${isMatched ? ' live' : ''}`} />
-                    <button className="chat-leave-btn" type="button" onClick={onLeave}>
-                        Leave room ⎋
-
-                    </button>
-
-                </div>
-            </div>
 
             {/* Messages area */}
             <div className="chat-messages-area" ref={messagesAreaRef}>
