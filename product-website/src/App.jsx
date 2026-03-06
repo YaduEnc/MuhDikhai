@@ -60,23 +60,7 @@ function App() {
   // Increment this to force a socket reconnect (e.g. after token refresh)
   const [socketVersion, setSocketVersion] = useState(0)
 
-  const safeDecode = (str) => {
-    if (!str) return "";
-    try {
-      // If it's base64, decode it
-      const decoded = atob(str);
-      try {
-        // Try UTF-8 decode
-        return decodeURIComponent(escape(decoded));
-      } catch (e) {
-        return decoded;
-      }
-    } catch (e) {
 
-      // If it's not base64 or fails, return as is
-      return str;
-    }
-  };
 
 
   const socketRef = useRef(null)
@@ -183,12 +167,9 @@ function App() {
         })
 
         socket.on('random:message', (msg) => {
-          console.log("Random message received:", msg);
-          // Decouple from refs for real-time reliable updates
           setChatMessages((prev) => {
             let processedMsg = { ...msg, reactions: [] }
-            // If the content looks like it might be encoded (placeholder for when random chat also uses encryption)
-            processedMsg.content = safeDecode(msg.content);
+            // Content is already plain text, no decoding needed
 
             if (msg.replyToMessageId) {
               const parent = prev.find((m) => m.id === msg.replyToMessageId)
