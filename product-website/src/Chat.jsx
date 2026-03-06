@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { playIncomingDrop, playOutgoingTick } from './utils/soundEngine'
+import { useWebRTC } from './hooks/useWebRTC'
 import './Chat.css'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -428,6 +429,60 @@ export default function Chat({
     const inputRef = useRef(null)
     const typingTimeoutRef = useRef(null)
 
+    // ─── WebRTC Hook ───
+    const {
+        localStream,
+        remoteStream,
+        isMuted,
+        isVideoOff,
+        revealFactor,
+        remoteRevealFactor,
+        toggleMute,
+        toggleVideo,
+        updateRevealFactor,
+        startCall
+    } = useWebRTC(socketState.socket, room?.roomId || room?.id, session?.user?.id)
+
+    const [isHoldingReveal, setIsHoldingReveal] = useState(false)
+    const revealIntervalRef = useRef(null)
+
+    // Handle initial call setup when matched
+    useEffect(() => {
+        if (isMatched && socketState.socket) {
+            const isInitiator = session?.user?.id < (room?.partner?.id || '')
+            if (isInitiator) {
+                startCall(true)
+            }
+        }
+    }, [isMatched, startCall, socketState.socket, session?.user?.id, room?.partner?.id])
+
+    // Reveal increment logic
+    useEffect(() => {
+        if (isHoldingReveal) {
+            revealIntervalRef.current = setInterval(() => {
+                setRevealFactor(prev => {
+                    const next = Math.min(prev + 0.02, 1)
+                    updateRevealFactor(next)
+                    return next
+                })
+            }, 50)
+        } else {
+            clearInterval(revealIntervalRef.current)
+            revealIntervalRef.current = setInterval(() => {
+                setRevealFactor(prev => {
+                    const next = Math.max(prev - 0.01, 0)
+                    updateRevealFactor(next)
+                    return next
+                })
+            }, 100)
+        }
+        return () => clearInterval(revealIntervalRef.current)
+    }, [isHoldingReveal, updateRevealFactor])
+
+    // Effective blur factor (requires both to be high for full clarity)
+    const combinedReveal = (revealFactor + remoteRevealFactor) / 2
+    const currentBlur = 90 - (combinedReveal * 90)
+
     // Auto-scroll to latest message and play sound for incoming messages
     useEffect(() => {
         if (messagesAreaRef.current) {
@@ -557,6 +612,69 @@ export default function Chat({
 
     return (
         <div className="chat-shell-v2">
+            {/* Video Portals (The Reveal) */}
+            {isMatched && (
+                <div className="video-portals">
+                    <div className="video-portal remote-portal">
+                        {remoteStream ? (
+                            <video
+                                autoPlay
+                                playsInline
+                                ref={el => { if (el) el.srcObject = remoteStream }}
+                                style={{ filter: `blur(${currentBlur}px)` }}
+                            />
+                        ) : (
+                            <div className="video-placeholder">
+                                <div className="placeholder-aura" />
+                                <span>Waiting for presence…</span>
+                            </div>
+                        )}
+                        <div className="video-overlay">
+                            <span className="partner-name">{room?.partner?.name}</span>
+                        </div>
+                    </div>
+
+                    <div className="video-portal local-portal">
+                        {localStream ? (
+                            <video
+                                autoPlay
+                                playsInline
+                                muted
+                                ref={el => { if (el) el.srcObject = localStream }}
+                            />
+                        ) : (
+                            <div className="video-placeholder" />
+                        )}
+                        <div className="video-controls">
+                            <button className={`video-ctrl ${isMuted ? 'off' : ''}`} onClick={toggleMute}>
+                                {isMuted ? '🎙️' : '🎤'}
+                            </button>
+                            <button className={`video-ctrl ${isVideoOff ? 'off' : ''}`} onClick={toggleVideo}>
+                                {isVideoOff ? '🙈' : '👁️'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Reveal Button Overlay */}
+                    <div className="reveal-trigger-area">
+                        <button
+                            className={`reveal-btn ${isHoldingReveal ? 'holding' : ''}`}
+                            onMouseDown={() => setIsHoldingReveal(true)}
+                            onMouseUp={() => setIsHoldingReveal(false)}
+                            onMouseLeave={() => setIsHoldingReveal(false)}
+                            onTouchStart={() => setIsHoldingReveal(true)}
+                            onTouchEnd={() => setIsHoldingReveal(false)}
+                        >
+                            <div className="reveal-btn-glow" style={{ opacity: combinedReveal }} />
+                            <span className="reveal-btn-text">
+                                {combinedReveal > 0.9 ? 'Fully Revealed' : 'Hold to Reveal'}
+                            </span>
+                            <div className="reveal-progress" style={{ width: `${combinedReveal * 100}%` }} />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="chat-header-v2">
                 <div className={`chat-header-left${isMatched ? ' clickable' : ''}`} onClick={() => isMatched && setShowProfile(room?.partner?.id)}>

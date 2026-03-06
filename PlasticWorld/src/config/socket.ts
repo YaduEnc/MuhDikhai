@@ -454,6 +454,48 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     });
 
     /**
+     * WebRTC: Signaling relay for P2P connection
+     */
+    socket.on('webrtc:signal', (data: { roomId: string; signal: any }) => {
+      try {
+        const currentRoomId = userToRandomRoom.get(userId);
+        if (!currentRoomId || currentRoomId !== data.roomId) return;
+
+        // Relay to everyone else in the room
+        socket.to(currentRoomId).emit('webrtc:signal', {
+          fromUserId: userId,
+          signal: data.signal
+        });
+      } catch (error) {
+        logger.error('Failed to relay WebRTC signal', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          userId
+        });
+      }
+    });
+
+    /**
+     * WebRTC: Synchronize the "Reveal Factor" (0 to 1)
+     */
+    socket.on('webrtc:reveal-sync', (data: { roomId: string; factor: number }) => {
+      try {
+        const currentRoomId = userToRandomRoom.get(userId);
+        if (!currentRoomId || currentRoomId !== data.roomId) return;
+
+        // Relay to everyone else in the room
+        socket.to(currentRoomId).emit('webrtc:reveal-sync', {
+          fromUserId: userId,
+          factor: data.factor
+        });
+      } catch (error) {
+        logger.error('Failed to sync Reveal Factor', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          userId
+        });
+      }
+    });
+
+    /**
      * Handle sending messages
      */
     socket.on('message:send', async (data: {

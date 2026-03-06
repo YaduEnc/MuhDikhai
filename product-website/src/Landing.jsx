@@ -3,6 +3,7 @@ import './Landing.css'
 
 export default function Landing({ onStartMatch, authLoading, authError, onlineCount }) {
     const [scrolled, setScrolled] = useState(0)
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
     const landingRef = useRef(null)
 
     // Parallax effect for orbs
@@ -12,6 +13,18 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
         }
         window.addEventListener('scroll', handleScroll, { passive: true })
         return () => window.removeEventListener('scroll', handleScroll)
+    }, [])
+
+    // Mouse tracking for orbs
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            setMousePos({
+                x: (e.clientX / window.innerWidth - 0.5) * 40,
+                y: (e.clientY / window.innerHeight - 0.5) * 40
+            })
+        }
+        window.addEventListener('mousemove', handleMouseMove)
+        return () => window.removeEventListener('mousemove', handleMouseMove)
     }, [])
 
     // Scroll reveal logic
@@ -41,15 +54,21 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
             <div className="aura-container">
                 <div
                     className="aura-orb aura-orb--1"
-                    style={{ transform: `translate3d(0, ${scrolled * 0.2}px, 0)` }}
+                    style={{
+                        transform: `translate3d(${mousePos.x * 1.5}px, ${scrolled * 0.2 + mousePos.y * 1.5}px, 0)`
+                    }}
                 />
                 <div
                     className="aura-orb aura-orb--2"
-                    style={{ transform: `translate3d(0, ${scrolled * -0.1}px, 0)` }}
+                    style={{
+                        transform: `translate3d(${mousePos.x * -1}px, ${scrolled * -0.1 + mousePos.y * -1}px, 0)`
+                    }}
                 />
                 <div
                     className="aura-orb aura-orb--3"
-                    style={{ transform: `translate3d(0, ${scrolled * 0.15}px, 0)` }}
+                    style={{
+                        transform: `translate3d(${mousePos.x * 0.8}px, ${scrolled * 0.15 + mousePos.y * 0.8}px, 0)`
+                    }}
                 />
             </div>
 
@@ -59,7 +78,10 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                         <span className="pulse-dot" />
                         <span className="pulse-text">{onlineCount || 0} sharing silence right now</span>
                     </div>
-                    <h1>Anonymous, but unexpectedly tender.</h1>
+                    <h1 className="hero-heading">
+                        <span className="heading-bold">Anonymous,</span>
+                        <span className="heading-tender">but unexpectedly tender.</span>
+                    </h1>
                     {authError && <p className="auth-error">{authError}</p>}
                     <button
                         className="btn-primary landing-btn"
@@ -69,6 +91,10 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                         <span className="btn-primary-dot" />
                         {authLoading ? 'Signing in…' : 'Start a gentle match'}
                     </button>
+                    <div className="hero-scroll-hint">
+                        <span className="hint-arrow">↓</span>
+                        <span className="hint-text">Scroll to breathe</span>
+                    </div>
                 </div>
             </section>
 
