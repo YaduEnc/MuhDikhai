@@ -13,6 +13,7 @@ import {
   getStoredSession as getSession,
   clearSession,
 } from './authClient'
+import { initAudio, playMatchThump } from './utils/soundEngine'
 import './App.css'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
@@ -176,6 +177,7 @@ function App() {
           setRoom(payload)
           setSocketState((prev) => ({ ...prev, phase: 'matched' }))
           setChatMessages([])
+          playMatchThump()
         })
 
 
@@ -439,6 +441,9 @@ function App() {
             onlineCount={onlineCount}
             isTransitioning={isTransitioning}
             onStartMatch={(topics) => {
+              // Browsers require a gesture to start audio
+              initAudio()
+
               setIsTransitioning(true)
               setSocketState((prev) => ({ ...prev, phase: 'matching' }))
 

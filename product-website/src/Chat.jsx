@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
+import { playIncomingDrop, playOutgoingTick } from './utils/soundEngine'
 import './Chat.css'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -427,12 +428,20 @@ export default function Chat({
     const inputRef = useRef(null)
     const typingTimeoutRef = useRef(null)
 
-    // Auto-scroll to latest message
+    // Auto-scroll to latest message and play sound for incoming messages
     useEffect(() => {
         if (messagesAreaRef.current) {
             messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight
         }
-    }, [chatMessages])
+
+        // Play incoming sound if the last message is from the stranger
+        if (chatMessages.length > 0) {
+            const lastMsg = chatMessages[chatMessages.length - 1]
+            if (lastMsg.fromUserId !== session?.user?.id) {
+                playIncomingDrop()
+            }
+        }
+    }, [chatMessages, session?.user?.id])
 
     // Emit read receipt
     useEffect(() => {
@@ -479,6 +488,7 @@ export default function Chat({
         if (!trimmed || (socketState.phase !== 'matched' && socketState.phase !== 'friend-chat')) return
 
         onSendMessage(trimmed, replyingTo?.id)
+        playOutgoingTick()
         setInput('')
         setReplyingTo(null)
         if (onTyping) onTyping(false)
@@ -500,6 +510,7 @@ export default function Chat({
 
     const handleGifSelect = (url) => {
         onSendMessage(`__GIF__${url}`)
+        playOutgoingTick()
         setShowGif(false)
     }
 
@@ -522,6 +533,7 @@ export default function Chat({
             const json = await res.json()
             if (json.success) {
                 onSendMessage(json.data.url) // enhanced socket will handle type detection
+                playOutgoingTick()
             }
         } catch (err) {
             console.error('Upload failed', err)

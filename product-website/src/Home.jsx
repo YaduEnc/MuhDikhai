@@ -197,6 +197,14 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
 
 function SettingsView({ session, onBack, onSignOut, onDeleteRequest }) {
     const isAdmin = session?.user?.isAdmin;
+    const [soundOn, setSoundOn] = useState(getSoundEnabled());
+
+    const handleToggleSound = () => {
+        const next = !soundOn;
+        setSoundOn(next);
+        toggleSound(next);
+        if (next) initAudio();
+    };
 
     const navigateToAdmin = () => {
         window.history.pushState({}, '', '/admin');
@@ -251,6 +259,14 @@ function SettingsView({ session, onBack, onSignOut, onDeleteRequest }) {
                             <span className="settings-row-desc">How much information shows at once.</span>
                         </div>
                         <span className="settings-badge">Sparse</span>
+                    </div>
+                    <div className="settings-row" onClick={handleToggleSound} style={{ cursor: 'pointer' }}>
+                        <span className="settings-row-icon">🔉</span>
+                        <div className="settings-row-body">
+                            <span className="settings-row-title">Ambient Sound</span>
+                            <span className="settings-row-desc">Subtle audio cues for matches and messages.</span>
+                        </div>
+                        <span className={`toggle-pill ${soundOn ? 'active' : ''}`} style={{ alignSelf: 'center', marginLeft: 'auto' }} />
                     </div>
                 </div>
 
