@@ -276,6 +276,8 @@ const PREDEFINED_TOPICS = ['Deep talk', 'Music', 'Coding', 'Movies', 'Vent', 'Si
 export default function Home({ session, onlineCount, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar }) {
 
     const [selectedTopics, setSelectedTopics] = useState([])
+    const [customTopic, setCustomTopic] = useState('')
+
 
 
 
@@ -296,6 +298,22 @@ export default function Home({ session, onlineCount, onStartMatch, onSignOut, on
                 : [...prev, topic]
         )
     }
+
+    const handleAddCustomTopic = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            const trimmed = customTopic.trim()
+            if (trimmed && !selectedTopics.includes(trimmed)) {
+                if (selectedTopics.length >= 10) {
+                    alert("Keep it gentle. 10 interests is plenty.")
+                    return
+                }
+                setSelectedTopics(prev => [...prev, trimmed])
+                setCustomTopic('')
+            }
+        }
+    }
+
 
     const handleStartMatch = () => {
         onStartMatch(selectedTopics)
@@ -366,7 +384,27 @@ export default function Home({ session, onlineCount, onStartMatch, onSignOut, on
                             {topic}
                         </button>
                     ))}
+                    {selectedTopics.filter(t => !PREDEFINED_TOPICS.includes(t)).map(topic => (
+                        <button
+                            key={topic}
+                            type="button"
+                            className="topic-pill active custom"
+                            onClick={() => toggleTopic(topic)}
+                        >
+                            {topic} <span className="pill-remove">×</span>
+                        </button>
+                    ))}
+
+                    <input
+                        className="home-topic-input"
+                        placeholder="Add your own…"
+                        value={customTopic}
+                        onChange={(e) => setCustomTopic(e.target.value)}
+                        onKeyDown={handleAddCustomTopic}
+                        maxLength={20}
+                    />
                 </div>
+
             </div>
 
             {/* Primary action — Start Matching */}
