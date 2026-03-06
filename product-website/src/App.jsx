@@ -439,8 +439,8 @@ function App() {
             onDeleteAccount={handleDeleteAccount}
             onUpdateProfile={handleUpdateProfile}
             onUploadAvatar={handleUploadAvatar}
-            onStartChat={handleStartFriendChat}
           />
+
 
         )}
 
