@@ -450,9 +450,12 @@ export default function Chat({
 
     // Call Request Flow Listeners
     useEffect(() => {
-        if (!socketState.socket || !room?.id) return
+        if (!socketState.socket || !room?.roomId) return
+
+        console.log('[DEBUG] Registering call-request listener for room:', room.roomId)
 
         const handleCallRequest = (data) => {
+            console.log('[DEBUG] Received webrtc:call-request', data)
             if (data.fromUserId !== session?.user?.id) {
                 setCallState('incoming')
                 playIncomingDrop()
@@ -479,7 +482,7 @@ export default function Chat({
             socketState.socket.off('webrtc:call-request', handleCallRequest)
             socketState.socket.off('webrtc:call-response', handleCallResponse)
         }
-    }, [socketState.socket, room?.id, session?.user?.id, establishConnection, stopLocalMedia, room?.partner?.name])
+    }, [socketState.socket, room?.roomId, session?.user?.id, establishConnection, stopLocalMedia, room?.partner?.name])
 
     const initiateCall = async () => {
         console.log('[DEBUG initiateCall] socket:', !!socketState.socket, 'connected:', socketState.socket?.connected, 'roomId:', room?.roomId || room?.id)
