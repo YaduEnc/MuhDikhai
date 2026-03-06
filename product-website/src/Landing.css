@@ -1,11 +1,73 @@
 /* ── Landing Page Styles ─────────────────────────────────── */
 .landing-wrapper {
+    position: relative;
     flex: 1;
     display: flex;
     flex-direction: column;
     gap: 6rem;
     padding-bottom: 8rem;
     animation: landing-fade-in 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+    overflow-x: hidden;
+}
+
+/* ── Aura Background ───────────────────────────────────── */
+.aura-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.aura-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.15;
+    will-change: transform;
+    animation: orb-pulse 20s infinite alternate ease-in-out;
+}
+
+.aura-orb--1 {
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, #4f46e5, transparent);
+    top: -100px;
+    right: -100px;
+    animation-delay: 0s;
+}
+
+.aura-orb--2 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, #f59e0b, transparent);
+    bottom: 20%;
+    left: -100px;
+    animation-delay: -5s;
+    opacity: 0.1;
+}
+
+.aura-orb--3 {
+    width: 450px;
+    height: 450px;
+    background: radial-gradient(circle, #0d9488, transparent);
+    top: 40%;
+    right: 30%;
+    animation-delay: -10s;
+    opacity: 0.08;
+}
+
+@keyframes orb-pulse {
+    from {
+        transform: scale(1) translate(0, 0);
+    }
+
+    to {
+        transform: scale(1.2) translate(50px, 30px);
+    }
 }
 
 @keyframes landing-fade-in {
@@ -27,6 +89,8 @@
     justify-content: center;
     text-align: center;
     padding: 4rem 1rem;
+    position: relative;
+    z-index: 1;
 }
 
 .landing-content h1 {
@@ -40,6 +104,44 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+}
+
+.quiet-pulse {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.6rem 1.2rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    border-radius: 999px;
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+    color: var(--text-soft);
+    animation: landing-fade-in 1.4s ease-out both;
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    background: #30d158;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(48, 209, 88, 0.4);
+    animation: dot-pulse 2s infinite ease-in-out;
+}
+
+@keyframes dot-pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.4);
+        opacity: 0.5;
+    }
 }
 
 .landing-btn {
@@ -335,4 +437,40 @@
     color: var(--text-soft);
     line-height: 1.6;
     font-size: 0.95rem;
+}
+
+/* ── Scroll Reveals ────────────────────────────────────── */
+.reveal-on-scroll {
+    opacity: 0;
+    filter: blur(15px);
+    transform: translateY(40px);
+    transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, filter, opacity;
+}
+
+.reveal-on-scroll.is-visible {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+    .aura-orb--1 {
+        width: 300px;
+        height: 300px;
+    }
+
+    .aura-orb--2 {
+        width: 250px;
+        height: 250px;
+    }
+
+    .aura-orb--3 {
+        display: none;
+    }
+
+    .landing-wrapper {
+        gap: 4rem;
+        padding-bottom: 5rem;
+    }
 }

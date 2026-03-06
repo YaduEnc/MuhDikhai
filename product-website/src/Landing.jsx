@@ -1,10 +1,64 @@
+import { useEffect, useRef, useState } from 'react'
 import './Landing.css'
 
-export default function Landing({ onStartMatch, authLoading, authError }) {
+export default function Landing({ onStartMatch, authLoading, authError, onlineCount }) {
+    const [scrolled, setScrolled] = useState(0)
+    const landingRef = useRef(null)
+
+    // Parallax effect for orbs
+    useEffect(() => {
+        const handleScroll = () => {
+            setScrolled(window.scrollY)
+        }
+        window.addEventListener('scroll', handleScroll, { passive: true })
+        return () => window.removeEventListener('scroll', handleScroll)
+    }, [])
+
+    // Scroll reveal logic
+    useEffect(() => {
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        }
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible')
+                }
+            })
+        }, observerOptions)
+
+        const revealElements = document.querySelectorAll('.reveal-on-scroll')
+        revealElements.forEach(el => observer.observe(el))
+
+        return () => observer.disconnect()
+    }, [])
+
     return (
-        <div className="landing-wrapper">
+        <div className="landing-wrapper" ref={landingRef}>
+            {/* Ambient Background Orbs */}
+            <div className="aura-container">
+                <div
+                    className="aura-orb aura-orb--1"
+                    style={{ transform: `translate3d(0, ${scrolled * 0.2}px, 0)` }}
+                />
+                <div
+                    className="aura-orb aura-orb--2"
+                    style={{ transform: `translate3d(0, ${scrolled * -0.1}px, 0)` }}
+                />
+                <div
+                    className="aura-orb aura-orb--3"
+                    style={{ transform: `translate3d(0, ${scrolled * 0.15}px, 0)` }}
+                />
+            </div>
+
             <section className="landing-hero">
                 <div className="landing-content">
+                    <div className="quiet-pulse">
+                        <span className="pulse-dot" />
+                        <span className="pulse-text">{onlineCount || 0} sharing silence right now</span>
+                    </div>
                     <h1>Anonymous, but unexpectedly tender.</h1>
                     {authError && <p className="auth-error">{authError}</p>}
                     <button
@@ -18,7 +72,7 @@ export default function Landing({ onStartMatch, authLoading, authError }) {
                 </div>
             </section>
 
-            <section className="pillars">
+            <section className="pillars reveal-on-scroll">
                 <div className="pillars-header">
                     <h2 className="pillars-title">Better rooms for smaller conversations</h2>
                     <p className="pillars-sub">
@@ -73,7 +127,7 @@ export default function Landing({ onStartMatch, authLoading, authError }) {
             </section>
 
             <section className="story-grid">
-                <article className="story-block">
+                <article className="story-block reveal-on-scroll">
                     <h2 className="story-heading">A tiny manifesto for gentle strangers</h2>
                     <p className="story-text">
                         There are already places to shout into the void. Muhdikhai is for the nights
@@ -90,7 +144,7 @@ export default function Landing({ onStartMatch, authLoading, authError }) {
                     </p>
                 </article>
 
-                <article className="story-block story-block--secondary">
+                <article className="story-block story-block--secondary reveal-on-scroll">
                     <h3 className="story-heading-sm">For builders, romantics, and late‑night coders</h3>
                     <p className="story-text">
                         Muhdikhai runs on a production‑grade messaging stack with end‑to‑end
@@ -108,7 +162,7 @@ export default function Landing({ onStartMatch, authLoading, authError }) {
                 </article>
             </section>
 
-            <section className="cta-band">
+            <section className="cta-band reveal-on-scroll">
                 <div className="cta-copy">
                     <span className="cta-title">Ready to see who appears?</span>
                     <span className="cta-sub">
@@ -127,7 +181,7 @@ export default function Landing({ onStartMatch, authLoading, authError }) {
                 </button>
             </section>
 
-            <section className="faq">
+            <section className="faq reveal-on-scroll">
                 <div className="faq-inner">
                     <h2 className="faq-title">Questions you might ask at 2:13&nbsp;AM</h2>
                     <p className="faq-intro">

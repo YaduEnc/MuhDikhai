@@ -482,6 +482,7 @@ function App() {
             onStartMatch={handleAuth}
             authLoading={authLoading}
             authError={authError}
+            onlineCount={onlineCount}
           />
         )}
 
