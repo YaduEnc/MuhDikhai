@@ -15,15 +15,23 @@ export function useWebRTC(socket, roomId, userId) {
 
     const pcRef = useRef(null)
     const pendingCandidates = useRef([])
+    const socketRef = useRef(socket)
+    const roomIdRef = useRef(roomId)
+    const localStreamRef = useRef(localStream)
+
+    // Keep refs in sync
+    useEffect(() => { socketRef.current = socket }, [socket])
+    useEffect(() => { roomIdRef.current = roomId }, [roomId])
+    useEffect(() => { localStreamRef.current = localStream }, [localStream])
 
     // ─── Initialize PeerConnection ───────────────────────────────────────────
     const createPC = useCallback(() => {
         const pc = new RTCPeerConnection(ICE_SERVERS)
 
         pc.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit('webrtc:signal', {
-                    roomId,
+            if (event.candidate && socketRef.current) {
+                socketRef.current.emit('webrtc:signal', {
+                    roomId: roomIdRef.current,
                     signal: { type: 'candidate', candidate: event.candidate }
                 })
             }
@@ -35,11 +43,11 @@ export function useWebRTC(socket, roomId, userId) {
 
         pcRef.current = pc
         return pc
-    }, [socket, roomId])
+    }, [])
 
     // ─── Start Media & Call ──────────────────────────────────────────────────
     const prepareLocalMedia = useCallback(async () => {
-        if (localStream) return true
+        if (localStreamRef.current) return true
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert('Your browser does not support video calls, or you are not using a secure (HTTPS) connection.')
@@ -52,16 +60,18 @@ export function useWebRTC(socket, roomId, userId) {
                 audio: true
             })
             setLocalStream(stream)
+            localStreamRef.current = stream
             return true
         } catch (err) {
             console.error('Failed to get media devices:', err)
             alert('Could not access camera/microphone. Please check browser permissions.')
             return false
         }
-    }, [localStream])
+    }, [])
 
     const establishConnection = useCallback(async (isInitiator) => {
-        if (!localStream) {
+        const stream = localStreamRef.current
+        if (!stream) {
             console.error("Cannot establish connection without local stream")
             return
         }
@@ -69,20 +79,21 @@ export function useWebRTC(socket, roomId, userId) {
         let pc = pcRef.current
         if (!pc) {
             pc = createPC()
-            localStream.getTracks().forEach(track => pc.addTrack(track, localStream))
+            stream.getTracks().forEach(track => pc.addTrack(track, stream))
         }
 
-        if (isInitiator) {
+        if (isInitiator && socketRef.current) {
             const offer = await pc.createOffer()
             await pc.setLocalDescription(offer)
-            socket.emit('webrtc:signal', { roomId, signal: offer })
+            socketRef.current.emit('webrtc:signal', { roomId: roomIdRef.current, signal: offer })
         }
-    }, [localStream, createPC, socket, roomId])
+    }, [createPC])
 
     const stopLocalMedia = useCallback(() => {
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop())
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(track => track.stop())
             setLocalStream(null)
+            localStreamRef.current = null
         }
         if (pcRef.current) {
             pcRef.current.close()
@@ -90,7 +101,7 @@ export function useWebRTC(socket, roomId, userId) {
         }
         setRemoteStream(null)
         pendingCandidates.current = []
-    }, [localStream])
+    }, [])
 
     // ─── Handle Signaling ────────────────────────────────────────────────────
     useEffect(() => {
@@ -101,7 +112,6 @@ export function useWebRTC(socket, roomId, userId) {
 
             let pc = pcRef.current
             if (!pc && data.signal.type === 'offer') {
-                // If we get an offer but don't have a PC, create one (we should have local media already if we accepted)
                 await establishConnection(false)
                 pc = pcRef.current
             }
@@ -115,7 +125,6 @@ export function useWebRTC(socket, roomId, userId) {
                     await pc.setLocalDescription(answer)
                     socket.emit('webrtc:signal', { roomId, signal: answer })
 
-                    // Add any pending candidates
                     while (pendingCandidates.current.length) {
                         await pc.addIceCandidate(pendingCandidates.current.shift())
                     }
@@ -142,25 +151,26 @@ export function useWebRTC(socket, roomId, userId) {
 
     // ─── Controls ────────────────────────────────────────────────────────────
     const toggleMute = () => {
-        if (localStream) {
-            localStream.getAudioTracks().forEach(track => (track.enabled = isMuted))
+        if (localStreamRef.current) {
+            localStreamRef.current.getAudioTracks().forEach(track => (track.enabled = isMuted))
             setIsMuted(!isMuted)
         }
     }
 
     const toggleVideo = () => {
-        if (localStream) {
-            localStream.getVideoTracks().forEach(track => (track.enabled = isVideoOff))
+        if (localStreamRef.current) {
+            localStreamRef.current.getVideoTracks().forEach(track => (track.enabled = isVideoOff))
             setIsVideoOff(!isVideoOff)
         }
     }
+
     // Cleanup
     useEffect(() => {
         return () => {
-            localStream?.getTracks().forEach(track => track.stop())
+            localStreamRef.current?.getTracks().forEach(track => track.stop())
             pcRef.current?.close()
         }
-    }, [localStream])
+    }, [])
 
     return {
         localStream,
