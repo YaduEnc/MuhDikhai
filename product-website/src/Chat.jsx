@@ -452,10 +452,7 @@ export default function Chat({
     useEffect(() => {
         if (!socketState.socket || !room?.roomId) return
 
-        console.log('[DEBUG] Registering call-request listener for room:', room.roomId)
-
         const handleCallRequest = (data) => {
-            console.log('[DEBUG] Received webrtc:call-request', data)
             if (data.fromUserId !== session?.user?.id) {
                 setCallState('incoming')
                 playIncomingDrop()
@@ -485,13 +482,11 @@ export default function Chat({
     }, [socketState.socket, room?.roomId, session?.user?.id, establishConnection, stopLocalMedia, room?.partner?.name])
 
     const initiateCall = async () => {
-        console.log('[DEBUG initiateCall] socket:', !!socketState.socket, 'connected:', socketState.socket?.connected, 'roomId:', room?.roomId || room?.id)
         const success = await prepareLocalMedia()
         if (!success) return
 
         setCallState('requesting')
         const roomId = room?.roomId || room?.id
-        console.log('[DEBUG initiateCall] emitting webrtc:call-request', { roomId })
         socketState.socket.emit('webrtc:call-request', { roomId })
     }
 
