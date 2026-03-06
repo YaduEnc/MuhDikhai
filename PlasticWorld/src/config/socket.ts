@@ -7,6 +7,7 @@ import jwtService from '../services/jwt.service';
 import sessionService from '../services/session.service';
 import userService from '../services/user.service';
 import messageService from '../services/message.service';
+import matchService from '../services/match.service';
 import logger from '../utils/logger';
 import { ExtendedError } from 'socket.io/dist/namespace';
 
@@ -317,6 +318,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           await Promise.all([
             userService.incrementRoomsEntered(userId),
             userService.incrementRoomsEntered(candidateId),
+            matchService.recordMatch(userId, candidateId, roomId, matchedTopic || undefined),
           ]);
 
           return;

@@ -13,6 +13,8 @@ import {
 } from '../utils/validation';
 import { deleteFirebaseUser } from '../config/firebase';
 import { upload } from '../middleware/multer';
+import friendshipService from '../services/friendship.service';
+import matchService from '../services/match.service';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -53,6 +55,24 @@ router.get(
           updatedAt: user.updatedAt,
         },
       },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/users/matches/recent
+ * Get recent random matches
+ */
+router.get(
+  '/matches/recent',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const matches = await matchService.getRecentMatches(userId);
+
+    res.status(200).json({
+      success: true,
+      data: { matches },
     });
   })
 );

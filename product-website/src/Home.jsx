@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { getSoundEnabled, toggleSound, initAudio } from './utils/soundEngine'
 import './Home.css'
 
 function DeleteConfirmationModal({ onConfirm, onCancel }) {
@@ -308,7 +309,44 @@ function SettingsView({ session, onBack, onSignOut, onDeleteRequest }) {
 
 const PREDEFINED_TOPICS = ['Deep talk', 'Music', 'Coding', 'Movies', 'Vent', 'Silence']
 
-export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar }) {
+function RecentMatches({ matches, onAddFriend }) {
+    if (!matches || matches.length === 0) return null;
+
+    return (
+        <div className="home-recents-section">
+            <div className="home-topic-header">
+                <span className="home-topic-title">Recent encounters</span>
+                <span className="home-topic-count">{matches.length} people</span>
+            </div>
+            <div className="recents-list">
+                {matches.map((match) => (
+                    <div key={match.id} className="recent-match-card">
+                        <div className="recent-avatar">
+                            {match.partner?.profilePictureUrl ? (
+                                <img src={match.partner.profilePictureUrl} alt="avatar" />
+                            ) : (
+                                <span className="avatar-placeholder">{match.partner?.name?.[0]?.toUpperCase() || 'S'}</span>
+                            )}
+                        </div>
+                        <div className="recent-info">
+                            <span className="recent-name">{match.partner?.name || 'Stranger'}</span>
+                            {match.sharedTopic && <span className="recent-topic">Talked about {match.sharedTopic}</span>}
+                        </div>
+                        <button
+                            className="recent-add-btn"
+                            title="Send Friend Request"
+                            onClick={() => onAddFriend(match.partner.id)}
+                        >
+                            + Friend
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onFetchMatches, onAddFriend }) {
 
     const [selectedTopics, setSelectedTopics] = useState([])
     const [customTopic, setCustomTopic] = useState('')
@@ -318,6 +356,27 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
 
     const [view, setView] = useState('home') // 'home' | 'profile' | 'settings'
     const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [recentMatches, setRecentMatches] = useState([])
+    const [loadingRecents, setLoadingRecents] = useState(false)
+
+    useEffect(() => {
+        if (view === 'home') {
+            setLoadingRecents(true);
+            onFetchMatches().then(matches => {
+                setRecentMatches(matches);
+                setLoadingRecents(false);
+            });
+        }
+    }, [view, onFetchMatches]);
+
+    const handleRecentAddFriend = async (userId) => {
+        try {
+            await onAddFriend(userId);
+            alert('Friend request sent!');
+        } catch (err) {
+            alert(err.message || 'Failed to send request');
+        }
+    };
 
     const hour = new Date().getHours()
     const greeting =
@@ -456,6 +515,11 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                 </div>
                 <span className="home-match-btn-arrow">↗</span>
             </button>
+
+            {/* Recent Matches */}
+            {!loadingRecents && recentMatches.length > 0 && (
+                <RecentMatches matches={recentMatches} onAddFriend={handleRecentAddFriend} />
+            )}
 
             {/* Secondary card grid */}
             <div className="home-card-grid">

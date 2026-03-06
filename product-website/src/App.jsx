@@ -372,6 +372,33 @@ function App() {
     }
   }
 
+  const handleFetchMatches = useCallback(async () => {
+    try {
+      const res = await authedFetch(`${BACKEND_URL}/api/v1/users/matches/recent`)
+      const json = await res.json()
+      return json.success ? json.data.matches : []
+    } catch (error) {
+      console.error('Failed to fetch recent matches:', error)
+      return []
+    }
+  }, [authedFetch])
+
+  const handleAddFriend = useCallback(async (userId) => {
+    try {
+      const res = await authedFetch(`${BACKEND_URL}/api/v1/friends/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error?.message || 'Failed to send friend request')
+      return true
+    } catch (error) {
+      console.error('Failed to add friend:', error)
+      throw error
+    }
+  }, [authedFetch])
+
   const handleDeleteAccount = async () => {
     try {
       const res = await authedFetch(`${BACKEND_URL}/api/v1/users/me`, { method: 'DELETE' })
@@ -462,6 +489,8 @@ function App() {
             onDeleteAccount={handleDeleteAccount}
             onUpdateProfile={handleUpdateProfile}
             onUploadAvatar={handleUploadAvatar}
+            onFetchMatches={handleFetchMatches}
+            onAddFriend={handleAddFriend}
           />
 
 

@@ -1248,3 +1248,117 @@
   color: var(--text-muted);
   opacity: 0.6;
 }
+
+/* ── Recent Matches Section ────────────────────────────── */
+.home-recents-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: home-fade-in 600ms ease-out both 200ms;
+}
+
+.recents-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.recent-match-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.recent-match-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.recent-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--bg-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.recent-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  font-weight: 600;
+  color: var(--accent-light);
+  font-size: 1.2rem;
+}
+
+.recent-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-name {
+  font-weight: 600;
+  color: #fff;
+  font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-topic {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-add-btn {
+  padding: 0.6rem 1rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.recent-add-btn:hover {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(251, 191, 119, 0.4);
+}
+
+@media (max-width: 640px) {
+  .recents-list {
+    grid-template-columns: 1fr;
+  }
+
+  .recent-match-card {
+    padding: 1.2rem;
+  }
+}
