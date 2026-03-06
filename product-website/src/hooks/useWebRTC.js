@@ -38,26 +38,59 @@ export function useWebRTC(socket, roomId, userId) {
     }, [socket, roomId])
 
     // ─── Start Media & Call ──────────────────────────────────────────────────
-    const startCall = useCallback(async (isInitiator) => {
+    const prepareLocalMedia = useCallback(async () => {
+        if (localStream) return true
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Your browser does not support video calls, or you are not using a secure (HTTPS) connection.')
+            return false
+        }
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 640, height: 480 },
+                video: { width: 640, height: 480, facingMode: 'user' },
                 audio: true
             })
             setLocalStream(stream)
-
-            const pc = createPC()
-            stream.getTracks().forEach(track => pc.addTrack(track, stream))
-
-            if (isInitiator) {
-                const offer = await pc.createOffer()
-                await pc.setLocalDescription(offer)
-                socket.emit('webrtc:signal', { roomId, signal: offer })
-            }
+            return true
         } catch (err) {
             console.error('Failed to get media devices:', err)
+            alert('Could not access camera/microphone. Please check browser permissions.')
+            return false
         }
-    }, [createPC, socket, roomId])
+    }, [localStream])
+
+    const establishConnection = useCallback(async (isInitiator) => {
+        if (!localStream) {
+            console.error("Cannot establish connection without local stream")
+            return
+        }
+
+        let pc = pcRef.current
+        if (!pc) {
+            pc = createPC()
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream))
+        }
+
+        if (isInitiator) {
+            const offer = await pc.createOffer()
+            await pc.setLocalDescription(offer)
+            socket.emit('webrtc:signal', { roomId, signal: offer })
+        }
+    }, [localStream, createPC, socket, roomId])
+
+    const stopLocalMedia = useCallback(() => {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop())
+            setLocalStream(null)
+        }
+        if (pcRef.current) {
+            pcRef.current.close()
+            pcRef.current = null
+        }
+        setRemoteStream(null)
+        pendingCandidates.current = []
+    }, [localStream])
 
     // ─── Handle Signaling ────────────────────────────────────────────────────
     useEffect(() => {
@@ -68,8 +101,8 @@ export function useWebRTC(socket, roomId, userId) {
 
             let pc = pcRef.current
             if (!pc && data.signal.type === 'offer') {
-                // If we get an offer but don't have a PC, create one and start media
-                await startCall(false)
+                // If we get an offer but don't have a PC, create one (we should have local media already if we accepted)
+                await establishConnection(false)
                 pc = pcRef.current
             }
 
@@ -105,7 +138,7 @@ export function useWebRTC(socket, roomId, userId) {
         return () => {
             socket.off('webrtc:signal', handleSignal)
         }
-    }, [socket, roomId, userId, startCall])
+    }, [socket, roomId, userId, establishConnection])
 
     // ─── Controls ────────────────────────────────────────────────────────────
     const toggleMute = () => {
@@ -136,6 +169,8 @@ export function useWebRTC(socket, roomId, userId) {
         isVideoOff,
         toggleMute,
         toggleVideo,
-        startCall
+        prepareLocalMedia,
+        establishConnection,
+        stopLocalMedia
     }
 }

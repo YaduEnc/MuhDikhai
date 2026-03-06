@@ -443,7 +443,9 @@ export default function Chat({
         isVideoOff,
         toggleMute,
         toggleVideo,
-        startCall
+        prepareLocalMedia,
+        establishConnection,
+        stopLocalMedia
     } = useWebRTC(socketState.socket, room?.roomId || room?.id, session?.user?.id)
 
     // Call Request Flow Listeners
@@ -461,9 +463,10 @@ export default function Chat({
             if (data.fromUserId !== session?.user?.id) {
                 if (data.status === 'accepted') {
                     setCallState('active')
-                    startCall(true) // Caller initiates P2P connection after acceptance
+                    establishConnection(true) // Caller initiates P2P connection after acceptance
                 } else {
                     setCallState('idle')
+                    stopLocalMedia()
                     alert(`${room?.partner?.name || 'Partner'} declined the video request.`)
                 }
             }
@@ -476,14 +479,23 @@ export default function Chat({
             socketState.socket.off('webrtc:call-request', handleCallRequest)
             socketState.socket.off('webrtc:call-response', handleCallResponse)
         }
-    }, [socketState.socket, room?.id, session?.user?.id, startCall, room?.partner?.name])
+    }, [socketState.socket, room?.id, session?.user?.id, establishConnection, stopLocalMedia, room?.partner?.name])
 
-    const initiateCall = () => {
+    const initiateCall = async () => {
+        const success = await prepareLocalMedia()
+        if (!success) return
+
         setCallState('requesting')
         socketState.socket.emit('webrtc:call-request', { roomId: room?.roomId || room?.id })
     }
 
-    const acceptCall = () => {
+    const acceptCall = async () => {
+        const success = await prepareLocalMedia()
+        if (!success) {
+            declineCall()
+            return
+        }
+
         setCallState('active')
         socketState.socket.emit('webrtc:call-response', { roomId: room?.roomId || room?.id, status: 'accepted' })
         // Callee waits for offer, starts media in handleSignal automatically on offer receipt
