@@ -15,10 +15,12 @@ export interface User {
   gender?: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
   lastSeen: Date;
   roomsEntered: number;
+  isAdmin: boolean;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
+
 
 export interface CreateUserData {
   firebaseUid: string;
@@ -27,7 +29,9 @@ export interface CreateUserData {
   profilePictureUrl?: string;
   gender?: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
   roomsEntered?: number;
+  isAdmin?: boolean;
 }
+
 
 export interface UpdateUserData {
   username?: string;
@@ -117,17 +121,18 @@ class UserService {
 
       const result = await database.query<User>(
         `INSERT INTO users (
-          firebase_uid, username, email, name, age, profile_picture_url, gender, status, rooms_entered
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          firebase_uid, username, email, name, age, profile_picture_url, gender, status, rooms_entered, is_admin
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING 
           id, firebase_uid as "firebaseUid", username, email,
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
           created_at as "createdAt", updated_at as "updatedAt",
-          rooms_entered as "roomsEntered"`,
-        [data.firebaseUid, username, data.email, data.name, defaultAge, data.profilePictureUrl || null, data.gender || 'prefer_not_to_say', 'offline', data.roomsEntered || 0]
+          rooms_entered as "roomsEntered", is_admin as "isAdmin"`,
+        [data.firebaseUid, username, data.email, data.name, defaultAge, data.profilePictureUrl || null, data.gender || 'prefer_not_to_say', 'offline', data.roomsEntered || 0, data.isAdmin || false]
       );
+
 
       const user = result.rows[0];
 
@@ -162,7 +167,7 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt"
+          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin"
         FROM users
         WHERE ${whereClause}
         ORDER BY 
@@ -171,6 +176,7 @@ class UserService {
         LIMIT 1`,
         [firebaseUid, email || '']
       );
+
 
       return result.rows[0] || null;
     } catch (error) {
@@ -198,12 +204,13 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt"
+          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin"
         FROM users
         WHERE ${whereClause}
         LIMIT 1`,
         [firebaseUid]
       );
+
 
       return result.rows[0] || null;
     } catch (error) {
@@ -230,12 +237,13 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt"
+          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin"
         FROM users
         WHERE ${whereClause}
         LIMIT 1`,
         [email]
       );
+
 
       return result.rows[0] || null;
     } catch (error) {
@@ -292,12 +300,13 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt"
+          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin"
         FROM users
         WHERE id = $1 AND is_active = true
         LIMIT 1`,
         [userId]
       );
+
 
       return result.rows[0] || null;
     } catch (error) {
@@ -421,9 +430,10 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt"`,
+          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin"`,
         values
       );
+
 
       if (result.rows.length === 0) {
         throw new Error('User not found');

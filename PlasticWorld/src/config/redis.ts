@@ -251,16 +251,27 @@ class RedisClient {
     if (!this.subscriber) {
       throw new Error('Redis subscriber not initialized');
     }
-      await this.subscriber.subscribe(channel);
-      this.subscriber.on('message', (ch: string, msg: string) => {
-        if (ch === channel) {
-          callback(msg);
-        }
-      });
+    await this.subscriber.subscribe(channel);
+    this.subscriber.on('message', (ch: string, msg: string) => {
+      if (ch === channel) {
+        callback(msg);
+      }
+    });
+  }
+
+  /**
+   * Get keys matching a pattern
+   */
+  public async keys(pattern: string): Promise<string[]> {
+    if (!this.client) {
+      throw new Error('Redis client not initialized');
+    }
+    return await this.client.keys(pattern);
   }
 
   /**
    * Check Redis health
+
    */
   public async healthCheck(): Promise<{ status: string; latency?: number }> {
     try {

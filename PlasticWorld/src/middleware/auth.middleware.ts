@@ -15,11 +15,13 @@ declare global {
         email: string;
         username?: string;
         name: string;
+        isAdmin: boolean;
       };
       deviceId?: string;
     }
   }
 }
+
 
 /**
  * Authentication middleware - verifies JWT access token
@@ -72,6 +74,7 @@ export const authenticate = async (
       email: user.email,
       username: user.username || undefined,
       name: user.name,
+      isAdmin: user.isAdmin,
     };
     req.deviceId = payload.deviceId;
 
@@ -121,3 +124,19 @@ export const optionalAuthenticate = async (
     next();
   }
 };
+
+/**
+ * Admin middleware - ensures user has isAdmin flag
+ */
+export const isAdmin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  if (!req.user || !req.user.isAdmin) {
+    res.status(403).json({ error: 'Forbidden: Admin access required' });
+    return;
+  }
+  next();
+};
+

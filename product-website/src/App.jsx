@@ -4,6 +4,8 @@ import Home from './Home'
 import Chat from './Chat'
 import Onboarding from './Onboarding'
 import Landing from './Landing'
+import AdminDashboard from './admin/AdminDashboard'
+
 import {
   signInWithGoogle,
   refreshSession,
@@ -59,6 +61,15 @@ function App() {
   const [authError, setAuthError] = useState('')
   // Increment this to force a socket reconnect (e.g. after token refresh)
   const [socketVersion, setSocketVersion] = useState(0)
+  const [isAdminView, setIsAdminView] = useState(window.location.pathname === '/admin')
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setIsAdminView(window.location.pathname === '/admin')
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
 
 
@@ -407,7 +418,19 @@ function App() {
       </header>
 
       <main>
-        {isHome && (
+        {isAdminView && isSignedIn && session.user.isAdmin && (
+          <AdminDashboard session={session} />
+        )}
+
+        {isAdminView && (!isSignedIn || !session.user.isAdmin) && (
+          <div className="admin-access-denied">
+            <h2>Access Denied</h2>
+            <p>You don't have permission to access this terminal.</p>
+            <button onClick={() => { setIsAdminView(false); window.history.pushState({}, '', '/'); }}>Return Home</button>
+          </div>
+        )}
+
+        {!isAdminView && isHome && (
           <Home
             session={session}
             onlineCount={onlineCount}
@@ -468,49 +491,52 @@ function App() {
         )}
       </main>
 
-      <footer className="footer">
-        <div className="footer-main">
-          <div className="footer-brand">
-            <div className="footer-brand-row">
-              <span className="footer-mark" />
-              <span className="footer-name">Muhdikhai</span>
+      {!isAdminView && (
+        <footer className="footer">
+          <div className="footer-main">
+            <div className="footer-brand">
+              <div className="footer-brand-row">
+                <span className="footer-mark" />
+                <span className="footer-name">Muhdikhai</span>
+              </div>
+              <p className="footer-tagline">
+                A privacy‑first random chat experiment. No infinite scroll.
+                Just one stranger and a softer interface.
+              </p>
             </div>
-            <p className="footer-tagline">
-              A privacy‑first random chat experiment. No infinite scroll.
-              Just one stranger and a softer interface.
-            </p>
-          </div>
 
-          <div className="footer-groups">
-            <div className="footer-group">
-              <span className="footer-group-title">Experiment</span>
-              <div className="footer-links-v2">
-                <span className="footer-link-v2">Changelog</span>
-                <span className="footer-link-v2">Principles</span>
-                <span className="footer-link-v2">Status</span>
+            <div className="footer-groups">
+              <div className="footer-group">
+                <span className="footer-group-title">Experiment</span>
+                <div className="footer-links-v2">
+                  <span className="footer-link-v2">Changelog</span>
+                  <span className="footer-link-v2">Principles</span>
+                  <span className="footer-link-v2">Status</span>
+                </div>
+              </div>
+              <div className="footer-group">
+                <span className="footer-group-title">Social</span>
+                <div className="footer-links-v2">
+                  <span className="footer-link-v2">Twitter</span>
+                  <span className="footer-link-v2">GitHub</span>
+                  <span className="footer-link-v2">Contact</span>
+                </div>
               </div>
             </div>
-            <div className="footer-group">
-              <span className="footer-group-title">Social</span>
-              <div className="footer-links-v2">
-                <span className="footer-link-v2">Twitter</span>
-                <span className="footer-link-v2">GitHub</span>
-                <span className="footer-link-v2">Contact</span>
-              </div>
+          </div>
+
+          <div className="footer-bottom">
+            <div className="footer-credit">
+              Developed &amp; Maintained by <span className="dev-name">Yaduraj Singh</span>
+            </div>
+            <div className="footer-meta-row">
+              <span className="footer-pill-v2">Built on PlasticWorld</span>
+              <span className="footer-pill-v2">© 2026 Muhdikhai</span>
             </div>
           </div>
-        </div>
+        </footer>
+      )}
 
-        <div className="footer-bottom">
-          <div className="footer-credit">
-            Developed &amp; Maintained by <span className="dev-name">Yaduraj Singh</span>
-          </div>
-          <div className="footer-meta-row">
-            <span className="footer-pill-v2">Built on PlasticWorld</span>
-            <span className="footer-pill-v2">© 2026 Muhdikhai</span>
-          </div>
-        </div>
-      </footer>
 
     </div>
   )
