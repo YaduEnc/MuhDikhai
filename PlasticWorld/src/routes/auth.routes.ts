@@ -146,6 +146,7 @@ router.post(
           gender: user.gender,
           age: user.age,
           status: user.status,
+          isAdmin: user.isAdmin,
           isProfileComplete: !!user.username && !!user.age,
         },
         device: {
@@ -211,6 +212,7 @@ router.post(
           bio: updatedUser.bio,
           gender: updatedUser.gender,
           status: updatedUser.status,
+          isAdmin: updatedUser.isAdmin,
         },
       },
     });

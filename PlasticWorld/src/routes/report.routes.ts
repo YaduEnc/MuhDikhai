@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import reportService from '../services/report.service';
 import { body, validationResult } from 'express-validator';
+import { authenticate } from '../middleware/auth.middleware';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -12,6 +13,7 @@ const router = Router();
  */
 router.post(
     '/',
+    authenticate,
     [
         body('reportedId').isUUID().withMessage('Invalid reported user ID'),
         body('reason').notEmpty().withMessage('Reason is required'),
