@@ -480,6 +480,13 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     socket.on('webrtc:call-request', (data: { roomId: string }) => {
       try {
         const currentRoomId = userToRandomRoom.get(userId);
+        console.log('[DEBUG webrtc:call-request]', {
+          userId,
+          dataRoomId: data.roomId,
+          currentRoomId,
+          match: currentRoomId === data.roomId,
+          socketsInRoom: currentRoomId ? io.sockets.adapter.rooms.get(currentRoomId)?.size : 0,
+        });
         if (!currentRoomId || currentRoomId !== data.roomId) return;
 
         // Notify the partner of the incoming call

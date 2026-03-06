@@ -482,11 +482,14 @@ export default function Chat({
     }, [socketState.socket, room?.id, session?.user?.id, establishConnection, stopLocalMedia, room?.partner?.name])
 
     const initiateCall = async () => {
+        console.log('[DEBUG initiateCall] socket:', !!socketState.socket, 'connected:', socketState.socket?.connected, 'roomId:', room?.roomId || room?.id)
         const success = await prepareLocalMedia()
         if (!success) return
 
         setCallState('requesting')
-        socketState.socket.emit('webrtc:call-request', { roomId: room?.roomId || room?.id })
+        const roomId = room?.roomId || room?.id
+        console.log('[DEBUG initiateCall] emitting webrtc:call-request', { roomId })
+        socketState.socket.emit('webrtc:call-request', { roomId })
     }
 
     const acceptCall = async () => {
