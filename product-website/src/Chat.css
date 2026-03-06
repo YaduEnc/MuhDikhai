@@ -1406,3 +1406,15 @@
     color: #fff;
     transform: translateY(-1px);
 }
+
+.chat-shared-topic {
+    font-size: 0.72rem;
+    color: var(--accent);
+    background: rgba(232, 177, 108, 0.1);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    margin-top: 0.3rem;
+    font-weight: 500;
+    display: inline-block;
+    letter-spacing: 0.02em;
+}

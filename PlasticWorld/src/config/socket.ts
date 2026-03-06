@@ -31,10 +31,16 @@ const typingUsers = new Map<string, Set<string>>();
 interface RandomRoom {
   id: string;
   users: [string, string]; // userIds
+  topic?: string;
 }
 
-// FIFO queue of userIds waiting for a random partner
-const randomQueue: string[] = [];
+interface QueuedUser {
+  userId: string;
+  topics: string[];
+}
+
+// Queue of users waiting for a random partner
+const randomQueue: QueuedUser[] = [];
 
 // Map userId -> current random roomId (if any)
 const userToRandomRoom = new Map<string, string>();
@@ -192,8 +198,10 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Random chat: join the gentle queue
      */
-    socket.on('random:join', async () => {
+    socket.on('random:join', async (payload?: { topics?: string[] }) => {
       try {
+        const userTopics = payload?.topics || [];
+
         // If user is already in a room, just echo back state
         const existingRoomId = userToRandomRoom.get(userId);
         if (existingRoomId) {
@@ -205,39 +213,69 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             socket.emit('random:matched', {
               roomId: existingRoomId,
               partner,
+              topic: room.topic,
             });
             return;
           }
         }
 
         // If already queued, do nothing
-        if (randomQueue.includes(userId)) {
+        if (randomQueue.find(q => q.userId === userId)) {
           socket.emit('random:waiting');
           return;
         }
 
-        // Try to find a partner from the queue
-        while (randomQueue.length > 0) {
-          const candidateId = randomQueue.shift();
-          if (!candidateId || candidateId === userId) {
-            continue;
-          }
+        // --- Matching Logic ---
+        let partnerIdx = -1;
+        let matchedTopic = '';
 
-          // Ensure candidate is still online and not already in a room
-          if (!activeUsers.has(candidateId) || userToRandomRoom.has(candidateId)) {
-            continue;
+        // 1. Try to find someone with a shared topic
+        if (userTopics.length > 0) {
+          for (let i = 0; i < randomQueue.length; i++) {
+            const candidate = randomQueue[i];
+
+            // Basic sanity checks
+            if (!activeUsers.has(candidate.userId) || userToRandomRoom.has(candidate.userId)) {
+              continue;
+            }
+
+            // Find intersection
+            const shared = candidate.topics.filter(t => userTopics.includes(t));
+            if (shared.length > 0) {
+              partnerIdx = i;
+              matchedTopic = shared[0]; // Take the first shared topic
+              break;
+            }
           }
+        }
+
+        // 2. Fallback: Take the first valid person in queue if no topic match
+        if (partnerIdx === -1) {
+          for (let i = 0; i < randomQueue.length; i++) {
+            const candidate = randomQueue[i];
+            if (activeUsers.has(candidate.userId) && !userToRandomRoom.has(candidate.userId)) {
+              partnerIdx = i;
+              break;
+            }
+          }
+        }
+
+        // 3. Perform the match if we found someone
+        if (partnerIdx !== -1) {
+          const [{ userId: candidateId }] = randomQueue.splice(partnerIdx, 1);
 
           const roomId = `random:${[userId, candidateId].sort().join(':')}:${Date.now()}`;
           const room: RandomRoom = {
             id: roomId,
             users: [userId, candidateId],
+            topic: matchedTopic || undefined,
           };
+
           randomRooms.set(roomId, room);
           userToRandomRoom.set(userId, roomId);
           userToRandomRoom.set(candidateId, roomId);
 
-          // Fetch partner profiles (public view)
+          // Fetch partner profiles
           const [selfProfile, partnerProfile] = await Promise.all([
             userService.getPublicUserProfile(userId),
             userService.getPublicUserProfile(candidateId),
@@ -285,7 +323,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         }
 
         // No partner yet; enqueue user
-        randomQueue.push(userId);
+        randomQueue.push({ userId, topics: userTopics });
         socket.emit('random:waiting');
       } catch (error) {
         logger.error('Failed to join random chat queue', {
@@ -365,7 +403,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     socket.on('random:leave', () => {
       try {
         // Remove from queue if waiting
-        const queueIndex = randomQueue.indexOf(userId);
+        const queueIndex = randomQueue.findIndex(q => q.userId === userId);
         if (queueIndex !== -1) {
           randomQueue.splice(queueIndex, 1);
         }
@@ -633,7 +671,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         logger.info('Socket disconnected', { userId, socketId: socket.id });
 
         // Clean up random queue / rooms
-        const queueIndex = randomQueue.indexOf(userId);
+        const queueIndex = randomQueue.findIndex(q => q.userId === userId);
         if (queueIndex !== -1) {
           randomQueue.splice(queueIndex, 1);
         }

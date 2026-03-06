@@ -483,7 +483,11 @@ export default function Chat({
                                     ? 'Connected · end-to-end encrypted'
                                     : 'Ready when you are'}
                         </span>
-
+                        {isMatched && room?.topic && (
+                            <span className="chat-shared-topic">
+                                Shared interest: {room.topic}
+                            </span>
+                        )}
 
                     </div>
                 </div>

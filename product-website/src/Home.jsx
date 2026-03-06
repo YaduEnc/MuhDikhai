@@ -271,7 +271,12 @@ function SettingsView({ onBack, onSignOut, onDeleteRequest }) {
     )
 }
 
+const PREDEFINED_TOPICS = ['Deep talk', 'Music', 'Coding', 'Movies', 'Vent', 'Silence']
+
 export default function Home({ session, onlineCount, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar }) {
+
+    const [selectedTopics, setSelectedTopics] = useState([])
+
 
 
     const [view, setView] = useState('home') // 'home' | 'profile' | 'settings'
@@ -284,6 +289,17 @@ export default function Home({ session, onlineCount, onStartMatch, onSignOut, on
     const name = session?.user?.name?.split(' ')[0] || 'you'
 
 
+    const toggleTopic = (topic) => {
+        setSelectedTopics(prev =>
+            prev.includes(topic)
+                ? prev.filter(t => t !== topic)
+                : [...prev, topic]
+        )
+    }
+
+    const handleStartMatch = () => {
+        onStartMatch(selectedTopics)
+    }
 
     if (view === 'profile') {
         return (
@@ -333,8 +349,29 @@ export default function Home({ session, onlineCount, onStartMatch, onSignOut, on
                 </p>
             </div>
 
+            {/* Topic Selection */}
+            <div className="home-topic-section">
+                <div className="home-topic-header">
+                    <span className="home-topic-title">What&apos;s on your mind?</span>
+                    <span className="home-topic-count">{selectedTopics.length || 'None'} selected</span>
+                </div>
+                <div className="home-topic-grid">
+                    {PREDEFINED_TOPICS.map(topic => (
+                        <button
+                            key={topic}
+                            type="button"
+                            className={`topic-pill ${selectedTopics.includes(topic) ? 'active' : ''}`}
+                            onClick={() => toggleTopic(topic)}
+                        >
+                            {topic}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* Primary action — Start Matching */}
-            <button className="home-match-btn" type="button" onClick={onStartMatch}>
+            <button className="home-match-btn" type="button" onClick={handleStartMatch}>
+
                 <div className="home-match-btn-left">
                     <div className="home-match-glow" />
                     <div className="home-match-btn-icon">◎</div>

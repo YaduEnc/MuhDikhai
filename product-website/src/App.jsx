@@ -166,6 +166,7 @@ function App() {
           setChatMessages([])
         })
 
+
         socket.on('random:message', (msg) => {
           setChatMessages((prev) => {
             let processedMsg = { ...msg, reactions: [] }
@@ -410,12 +411,13 @@ function App() {
           <Home
             session={session}
             onlineCount={onlineCount}
-            onStartMatch={() => {
+            onStartMatch={(topics) => {
               setShowChat(true)
               setSocketState((prev) => ({ ...prev, phase: 'matching' }))
               // Give React one tick to render the chat screen, then join queue
-              setTimeout(() => socketRef.current?.emit('random:join'), 50)
+              setTimeout(() => socketRef.current?.emit('random:join', { topics }), 50)
             }}
+
             onSignOut={handleSignOut}
             onDeleteAccount={handleDeleteAccount}
             onUpdateProfile={handleUpdateProfile}
