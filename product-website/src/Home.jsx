@@ -292,7 +292,7 @@ function SettingsView({ session, onBack, onSignOut, onDeleteRequest }) {
 
 const PREDEFINED_TOPICS = ['Deep talk', 'Music', 'Coding', 'Movies', 'Vent', 'Silence']
 
-export default function Home({ session, onlineCount, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar }) {
+export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar }) {
 
     const [selectedTopics, setSelectedTopics] = useState([])
     const [customTopic, setCustomTopic] = useState('')
@@ -369,7 +369,7 @@ export default function Home({ session, onlineCount, onStartMatch, onSignOut, on
     }
 
     return (
-        <div className="home-shell">
+        <div className={`home-shell ${isTransitioning ? 'transition-out' : ''}`}>
             {/* Greeting */}
             <div className="home-greeting">
                 <div className="home-greeting-eyebrow">
@@ -428,7 +428,7 @@ export default function Home({ session, onlineCount, onStartMatch, onSignOut, on
             </div>
 
             {/* Primary action — Start Matching */}
-            <button className="home-match-btn" type="button" onClick={handleStartMatch}>
+            <button className={`home-match-btn ${isTransitioning ? 'expanding' : ''}`} type="button" onClick={handleStartMatch}>
 
                 <div className="home-match-btn-left">
                     <div className="home-match-glow" />

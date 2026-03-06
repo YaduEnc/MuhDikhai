@@ -53,6 +53,7 @@ function App() {
   const [session, setSession] = useState(() => getSession())
   const [onlineCount, setOnlineCount] = useState(0)
   const [showChat, setShowChat] = useState(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
   const [room, setRoom] = useState(null)
   const [socketState, setSocketState] = useState({ status: 'disconnected', phase: 'idle' })
   const [chatMessages, setChatMessages] = useState([])
@@ -290,6 +291,7 @@ function App() {
     clearSession()
     setSession(null)
     setShowChat(false)
+    setIsTransitioning(false)
     setRoom(null)
     setSocketState({ status: 'disconnected', phase: 'idle' })
   }
@@ -299,6 +301,7 @@ function App() {
       socketRef.current.emit('random:leave')
     }
     setShowChat(false)
+    setIsTransitioning(false)
     setRoom(null)
     setSocketState((prev) => ({ ...prev, phase: 'idle' }))
   }
@@ -434,10 +437,18 @@ function App() {
           <Home
             session={session}
             onlineCount={onlineCount}
+            isTransitioning={isTransitioning}
             onStartMatch={(topics) => {
-              setShowChat(true)
+              setIsTransitioning(true)
               setSocketState((prev) => ({ ...prev, phase: 'matching' }))
-              // Give React one tick to render the chat screen, then join queue
+
+              // Delay chat render to allow CSS transition to play
+              setTimeout(() => {
+                setShowChat(true)
+                setIsTransitioning(false)
+              }, 600) // Match CSS animation duration
+
+              // Give React one tick, then join queue
               setTimeout(() => socketRef.current?.emit('random:join', { topics }), 50)
             }}
 
