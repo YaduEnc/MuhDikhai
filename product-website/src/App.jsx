@@ -129,10 +129,11 @@ function App() {
           reconnectionDelay: 2000,
         })
         socketRef.current = socket
+        setSocketState((prev) => ({ ...prev, socket }))
 
         socket.on('connect', () => {
           refreshingRef.current = false
-          setSocketState((prev) => ({ ...prev, status: 'connected' }))
+          setSocketState((prev) => ({ ...prev, socket, status: 'connected' }))
         })
 
         socket.on('connect_error', async (err) => {
@@ -295,7 +296,7 @@ function App() {
     setShowChat(false)
     setIsTransitioning(false)
     setRoom(null)
-    setSocketState({ status: 'disconnected', phase: 'idle' })
+    setSocketState({ status: 'disconnected', phase: 'idle', socket: null })
   }
 
   const handleLeaveChat = () => {
