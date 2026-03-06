@@ -195,7 +195,14 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
     )
 }
 
-function SettingsView({ onBack, onSignOut, onDeleteRequest }) {
+function SettingsView({ session, onBack, onSignOut, onDeleteRequest }) {
+    const isAdmin = session?.user?.isAdmin;
+
+    const navigateToAdmin = () => {
+        window.history.pushState({}, '', '/admin');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+    };
+
     return (
         <div className="inner-view">
             <button className="back-btn" type="button" onClick={onBack}>
@@ -205,6 +212,18 @@ function SettingsView({ onBack, onSignOut, onDeleteRequest }) {
             <div className="settings-card">
                 <div className="settings-group">
                     <div className="settings-group-label">Account</div>
+
+                    {isAdmin && (
+                        <button className="settings-row" type="button" onClick={navigateToAdmin} style={{ marginBottom: '1rem', border: '1px solid rgba(48, 209, 88, 0.3)', background: 'rgba(48, 209, 88, 0.05)' }}>
+                            <span className="settings-row-icon" style={{ color: '#30d158' }}>🪐</span>
+                            <div className="settings-row-body">
+                                <span className="settings-row-title" style={{ color: '#30d158' }}>Admin Terminal</span>
+                                <span className="settings-row-desc">Access growth stats and safety reports.</span>
+                            </div>
+                            <span className="settings-row-arrow">→</span>
+                        </button>
+                    )}
+
                     <button className="settings-row danger" type="button" onClick={onSignOut}>
                         <span className="settings-row-icon">⎋</span>
                         <div className="settings-row-body">
@@ -334,6 +353,7 @@ export default function Home({ session, onlineCount, onStartMatch, onSignOut, on
         return (
             <>
                 <SettingsView
+                    session={session}
                     onBack={() => setView('home')}
                     onSignOut={onSignOut}
                     onDeleteRequest={() => setShowDeleteModal(true)}
