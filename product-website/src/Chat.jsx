@@ -695,44 +695,56 @@ export default function Chat({
 
             {/* Video Portals (Active Call) */}
             {callState === 'active' && (
-                <div className="video-portals">
-                    <div className="video-portal remote-portal">
-                        {remoteStream ? (
-                            <video
-                                autoPlay
-                                playsInline
-                                ref={el => { if (el) el.srcObject = remoteStream }}
-                            />
-                        ) : (
-                            <div className="video-placeholder">
-                                <div className="placeholder-aura" />
-                                <span>Connecting video...</span>
+                <div className="video-call-container">
+                    <div className="video-grid">
+                        {/* Remote Video */}
+                        <div className="video-tile remote-tile">
+                            {remoteStream ? (
+                                <video
+                                    autoPlay
+                                    playsInline
+                                    ref={el => { if (el) el.srcObject = remoteStream }}
+                                />
+                            ) : (
+                                <div className="video-placeholder">
+                                    <div className="placeholder-aura" />
+                                    <span>Connecting video…</span>
+                                </div>
+                            )}
+                            <div className="tile-label">
+                                <span>{room?.partner?.name || 'Partner'}</span>
                             </div>
-                        )}
-                        <div className="video-overlay">
-                            <span className="partner-name">{room?.partner?.name}</span>
+                        </div>
+
+                        {/* Local Video */}
+                        <div className="video-tile local-tile">
+                            {localStream ? (
+                                <video
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    ref={el => { if (el) el.srcObject = localStream }}
+                                />
+                            ) : (
+                                <div className="video-placeholder" />
+                            )}
+                            <div className="tile-label">
+                                <span>You</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="video-portal local-portal">
-                        {localStream ? (
-                            <video
-                                autoPlay
-                                playsInline
-                                muted
-                                ref={el => { if (el) el.srcObject = localStream }}
-                            />
-                        ) : (
-                            <div className="video-placeholder" />
-                        )}
-                        <div className="video-controls">
-                            <button className={`video-ctrl ${isMuted ? 'off' : ''}`} onClick={toggleMute}>
-                                {isMuted ? '🎙️' : '🎤'}
-                            </button>
-                            <button className={`video-ctrl ${isVideoOff ? 'off' : ''}`} onClick={toggleVideo}>
-                                {isVideoOff ? '🙈' : '👁️'}
-                            </button>
-                        </div>
+                    {/* Call Controls Bar */}
+                    <div className="call-controls-bar">
+                        <button className={`call-ctrl-btn ${isMuted ? 'off' : ''}`} onClick={toggleMute} title={isMuted ? 'Unmute' : 'Mute'}>
+                            {isMuted ? '🔇' : '🎤'}
+                        </button>
+                        <button className={`call-ctrl-btn ${isVideoOff ? 'off' : ''}`} onClick={toggleVideo} title={isVideoOff ? 'Turn Video On' : 'Turn Video Off'}>
+                            {isVideoOff ? '�' : '🎥'}
+                        </button>
+                        <button className="call-ctrl-btn end-call" onClick={() => { stopLocalMedia(); setCallState('idle') }} title="End Call">
+                            📞
+                        </button>
                     </div>
                 </div>
             )}
