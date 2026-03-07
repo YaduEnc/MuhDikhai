@@ -68,6 +68,8 @@ function App() {
   const [matchPrefs, setMatchPrefs] = useState({ topics: [], preference: 'everyone' })
 
   const [callOverlayState, setCallOverlayState] = useState({
+    status: 'idle', // 'idle', 'requesting', 'incoming', 'active'
+    partner: null,
     type: 'random', // 'random' or 'friend'
     isInitiator: false
   })
@@ -202,7 +204,8 @@ function App() {
         })
         socket.on('random:left', () => {
           const currentRoom = roomRef.current
-          if (currentRoom?.partner) {
+          // Only show vibe check if we were actually matched and there is a partner to vote on
+          if (socketState.phase === 'matched' && currentRoom?.partner?.id) {
             setVibeCheckState({
               show: true,
               partner: currentRoom.partner,
