@@ -62,6 +62,7 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [socketVersion, setSocketVersion] = useState(0)
   const [isAdminView, setIsAdminView] = useState(window.location.pathname === '/admin')
+  const [unreadCounts, setUnreadCounts] = useState({})
 
   const [callOverlayState, setCallOverlayState] = useState({
     status: 'idle', // 'idle', 'requesting', 'incoming', 'active'
@@ -126,6 +127,11 @@ function App() {
         socket.on('connect', () => {
           refreshingRef.current = false
           setSocketState((prev) => ({ ...prev, socket, status: 'connected' }))
+          // Fetch unread counts on connect
+          authedFetch(`${BACKEND_URL}/api/v1/messages/unread-counts`)
+            .then(r => r.json())
+            .then(json => { if (json.success) setUnreadCounts(json.data.counts || {}) })
+            .catch(() => { })
         })
 
         socket.on('connect_error', async (err) => {
@@ -183,6 +189,19 @@ function App() {
         socket.on('random:left', () => setSocketState((prev) => ({ ...prev, phase: 'partner-left' })))
         socket.on('typing:start', () => setPartnerTyping(true))
         socket.on('typing:stop', () => setPartnerTyping(false))
+
+        // Track unread messages when NOT in that friend's chat
+        socket.on('message:received', (payload) => {
+          const senderId = payload.message?.senderId
+          if (senderId) {
+            setUnreadCounts(prev => {
+              // Only increment if NOT viewing this friend's chat
+              const currentFriend = sessionRef.current // we'll rely on component re-render
+              return { ...prev, [senderId]: (prev[senderId] || 0) + 1 }
+            })
+          }
+        })
+
         socket.on('disconnect', () => setSocketState((prev) => ({ ...prev, status: 'disconnected' })))
 
         // Global Call Signaling
@@ -409,6 +428,12 @@ function App() {
   const handleOpenFriendChat = (friend) => {
     setActiveFriend(friend)
     setSocketState(prev => ({ ...prev, phase: 'friend-chat' }))
+    // Clear unread count for this friend
+    setUnreadCounts(prev => {
+      const next = { ...prev }
+      delete next[friend.user.id]
+      return next
+    })
   }
 
   const handleBackFromFriendChat = () => {
@@ -540,6 +565,7 @@ function App() {
             onFetchFriendships={handleFetchFriendships}
             onRespondToFriendRequest={handleRespondToFriendRequest}
             onOpenChat={handleOpenFriendChat}
+            unreadCounts={unreadCounts}
           />
         )}
         {needsOnboarding && (

@@ -207,12 +207,12 @@ class MessageService {
     limit: number = 50,
     offset: number = 0,
     beforeMessageId?: string
-  ): Promise<{ 
+  ): Promise<{
     messages: Array<Omit<Message, 'encryptedContent' | 'encryptedKey'> & {
       encryptedContent: string | null;
       encryptedKey: string | null;
-    }>; 
-    total: number 
+    }>;
+    total: number
   }> {
     try {
       // Build WHERE clause
@@ -220,7 +220,7 @@ class MessageService {
         (sender_id = $1 AND recipient_id = $2) OR 
         (sender_id = $2 AND recipient_id = $1)
       ) AND is_deleted = false`;
-      
+
       const queryParams: any[] = [userId1, userId2];
       let paramIndex = 3;
 
@@ -288,7 +288,7 @@ class MessageService {
         senderId: row.senderId,
         recipientId: row.recipientId,
         // Convert Buffer to base64 string for JSON serialization
-        encryptedContent: row.encryptedContent 
+        encryptedContent: row.encryptedContent
           ? row.encryptedContent.toString('base64')
           : null,
         encryptedKey: row.encryptedKey
@@ -380,7 +380,7 @@ class MessageService {
 
       const result = await database.query<Message>(
         `UPDATE messages 
-        SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+        SET ${updates.join(', ')}, edited_at = CURRENT_TIMESTAMP
         WHERE id = $${paramIndex} AND is_deleted = false
         RETURNING 
           id, sender_id as "senderId", recipient_id as "recipientId",
@@ -430,7 +430,7 @@ class MessageService {
       // Soft delete
       await database.query(
         `UPDATE messages 
-        SET is_deleted = true, updated_at = CURRENT_TIMESTAMP
+        SET is_deleted = true, deleted_at = CURRENT_TIMESTAMP
         WHERE id = $1`,
         [messageId]
       );
@@ -466,7 +466,7 @@ class MessageService {
       if (message.status === 'sent') {
         await database.query(
           `UPDATE messages 
-          SET status = 'delivered', updated_at = CURRENT_TIMESTAMP
+          SET status = 'delivered', delivered_at = CURRENT_TIMESTAMP
           WHERE id = $1`,
           [messageId]
         );
@@ -506,7 +506,7 @@ class MessageService {
       if (message.status !== 'read') {
         await database.query(
           `UPDATE messages 
-          SET status = 'read', updated_at = CURRENT_TIMESTAMP
+          SET status = 'read', read_at = CURRENT_TIMESTAMP
           WHERE id = $1`,
           [messageId]
         );
@@ -538,7 +538,7 @@ class MessageService {
       // Verify all messages belong to user and update them
       await database.query(
         `UPDATE messages 
-        SET status = 'read', updated_at = CURRENT_TIMESTAMP
+        SET status = 'read', read_at = CURRENT_TIMESTAMP
         WHERE id = ANY($1::uuid[]) 
         AND recipient_id = $2 
         AND status != 'read'

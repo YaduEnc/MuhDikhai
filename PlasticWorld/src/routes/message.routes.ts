@@ -9,6 +9,24 @@ import logger from '../utils/logger';
 const router = Router();
 
 /**
+ * GET /api/v1/messages/unread-counts
+ * Get unread message counts per conversation
+ */
+router.get(
+  '/unread-counts',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const counts = await messageService.getUnreadCountPerConversation(userId);
+
+    res.status(200).json({
+      success: true,
+      data: { counts },
+    });
+  })
+);
+
+/**
  * GET /api/v1/messages/conversations
  * Get all conversations for the current user
  */

@@ -1485,3 +1485,55 @@
   background: rgba(255, 69, 58, 0.15);
   border-color: rgba(255, 69, 58, 0.3);
 }
+
+/* ── Unread Badge Styles ──────────────────────────────── */
+.recent-match-card.has-unread {
+  border-color: rgba(251, 191, 119, 0.25);
+  background: rgba(251, 191, 119, 0.04);
+}
+
+.recent-avatar {
+  position: relative;
+}
+
+.unread-dot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: #f87171;
+  border-radius: 50%;
+  border: 2px solid rgba(7, 9, 26, 0.95);
+  animation: unread-pulse 2s infinite;
+}
+
+@keyframes unread-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(248, 113, 113, 0);
+  }
+}
+
+.unread-badge {
+  background: #f87171;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  min-width: 18px;
+  text-align: center;
+  margin-right: 0.4rem;
+  animation: unread-pulse 2s infinite;
+}
+
+.recent-match-card.has-unread .recent-topic {
+  color: #fbbf77;
+  font-weight: 500;
+}

@@ -339,34 +339,41 @@ function FriendRequests({ requests, onRespond }) {
     )
 }
 
-function FriendsList({ friends, onOpenChat }) {
+function FriendsList({ friends, onOpenChat, unreadCounts = {} }) {
     if (!friends || friends.length === 0) {
         return <div className="friends-empty">No friends yet. Start matching!</div>
     }
 
     return (
         <div className="friends-list">
-            {friends.map((friend) => (
-                <div key={friend.id} className="recent-match-card">
-                    <div className="recent-avatar">
-                        {friend.user?.profilePictureUrl ? (
-                            <img src={friend.user.profilePictureUrl} alt="avatar" />
-                        ) : (
-                            <span className="avatar-placeholder">{friend.user?.name?.[0]?.toUpperCase() || 'S'}</span>
-                        )}
+            {friends.map((friend) => {
+                const unread = unreadCounts[friend.user?.id] || 0
+                return (
+                    <div key={friend.id} className={`recent-match-card ${unread > 0 ? 'has-unread' : ''}`}>
+                        <div className="recent-avatar">
+                            {friend.user?.profilePictureUrl ? (
+                                <img src={friend.user.profilePictureUrl} alt="avatar" />
+                            ) : (
+                                <span className="avatar-placeholder">{friend.user?.name?.[0]?.toUpperCase() || 'S'}</span>
+                            )}
+                            {unread > 0 && <span className="unread-dot" />}
+                        </div>
+                        <div className="recent-info">
+                            <span className="recent-name">{friend.user?.name || 'Stranger'}</span>
+                            <span className="recent-topic">{unread > 0 ? `${unread} new message${unread > 1 ? 's' : ''}` : 'Friend'}</span>
+                        </div>
+                        <button className="recent-add-btn" onClick={() => onOpenChat(friend)}>
+                            {unread > 0 && <span className="unread-badge">{unread}</span>}
+                            Message
+                        </button>
                     </div>
-                    <div className="recent-info">
-                        <span className="recent-name">{friend.user?.name || 'Stranger'}</span>
-                        <span className="recent-topic">Friend</span>
-                    </div>
-                    <button className="recent-add-btn" onClick={() => onOpenChat(friend)}>Message</button>
-                </div>
-            ))}
+                )
+            })}
         </div>
     )
 }
 
-export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat }) {
+export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts }) {
 
     const [selectedTopics, setSelectedTopics] = useState([])
     const [customTopic, setCustomTopic] = useState('')
@@ -630,7 +637,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                             )
                         )}
 
-                        {homeTab === 'friends' && <FriendsList friends={friendships} onOpenChat={onOpenChat} />}
+                        {homeTab === 'friends' && <FriendsList friends={friendships} onOpenChat={onOpenChat} unreadCounts={unreadCounts} />}
                         {homeTab === 'requests' && <FriendRequests requests={friendRequests} onRespond={handleRespond} />}
                     </>
                 )}
