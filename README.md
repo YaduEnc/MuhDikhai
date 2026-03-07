@@ -102,7 +102,7 @@ sequenceDiagram
 
 ---
 
-## � Database Schema (Entity Relationship)
+## 💾 Database Schema (Entity Relationship)
 
 The PostgreSQL schema is optimized for social connections and message history tracking.
 
@@ -194,7 +194,24 @@ sequenceDiagram
     S-->>A: webrtc:signal (Answer/ICE)
     
     Note over A,B: P2P Tunnel Established
-    A<->>B: Media Stream (Video/Audio)
+    A->>B: Media Stream (Video/Audio)
+```
+
+### File Upload & Media Handling
+MushDikhai handles media uploads through a secure multi-stage process, distinguishing between ephemeral random chat media and persistent friend chat media.
+
+```mermaid
+graph LR
+    User[User Client] --> Check{Type of Chat?}
+    Check -->|Random| Ephemeral[Multer Upload to /tmp]
+    Check -->|Friend| Persistent[S3/Local Persistent Storage]
+    
+    Ephemeral --> Match[Shared via Socket]
+    Persistent --> DBRecord[Save to message_media Table]
+    
+    subgraph Cleanup [Cleanup Service]
+        Match --> Expire[Delete on Room Close]
+    end
 ```
 
 ---
