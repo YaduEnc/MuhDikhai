@@ -15,7 +15,7 @@ import {
   getStoredSession as getSession,
   clearSession,
 } from './authClient'
-import { initAudio, playMatchThump } from './utils/soundEngine'
+import { initAudio, playMatchThump, playIncomingDrop, playOutgoingTick } from './utils/soundEngine'
 import './App.css'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'

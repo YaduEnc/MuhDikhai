@@ -33,9 +33,6 @@ export default function CallOverlay({
     // Sync WebRTC with call status
     useEffect(() => {
         if (callState.status === 'active') {
-            // If we are the one who accepted, we just wait for offer.
-            // If we are the one who initiated and got 'accepted' response, we call establishConnection(true)
-            // But wait, App.jsx will trigger onAccept/onDecline.
         }
     }, [callState.status])
 
