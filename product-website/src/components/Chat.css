@@ -145,11 +145,23 @@
 .chat-messages-area {
     flex: 1;
     overflow-y: auto;
-    padding: 1.2rem 1.25rem 0.6rem;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
     scroll-behavior: smooth;
+    overflow-x: visible;
+}
+
+.chat-message-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-top: 50px;
+    /* Space for the first message context menu */
 }
 
 .chat-messages-area::-webkit-scrollbar {
@@ -261,23 +273,23 @@
 .msg-actions-row {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
+    padding-top: 4px;
 }
 
 .msg-action-item {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     padding: 8px 12px;
     background: none;
     border: none;
-    color: var(--text-muted);
+    color: rgba(255, 255, 255, 0.7);
     font-size: 0.85rem;
     font-weight: 500;
     cursor: pointer;
     border-radius: 8px;
     transition: all 0.2s;
-    width: 100%;
     text-align: left;
 }
 
@@ -291,19 +303,95 @@
     color: #f87171;
 }
 
+/* ── Vanish Mode Toggle ────────────────────────────────────────── */
+.fc-vanish-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-right: 8px;
+}
+
+.fc-vanish-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.fc-vanish-toggle.active {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.4);
+    box-shadow: 0 0 15px rgba(139, 92, 246, 0.1);
+}
+
+.fc-vanish-icon {
+    font-size: 1rem;
+    filter: grayscale(1);
+    transition: all 0.3s ease;
+}
+
+.fc-vanish-toggle.active .fc-vanish-icon {
+    filter: grayscale(0);
+    transform: scale(1.2);
+}
+
+.fc-vanish-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    transition: color 0.3s ease;
+}
+
+.fc-vanish-toggle.active .fc-vanish-label {
+    color: #a78bfa;
+}
+
+/* ── Random Chat Vanish Styles ────────────────────────────────────────── */
+.msg-bubble.vanish {
+    border: 1px dashed rgba(167, 139, 250, 0.5);
+}
+
+.random-vanish {
+    position: absolute;
+    bottom: -6px;
+    right: -6px;
+    width: 22px;
+    height: 22px;
+    background: #1e1b4b;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: #a78bfa;
+    border: 2px solid rgba(139, 92, 246, 0.4);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+    z-index: 5;
+}
+
 .edit-input {
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid var(--accent-faded);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
     color: #fff;
-    padding: 6px 10px;
     font-family: inherit;
-    font-size: 0.9rem;
-    min-width: 200px;
-    min-height: 40px;
+    font-size: inherit;
+    width: 100%;
+    min-width: 150px;
+    max-width: 300px;
+    padding: 4px 8px;
     resize: none;
     outline: none;
 }
+
 
 .msg-edited-tag {
     font-size: 0.65rem;

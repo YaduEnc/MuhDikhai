@@ -152,12 +152,14 @@ const MessageMenu = memo(function MessageMenu({ msg, isSelf, onReact, onEdit, on
             </div>
             {isOwner && (
                 <div className="msg-actions-row">
-                    <button className="msg-action-item" onClick={() => { onEdit(msg); onClose(); }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                        Edit
-                    </button>
+                    {!msg.content?.startsWith('__GIF__') && !msg.type?.includes('image') && !msg.type?.includes('video') && (
+                        <button className="msg-action-item" onClick={() => { onEdit(msg); onClose(); }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                            Edit
+                        </button>
+                    )}
                     <button className="msg-action-item delete" onClick={() => { onDelete(msg.id); onClose(); }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -170,13 +172,18 @@ const MessageMenu = memo(function MessageMenu({ msg, isSelf, onReact, onEdit, on
     )
 })
 
-// ─── Single message bubble ────────────────────────────────────────────────────
-const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProfilePeek, onReply, onReact, onEdit, onDelete }) {
-    const isSelfSent = msg.fromUserId === session?.user?.id
-    const [revealed, setRevealed] = useState(isSelfSent) // Auto-reveal own media
-    const [showMenu, setShowMenu] = useState(false)
-    const [isEditing, setIsEditing] = useState(false)
-    const [editValue, setEditValue] = useState(msg.content)
+// ─── Message Content Renderer (Random Chat) ───────────────────────────────────
+const RandomMessageContent = memo(function RandomMessageContent({ msg, isSelf, isEditing, editValue, setEditValue, onEditSubmit, onTimeUp }) {
+    const [revealed, setRevealed] = useState(isSelf || !msg.isVanish)
+    const [timeLeft, setTimeLeft] = useState(msg.isVanish ? 10 : null)
+
+    useEffect(() => {
+        if (msg.isVanish && revealed && timeLeft > 0) {
+            const timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000)
+            return () => clearInterval(timer)
+        }
+        if (timeLeft === 0) onTimeUp(msg.id)
+    }, [msg.isVanish, revealed, timeLeft, msg.id, onTimeUp])
 
     // Detect media type
     const isGif = msg.content?.startsWith('__GIF__')
@@ -185,104 +192,88 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
 
     const mediaUrl = isGif ? msg.content.replace('__GIF__', '') : msg.content
 
-    const time = msg.sentAt ? new Date(msg.sentAt).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-    }) : '--:--'
+    if (!isImage && !isVideo) {
+        if (isEditing) {
+            return (
+                <textarea
+                    className="edit-input"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            onEditSubmit(msg.id, editValue)
+                        }
+                        if (e.key === 'Escape') onEditSubmit(null)
+                    }}
+                    autoFocus
+                />
+            )
+        }
+        return (
+            <span className="msg-text-span">
+                {msg.content}
+                {msg.isEdited && <span className="msg-edited-tag">(edited)</span>}
+                {timeLeft !== null && <div className="fc-vanish-timer random-vanish">{timeLeft}</div>}
+            </span>
+        )
+    }
 
-    // Group reactions by emoji
+    return (
+        <div className={`media-privacy-wrap ${revealed ? 'revealed' : ''}`} onClick={(e) => {
+            if (!revealed) {
+                e.stopPropagation()
+                setRevealed(true)
+            }
+        }}>
+            {isVideo ? (
+                <video className="msg-gif blur-media" src={mediaUrl} controls={revealed} autoPlay={revealed} loop muted playsInline />
+            ) : (
+                <img className="msg-gif blur-media" src={mediaUrl} alt="Shared media" />
+            )}
+
+            {!revealed && (
+                <div className="blur-overlay">
+                    <span className="blur-icon">{isVideo ? '🎬' : '📷'}</span>
+                    <span className="blur-text">Click to reveal</span>
+                </div>
+            )}
+            {timeLeft !== null && revealed && <div className="fc-vanish-timer random-vanish">{timeLeft}</div>}
+        </div>
+    )
+})
+
+// ─── Single message bubble ────────────────────────────────────────────────────
+const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProfilePeek, onReply, onReact, onEditMessage, onDeleteMessage }) {
+    const isSelfSent = msg.fromUserId === session?.user?.id
+    const [showMenu, setShowMenu] = useState(false)
+    const [isEditing, setIsEditing] = useState(false)
+    const [editValue, setEditValue] = useState(msg.content)
+
+    const isImage = msg.type === 'image' || msg.content?.startsWith('__GIF__') || /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i.test(msg.content) || msg.content?.includes('giphy.com')
+    const isVideo = msg.type === 'video' || msg.content?.match(/\.(mp4|webm|mov)(\?.*)?$/i)
+
+    const time = msg.sentAt ? new Date(msg.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'
+
     const reactionCounts = (msg.reactions || []).reduce((acc, r) => {
         acc[r.emoji] = (acc[r.emoji] || 0) + 1
         return acc
     }, {})
 
-    const handleEditSubmit = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            onEdit(msg.id, editValue)
-            setIsEditing(false)
-        }
-        if (e.key === 'Escape') {
-            setIsEditing(false)
-            setEditValue(msg.content)
-        }
-    }
-
-    const renderMedia = () => {
-        if (!isImage && !isVideo) {
-            if (isEditing) {
-                return (
-                    <textarea
-                        className="edit-input"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={handleEditSubmit}
-                        autoFocus
-                    />
-                )
-            }
-            return (
-                <span>
-                    {msg.content}
-                    {msg.isEdited && <span className="msg-edited-tag">(edited)</span>}
-                </span>
-            )
-        }
-
-        return (
-            <div className={`media-privacy-wrap ${revealed ? 'revealed' : ''}`} onClick={(e) => {
-                if (!revealed) {
-                    e.stopPropagation()
-                    setRevealed(true)
-                }
-            }}>
-                {isVideo ? (
-                    <video
-                        className="msg-gif blur-media"
-                        src={mediaUrl}
-                        controls={revealed}
-                        autoPlay={revealed}
-                        loop
-                        muted
-                        playsInline
-                    />
-                ) : (
-                    <img className="msg-gif blur-media" src={mediaUrl} alt="Shared media" />
-                )}
-
-                {!revealed && (
-                    <div className="blur-overlay">
-                        <span className="blur-icon">{isVideo ? '🎬' : '📷'}</span>
-                        <span className="blur-text">Click to reveal</span>
-                    </div>
-                )}
-            </div>
-        )
-    }
-
     return (
         <li className={`msg-row${isSelf ? ' msg-row--self' : ''}`}>
             {!isSelf && (
-                <div
-                    className="msg-avatar clickable"
-                    onClick={() => onProfilePeek(msg.fromUserId)}
-                    title="View profile"
-                >
-                    {msg.fromProfilePictureUrl ? (
-                        <img src={msg.fromProfilePictureUrl} alt={msg.fromName} />
-                    ) : (
-                        (msg.fromName || 'S')[0].toUpperCase()
-                    )}
+                <div className="msg-avatar clickable" onClick={() => onProfilePeek(msg.fromUserId)}>
+                    {msg.fromProfilePictureUrl ? <img src={msg.fromProfilePictureUrl} alt="" /> : (msg.fromName || 'S')[0].toUpperCase()}
                 </div>
             )}
             <div className="msg-content">
                 {!isSelf && <span className="msg-sender">{msg.fromName || 'Stranger'}</span>}
 
                 <div
-                    className={`msg-bubble${isSelf ? ' msg-bubble--self' : ''}${isImage || isVideo ? ' msg-bubble--image' : ''}`}
+                    className={`msg-bubble${isSelf ? ' msg-bubble--self' : ''}${isImage || isVideo ? ' msg-bubble--image' : ''} ${msg.isVanish ? 'vanish' : ''}`}
                     onContextMenu={(e) => { e.preventDefault(); setShowMenu(!showMenu); }}
                 >
-                    {/* Quoted Reply */}
                     {msg.replyTo && (
                         <div className="msg-quote">
                             <span className="quote-sender">{msg.replyTo.fromName === session?.user?.name ? 'You' : msg.replyTo.fromName}</span>
@@ -290,38 +281,34 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
                         </div>
                     )}
 
-                    {renderMedia()}
+                    <RandomMessageContent
+                        msg={msg}
+                        isSelf={isSelf}
+                        isEditing={isEditing}
+                        editValue={editValue}
+                        setEditValue={setEditValue}
+                        onEditSubmit={(id, val) => {
+                            if (id) onEditMessage(id, val);
+                            setIsEditing(false);
+                        }}
+                        onTimeUp={onDeleteMessage}
+                    />
 
-                    {/* Context Menu / Options */}
                     {showMenu && (
                         <MessageMenu
                             msg={msg}
                             isSelf={isSelf}
                             onReact={onReact}
                             onEdit={() => setIsEditing(true)}
-                            onDelete={onDelete}
+                            onDelete={onDeleteMessage}
                             onClose={() => setShowMenu(false)}
                         />
                     )}
 
-                    {/* Quick Actions (Hover) */}
-                    <button
-                        className="msg-action-btn reply"
-                        onClick={() => onReply(msg)}
-                        title="Reply"
-                    >
-                        ↩
-                    </button>
-                    <button
-                        className="msg-action-btn react"
-                        onClick={() => setShowMenu(!showMenu)}
-                        title="Options"
-                    >
-                        ☺
-                    </button>
+                    <button className="msg-action-btn reply" onClick={() => onReply(msg)}>↩</button>
+                    <button className="msg-action-btn react" onClick={() => setShowMenu(!showMenu)}>☺</button>
                 </div>
 
-                {/* Rendered Reactions */}
                 {Object.keys(reactionCounts).length > 0 && (
                     <div className={`msg-reactions-list${isSelf ? ' self' : ''}`}>
                         {Object.entries(reactionCounts).map(([emoji, count]) => (
@@ -500,6 +487,8 @@ export default function Chat({
     chatMessages,
     partnerTyping,
     onSendMessage,
+    onEditMessage,
+    onDeleteMessage,
     onTyping,
     onLeave,
     onSearchAgain,
@@ -512,6 +501,7 @@ export default function Chat({
     const [showProfile, setShowProfile] = useState(null) // null or userId
     const [uploading, setUploading] = useState(false)
     const [replyingTo, setReplyingTo] = useState(null)
+    const [vanishMode, setVanishMode] = useState(false)
     const fileInputRef = useRef(null)
     const messagesAreaRef = useRef(null)
     const inputRef = useRef(null)
@@ -580,7 +570,7 @@ export default function Chat({
         const trimmed = input.trim()
         if (!trimmed || (socketState.phase !== 'matched' && socketState.phase !== 'friend-chat')) return
 
-        onSendMessage(trimmed, replyingTo?.id)
+        onSendMessage(trimmed, replyingTo?.id, vanishMode)
         playOutgoingTick()
         setInput('')
         setReplyingTo(null)
@@ -675,6 +665,16 @@ export default function Chat({
                     </div>
                 </div>
                 <div className="chat-header-right">
+                    {isMatched && (
+                        <button
+                            className={`fc-vanish-toggle ${vanishMode ? 'active' : ''}`}
+                            onClick={() => setVanishMode(!vanishMode)}
+                            title="Vanish Mode (Messages disappear in 10s)"
+                        >
+                            <span className="fc-vanish-icon">✨</span>
+                            <span className="fc-vanish-label">Vanish</span>
+                        </button>
+                    )}
                     {isMatched && callOverlayStatus === 'idle' && (
                         <button className="video-request-btn" onClick={onInitiateCall}>
                             🎥 Switch to Video

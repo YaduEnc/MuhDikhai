@@ -263,20 +263,21 @@ function App() {
     }
   }, [session?.accessToken, socketVersion])
 
-  const handleSendMessage = (content, replyToMessageId) => {
+  const handleSendMessage = (content, replyToMessageId, isVanish = false) => {
     if (socketState.phase === 'friend-chat' && activeFriend) {
       socketRef.current?.emit('message:send', {
         recipientId: activeFriend.user.id,
         encryptedContent: btoa(content),
         encryptedKey: btoa('placeholder-key'),
         messageType: 'text',
-        replyToId: replyToMessageId
+        replyToId: replyToMessageId,
+        isVanish
       })
       return
     }
     const targetRoomId = room?.roomId || room?.id
     if (!targetRoomId) return
-    socketRef.current?.emit('random:message', { roomId: targetRoomId, content, replyToMessageId })
+    socketRef.current?.emit('random:message', { roomId: targetRoomId, content, replyToMessageId, isVanish })
   }
 
   const handleEditRandomMessage = (messageId, content) => {

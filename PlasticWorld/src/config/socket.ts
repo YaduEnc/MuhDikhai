@@ -343,7 +343,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Random chat: send message within current room
      */
-    socket.on('random:message', (data: { roomId: string; content: string }) => {
+    socket.on('random:message', (data: { roomId: string; content: string; replyToMessageId?: string; isVanish?: boolean }) => {
       try {
         const currentRoomId = userToRandomRoom.get(userId);
         if (!currentRoomId || currentRoomId !== data.roomId) {
@@ -372,7 +372,8 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
               ? 'video'
               : 'text',
           sentAt: new Date().toISOString(),
-          replyToMessageId: (data as any).replyToMessageId, // Support replies
+          replyToMessageId: data.replyToMessageId, // Support replies
+          isVanish: data.isVanish, // Support vanish mode
         });
       } catch (error) {
         logger.error('Failed to relay random chat message', {
