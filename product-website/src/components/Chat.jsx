@@ -495,6 +495,8 @@ export default function Chat({
     onSearchAgain,
     onInitiateCall,
     callOverlayStatus,
+    matchingStats,
+    onAddFriend,
 }) {
     const [input, setInput] = useState('')
     const [showEmoji, setShowEmoji] = useState(false)
@@ -503,6 +505,12 @@ export default function Chat({
     const [uploading, setUploading] = useState(false)
     const [replyingTo, setReplyingTo] = useState(null)
     const [vanishMode, setVanishMode] = useState(false)
+    const [friendRequested, setFriendRequested] = useState(false)
+
+    useEffect(() => {
+        setFriendRequested(false)
+    }, [room?.partner?.id])
+
     const fileInputRef = useRef(null)
     const messagesAreaRef = useRef(null)
     const inputRef = useRef(null)
@@ -684,6 +692,31 @@ export default function Chat({
                     {isMatched && callOverlayStatus === 'requesting' && (
                         <span className="video-request-status">Calling...</span>
                     )}
+
+                    {(isMatched || hasLeft) && (
+                        <button className="chat-next-btn" onClick={() => { setFriendRequested(false); onSearchAgain(); }}>
+                            Next partner ⏭
+                        </button>
+                    )}
+
+                    {isMatched && (
+                        <button
+                            className={`chat-add-friend-btn ${friendRequested ? 'requested' : ''}`}
+                            onClick={async () => {
+                                if (friendRequested || !room?.partner?.id) return;
+                                try {
+                                    await onAddFriend(room.partner.id);
+                                    setFriendRequested(true);
+                                } catch (err) {
+                                    alert(err.message);
+                                }
+                            }}
+                            disabled={friendRequested}
+                        >
+                            {friendRequested ? '✓ Request Sent' : '✚ Add Friend'}
+                        </button>
+                    )}
+
                     <div className={`chat-conn-dot${isMatched ? ' live' : ''}`} />
                     <button className="chat-leave-btn" type="button" onClick={onLeave}>
                         Leave room ⎋
@@ -699,11 +732,41 @@ export default function Chat({
             <div className="chat-messages-area" ref={messagesAreaRef}>
                 {isMatching && (
                     <div className="chat-waiting">
-                        <div className="chat-waiting-glow" />
-                        <p className="chat-waiting-text">
-                            We&apos;re placing you in a slow queue, not a noisy lobby.
-                            <br />You&apos;ll see someone as soon as they arrive.
-                        </p>
+                        <div className="radar-container">
+                            <div className="radar-circle circle-1" />
+                            <div className="radar-circle circle-2" />
+                            <div className="radar-circle circle-3" />
+                            <div className="radar-avatar">
+                                {session?.user?.profilePictureUrl ? (
+                                    <img src={session.user.profilePictureUrl} alt="You" />
+                                ) : (
+                                    <span>{session?.user?.name?.[0]?.toUpperCase() || 'Y'}</span>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="matching-insight">
+                            <h3 className="matching-insight-title">Searching the mist...</h3>
+                            <p className="chat-waiting-text">
+                                We&apos;re looking for a partner who matches your vibe.
+                            </p>
+
+                            <div className="matching-stats-grid">
+                                <div className="stat-card">
+                                    <span className="stat-value">{matchingStats?.online || 0}</span>
+                                    <span className="stat-label">Present</span>
+                                </div>
+                                <div className="stat-card highlight">
+                                    <span className="stat-value">{matchingStats?.inQueue || 0}</span>
+                                    <span className="stat-label">In Queue</span>
+                                </div>
+                                <div className="stat-card">
+                                    <span className="stat-value">{matchingStats?.matched || 0}</span>
+                                    <span className="stat-label">Busy</span>
+                                </div>
+                            </div>
+
+                        </div>
                     </div>
                 )}
 

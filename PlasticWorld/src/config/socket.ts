@@ -57,6 +57,18 @@ const randomRooms = new Map<string, RandomRoom>();
 const roomMedia = new Map<string, Set<string>>();
 
 /**
+ * Emit stats about the matching system to all connected users
+ */
+function emitMatchingStats(io: any) {
+  const stats = {
+    online: activeUsers.size,
+    inQueue: randomQueue.length,
+    matched: userToRandomRoom.size, // count of users currently matched
+  };
+  io.emit('random:stats', stats);
+}
+
+/**
  * Track a file uploaded to a specific room
  */
 export function trackRoomMedia(roomId: string, filename: string) {
@@ -207,6 +219,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
      */
     socket.on('random:join', async (payload?: { topics?: string[]; preference?: 'male' | 'female' | 'everyone' }) => {
       try {
+        emitMatchingStats(io);
         const userTopics = payload?.topics || [];
         const preference = payload?.preference || 'everyone';
         const userGender = socket.user?.gender || 'prefer_not_to_say';
@@ -335,6 +348,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             matchService.recordMatch(userId, candidateId, roomId, matchedTopic || undefined),
           ]);
 
+          emitMatchingStats(io);
           return;
         }
 
@@ -346,6 +360,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           preference
         });
         socket.emit('random:waiting');
+        emitMatchingStats(io);
       } catch (error) {
         logger.error('Failed to join random chat queue', {
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -463,6 +478,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         const queueIndex = randomQueue.findIndex(q => q.userId === userId);
         if (queueIndex !== -1) {
           randomQueue.splice(queueIndex, 1);
+          emitMatchingStats(io);
         }
 
         const roomId = userToRandomRoom.get(userId);
@@ -502,6 +518,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
 
         socket.leave(roomId);
         socket.emit('random:ended', { roomId });
+        emitMatchingStats(io);
       } catch (error) {
         logger.error('Failed to leave random chat', {
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -905,6 +922,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             await userService.updateStatus(userId, 'offline');
             io.emit('user:offline', { userId, name });
             io.emit('presence:count', { count: activeUsers.size });
+            emitMatchingStats(io);
           }
         }
 

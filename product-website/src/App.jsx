@@ -63,6 +63,8 @@ function App() {
   const [socketVersion, setSocketVersion] = useState(0)
   const [isAdminView, setIsAdminView] = useState(window.location.pathname === '/admin')
   const [unreadCounts, setUnreadCounts] = useState({})
+  const [matchingStats, setMatchingStats] = useState({ online: 0, inQueue: 0, matched: 0 })
+  const [matchPrefs, setMatchPrefs] = useState({ topics: [], preference: 'everyone' })
 
   const [callOverlayState, setCallOverlayState] = useState({
     status: 'idle', // 'idle', 'requesting', 'incoming', 'active'
@@ -154,6 +156,7 @@ function App() {
         })
 
         socket.on('presence:count', (payload) => setOnlineCount(payload.count))
+        socket.on('random:stats', (stats) => setMatchingStats(stats))
         socket.on('random:waiting', () => setSocketState((prev) => ({ ...prev, phase: 'matching' })))
         socket.on('random:matched', (payload) => {
           setRoom(payload)
@@ -590,6 +593,7 @@ function App() {
             onStartMatch={(topics, preference) => {
               initAudio()
               setIsTransitioning(true)
+              setMatchPrefs({ topics, preference })
               setSocketState((prev) => ({ ...prev, phase: 'matching' }))
               setTimeout(() => { setShowChat(true); setIsTransitioning(false); }, 600)
               setTimeout(() => socketRef.current?.emit('random:join', { topics, preference }), 50)
@@ -630,8 +634,17 @@ function App() {
             onInitiateCall={() => handleInitiateCall(room, 'random')}
             callOverlayStatus={callOverlayState.status}
             onSearchAgain={() => {
-              setSocketState((prev) => ({ ...prev, phase: 'matching' })); setRoom(null); setChatMessages([]); socketRef.current?.emit('random:join');
+              // Leave current first
+              socketRef.current?.emit('random:leave');
+
+              // Then join new with same prefs
+              setSocketState((prev) => ({ ...prev, phase: 'matching' }));
+              setRoom(null);
+              setChatMessages([]);
+              socketRef.current?.emit('random:join', matchPrefs);
             }}
+            matchingStats={matchingStats}
+            onAddFriend={handleAddFriend}
           />
         )}
       </main>
