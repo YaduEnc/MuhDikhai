@@ -95,7 +95,7 @@ const MessageContent = memo(function MessageContent({ m, isMine, decodeContent }
 
     const isGif = content.startsWith('__GIF__')
     const isImage = m.messageType === 'image' || isGif || /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)/i.test(content) || content.includes('giphy.com')
-    const isVideo = m.messageType === 'video' || content.endsWith('.mp4') || content.endsWith('.webm')
+    const isVideo = m.messageType === 'video' || content?.match(/\.(mp4|webm|mov)$/)
 
     if (!isImage && !isVideo) return <span>{content}</span>
 

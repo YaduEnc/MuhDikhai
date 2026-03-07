@@ -162,7 +162,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
     // Detect media type
     const isGif = msg.content?.startsWith('__GIF__')
     const isImage = msg.type === 'image' || isGif
-    const isVideo = msg.type === 'video' || msg.content?.endsWith('.mp4') || msg.content?.endsWith('.webm')
+    const isVideo = msg.type === 'video' || msg.content?.match(/\.(mp4|webm|mov)$/)
 
     const mediaUrl = isGif ? msg.content.replace('__GIF__', '') : msg.content
 
@@ -557,7 +557,7 @@ export default function Chat({
 
     const handleImageUpload = async (e) => {
         const file = e.target.files?.[0]
-        if (!file || !room?.id) return
+        if (!file || !(room?.roomId || room?.id)) return
 
         setUploading(true)
         const formData = new FormData()
