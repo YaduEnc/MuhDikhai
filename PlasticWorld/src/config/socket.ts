@@ -242,8 +242,10 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         for (let i = 0; i < randomQueue.length; i++) {
           const candidate = randomQueue[i];
 
-          // Basic sanity checks
+          // Scrub stale or busy entries from queue
           if (!activeUsers.has(candidate.userId) || userToRandomRoom.has(candidate.userId)) {
+            randomQueue.splice(i, 1);
+            i--;
             continue;
           }
 
@@ -257,11 +259,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             continue;
           }
 
-          // Topic matching (optional bonus, but we prioritize gender compatibility if both selected it)
-          const shared = candidate.topics.filter(t => userTopics.includes(t));
-
           // Match found!
           partnerIdx = i;
+          const shared = candidate.topics.filter(t => userTopics.includes(t));
           matchedTopic = shared.length > 0 ? shared[0] : '';
           break;
         }
@@ -270,14 +270,8 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         if (partnerIdx !== -1) {
           const [{ userId: candidateId }] = randomQueue.splice(partnerIdx, 1);
 
+          // Mark as busy immediately (Sync check)
           const roomId = `random:${[userId, candidateId].sort().join(':')}:${Date.now()}`;
-          const room: RandomRoom = {
-            id: roomId,
-            users: [userId, candidateId],
-            topic: matchedTopic || undefined,
-          };
-
-          randomRooms.set(roomId, room);
           userToRandomRoom.set(userId, roomId);
           userToRandomRoom.set(candidateId, roomId);
 
@@ -286,6 +280,21 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             userService.getPublicUserProfile(userId),
             userService.getPublicUserProfile(candidateId),
           ]);
+
+          // Liveness check: Ensure both still around after async profile fetch
+          if (!activeUsers.has(userId) || !activeUsers.has(candidateId)) {
+            userToRandomRoom.delete(userId);
+            userToRandomRoom.delete(candidateId);
+            return;
+          }
+
+          const room: RandomRoom = {
+            id: roomId,
+            users: [userId, candidateId],
+            topic: matchedTopic || undefined,
+          };
+
+          randomRooms.set(roomId, room);
 
           // Join all sockets for both users to the room
           const thisSockets = activeUsers.get(userId) ?? new Set<string>();
@@ -847,46 +856,50 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
       try {
         logger.info('Socket disconnected', { userId, socketId: socket.id });
 
-        // Clean up random queue / rooms
-        const queueIndex = randomQueue.findIndex(q => q.userId === userId);
-        if (queueIndex !== -1) {
-          randomQueue.splice(queueIndex, 1);
-        }
-
-        const roomId = userToRandomRoom.get(userId);
-        if (roomId) {
-          const room = randomRooms.get(roomId);
-          userToRandomRoom.delete(userId);
-          randomRooms.delete(roomId);
-
-          if (room) {
-            const otherUserId = room.users.find((id) => id !== userId);
-
-            // Notify the room that somebody left/disconnected
-            io.to(roomId).emit('random:left', {
-              roomId,
-              userId,
-            });
-
-            if (otherUserId) {
-              userToRandomRoom.delete(otherUserId);
-              const otherSockets = activeUsers.get(otherUserId) ?? new Set<string>();
-              for (const id of otherSockets) {
-                const s = io.sockets.sockets.get(id);
-                if (s) s.leave(roomId);
-              }
-            }
-
-            // Trigger ephemeral media cleanup
-            cleanupRoomMedia(roomId);
-          }
-        }
-
         // Remove socket from active users
         const userSockets = activeUsers.get(userId);
         if (userSockets) {
           userSockets.delete(socket.id);
           if (userSockets.size === 0) {
+            // ONLY clean up state if this was the last active socket for this user
+            logger.info('Last user socket disconnected, cleaning up session', { userId });
+
+            // Clean up random queue
+            const queueIndex = randomQueue.findIndex(q => q.userId === userId);
+            if (queueIndex !== -1) {
+              randomQueue.splice(queueIndex, 1);
+            }
+
+            // Clean up random room
+            const roomId = userToRandomRoom.get(userId);
+            if (roomId) {
+              const room = randomRooms.get(roomId);
+              userToRandomRoom.delete(userId);
+              randomRooms.delete(roomId);
+
+              if (room) {
+                const otherUserId = room.users.find((id) => id !== userId);
+
+                // Notify the room that somebody left/disconnected
+                io.to(roomId).emit('random:left', {
+                  roomId,
+                  userId,
+                });
+
+                if (otherUserId) {
+                  userToRandomRoom.delete(otherUserId);
+                  const otherSockets = activeUsers.get(otherUserId) ?? new Set<string>();
+                  for (const id of otherSockets) {
+                    const s = io.sockets.sockets.get(id);
+                    if (s) s.leave(roomId);
+                  }
+                }
+
+                // Trigger ephemeral media cleanup
+                cleanupRoomMedia(roomId);
+              }
+            }
+
             // User is no longer online
             activeUsers.delete(userId);
             await userService.updateStatus(userId, 'offline');
