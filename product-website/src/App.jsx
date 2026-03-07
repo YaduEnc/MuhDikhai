@@ -256,11 +256,17 @@ function App() {
     const doFetch = (token) => fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: `Bearer ${token}` } })
     let res = await doFetch(cur.accessToken)
     if (res.status === 401 && cur.refreshToken) {
-      const next = await refreshSession(cur.refreshToken)
-      setSession(next)
-      saveSession(next)
-      sessionRef.current = next
-      res = await doFetch(next.accessToken)
+      try {
+        const next = await refreshSession(cur.refreshToken)
+        setSession(next)
+        saveSession(next)
+        sessionRef.current = next
+        res = await doFetch(next.accessToken)
+      } catch (err) {
+        console.error('Session refresh failed:', err)
+        handleSignOut()
+        throw err
+      }
     }
     return res
   }, [])
@@ -384,6 +390,7 @@ function App() {
           session={session}
           friend={activeFriend}
           socket={socketRef.current}
+          authedFetch={authedFetch}
           onBack={handleBackFromFriendChat}
         />
       </div>

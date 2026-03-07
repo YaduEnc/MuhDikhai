@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './FriendChat.css'
 
-export default function FriendChat({ session, friend, onBack, socket }) {
+export default function FriendChat({ session, friend, onBack, socket, authedFetch }) {
     const [messages, setMessages] = useState([])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(true)
@@ -12,11 +12,7 @@ export default function FriendChat({ session, friend, onBack, socket }) {
 
     const fetchHistory = useCallback(async () => {
         try {
-            const response = await fetch(`${BACKEND_URL}/api/v1/messages/conversation/${friend.user.id}`, {
-                headers: {
-                    Authorization: `Bearer ${session.accessToken}`
-                }
-            })
+            const response = await authedFetch(`${BACKEND_URL}/api/v1/messages/${friend.user.id}`)
             const json = await response.json()
             if (json.success) {
                 // Reverse because backend returns newest first
@@ -27,7 +23,7 @@ export default function FriendChat({ session, friend, onBack, socket }) {
         } finally {
             setLoading(false)
         }
-    }, [BACKEND_URL, friend.user.id, session.accessToken])
+    }, [BACKEND_URL, friend.user.id, authedFetch])
 
     useEffect(() => {
         fetchHistory()
@@ -120,17 +116,26 @@ export default function FriendChat({ session, friend, onBack, socket }) {
                 {loading ? (
                     <div className="chat-loading">Restoring conversation...</div>
                 ) : (
-                    messages.map((m) => (
-                        <div key={m.id} className={`chat-bubble ${m.senderId === session.user.id ? 'mine' : 'theirs'}`}>
-                            {/* Note: Real app would decrypt m.encryptedContent here */}
-                            <div className="bubble-text">
-                                {m.senderId === session.user.id ? atob(m.encryptedContent) : (m.encryptedContent ? atob(m.encryptedContent) : 'Message hidden')}
+                    messages.map((m) => {
+                        const decodeContent = (content) => {
+                            if (!content) return 'Message hidden'
+                            try {
+                                return atob(content)
+                            } catch (e) {
+                                return content // Fallback if not base64
+                            }
+                        }
+                        return (
+                            <div key={m.id} className={`chat-bubble ${m.senderId === session.user.id ? 'mine' : 'theirs'}`}>
+                                <div className="bubble-text">
+                                    {decodeContent(m.encryptedContent || m.content)}
+                                </div>
+                                <div className="bubble-meta">
+                                    {new Date(m.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
                             </div>
-                            <div className="bubble-meta">
-                                {new Date(m.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                        </div>
-                    ))
+                        )
+                    })
                 )}
                 <div ref={scrollRef} />
             </main>
