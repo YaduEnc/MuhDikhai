@@ -94,8 +94,8 @@ const MessageContent = memo(function MessageContent({ m, isMine, decodeContent }
     if (!content) return <span className="fc-msg-hidden">Message unavailable</span>
 
     const isGif = content.startsWith('__GIF__')
-    const isImage = m.messageType === 'image' || isGif || /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)/i.test(content) || content.includes('giphy.com')
-    const isVideo = m.messageType === 'video' || content?.match(/\.(mp4|webm|mov)$/)
+    const isImage = m.messageType === 'image' || isGif || /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i.test(content) || content.includes('giphy.com')
+    const isVideo = m.messageType === 'video' || content?.match(/\.(mp4|webm|mov)(\?.*)?$/i)
 
     if (!isImage && !isVideo) return <span>{content}</span>
 

@@ -161,8 +161,8 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
 
     // Detect media type
     const isGif = msg.content?.startsWith('__GIF__')
-    const isImage = msg.type === 'image' || isGif
-    const isVideo = msg.type === 'video' || msg.content?.match(/\.(mp4|webm|mov)$/)
+    const isImage = msg.type === 'image' || isGif || /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i.test(msg.content) || msg.content?.includes('giphy.com')
+    const isVideo = msg.type === 'video' || msg.content?.match(/\.(mp4|webm|mov)(\?.*)?$/i)
 
     const mediaUrl = isGif ? msg.content.replace('__GIF__', '') : msg.content
 

@@ -363,9 +363,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           fromUserId: userId,
           fromName: name,
           content: trimmed,
-          type: trimmed.startsWith('http') && (trimmed.match(/\.(jpeg|jpg|gif|png|webp)$/) || trimmed.includes('giphy.com'))
+          type: (trimmed.startsWith('http') && trimmed.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i)) || trimmed.includes('giphy.com')
             ? 'image'
-            : trimmed.startsWith('http') && trimmed.match(/\.(mp4|webm|mov)$/)
+            : trimmed.startsWith('http') && trimmed.match(/\.(mp4|webm|mov)(\?.*)?$/i)
               ? 'video'
               : 'text',
           sentAt: new Date().toISOString(),
