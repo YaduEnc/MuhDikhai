@@ -82,6 +82,7 @@ const GifPicker = memo(function GifPicker({ onSelect, onClose }) {
         </div>
     )
 })
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
 
 // ─── Emoji Picker ─────────────────────────────────────────────────────────────
 const EMOJI_CATEGORIES = [
