@@ -137,10 +137,10 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
 
                 <div className="profile-edit-section">
                     <div className="profile-field-group">
-                        <label className="profile-field-label">About you</label>
+                        <label className="profile-field-label">Apne baare mein batao</label>
                         <textarea
                             className="profile-textarea"
-                            placeholder="Tell the world something about yourself..."
+                            placeholder="Tell the world something unfiltered..."
                             value={bio}
                             onChange={(e) => setBio(e.target.value)}
                             maxLength={500}
@@ -179,7 +179,7 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                 <div className="profile-stats">
                     <div className="profile-stat">
                         <span className="profile-stat-value">{session?.user?.roomsEntered || 0}</span>
-                        <span className="profile-stat-label">Rooms entered</span>
+                        <span className="profile-stat-label">Entry count</span>
                     </div>
                     <div className="profile-stat">
                         <span className="profile-stat-value">0</span>
@@ -551,8 +551,8 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                 </h1>
                 <p className="home-greeting-sub">
                     {onlineCount > 1
-                        ? `${onlineCount - 1} stranger${onlineCount === 2 ? '' : 's'} waiting to be found. Or take your time — there's no rush here.`
-                        : "The rooms are quiet right now. You're the first one here — take a moment for yourself."
+                        ? `${onlineCount - 1} strangers are loose in the pool. Go find some chaos.`
+                        : "The rooms are too quiet. You're the first one here — wait for the storm."
                     }
                 </p>
             </div>
@@ -626,10 +626,10 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
 
                 <div className="home-match-btn-left">
                     <div className="home-match-glow" />
-                    <div className="home-match-btn-icon">◎</div>
+                    <div className="home-match-btn-icon">⚡</div>
                     <div className="home-match-btn-copy">
-                        <span className="home-match-btn-title">Start a gentle match</span>
-                        <span className="home-match-btn-sub">Enter a quiet room with one stranger</span>
+                        <span className="home-match-btn-title">Matching shuru karein?</span>
+                        <span className="home-match-btn-sub">Diving into the unfiltered mayhem</span>
                     </div>
                 </div>
                 <span className="home-match-btn-arrow">↗</span>

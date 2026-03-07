@@ -8,6 +8,7 @@ import AdminDashboard from './admin/AdminDashboard'
 import FriendChat from './components/FriendChat'
 import CallOverlay from './components/CallOverlay'
 import VibeCheckModal from './components/VibeCheckModal'
+import LegalPages from './components/LegalPages'
 
 import {
   signInWithGoogle,
@@ -79,6 +80,8 @@ function App() {
     partner: null,
     roomId: null
   })
+
+  const [legalView, setLegalView] = useState(null) // null | 'privacy' | 'terms' | 'safety'
 
   const socketRef = useRef(null)
   const sessionRef = useRef(session)
@@ -594,11 +597,13 @@ function App() {
     <div className="page">
       <header className="nav">
         <div className="nav-left">
-          <div className="nav-mark"><span className="nav-mark-dot" /></div>
+          <div className="nav-mark">
+            <img src="/logo.png" alt="Muhdikhai Mascot" className="nav-logo-img" />
+          </div>
           <div className="nav-title">
             <span className="brand-word">Muhdikhai</span>
             <span className="brand-sub">
-              {isInChat ? 'You are in a room' : isHome ? 'Welcome back' : 'Anonymous, but unexpectedly tender.'}
+              {isInChat ? 'Inside the madness' : isHome ? 'Vibe Check' : 'Real people. Pure chaos.'}
             </span>
           </div>
         </div>
@@ -736,13 +741,26 @@ function App() {
           <div className="footer-main">
             <div className="footer-brand">
               <span className="footer-name">Muhdikhai</span>
-              <p className="footer-tagline">A privacy‑first random chat experiment.</p>
+              <p className="footer-tagline">The loudness you needed. Unfiltered random chat.</p>
+            </div>
+            <div className="footer-links">
+              <button className="footer-link" onClick={() => setLegalView('terms')}>Terms</button>
+              <button className="footer-link" onClick={() => setLegalView('privacy')}>Privacy</button>
+              <button className="footer-link" onClick={() => setLegalView('safety')}>Safety</button>
             </div>
           </div>
           <div className="footer-bottom">
             <div className="footer-credit">Developed by Yaduraj Singh</div>
+            <div className="footer-copyright">© 2026 MUHDIKHAI. Built for the chaos.</div>
           </div>
         </footer>
+      )}
+
+      {legalView && (
+        <LegalPages
+          initialTab={legalView}
+          onClose={() => setLegalView(null)}
+        />
       )}
     </div>
   )

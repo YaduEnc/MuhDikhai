@@ -58,18 +58,20 @@
 }
 
 .home-greeting-heading {
-  font-family: 'Sora', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-weight: 600;
-  font-size: clamp(2rem, 3vw + 1.2rem, 3rem);
-  letter-spacing: -0.04em;
-  line-height: 1.1;
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+  margin-bottom: 0.8rem;
 }
 
 .home-greeting-heading span {
-  background: linear-gradient(135deg, #ffe3b2, #f8b16a, #ff8ba7);
+  background: linear-gradient(135deg, #ff0055, #ffae00);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 0, 85, 0.3));
 }
 
 .home-greeting-sub {
@@ -81,13 +83,11 @@
 /* ── Match button ──────────────────────────────────────── */
 .home-match-btn {
   width: 100%;
-  border-radius: var(--radius-lg);
-  padding: 1.5rem 1.6rem;
+  border-radius: 24px;
+  padding: 2rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background:
-    radial-gradient(circle at -10% -20%, rgba(255, 243, 220, 0.13) 0, transparent 55%),
-    radial-gradient(circle at 110% 120%, rgba(248, 113, 113, 0.1) 0, transparent 55%),
-    linear-gradient(145deg, #13112a, #090b20);
+  background: linear-gradient(145deg, #ff0055, #ffae00);
+  color: #000;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -95,11 +95,8 @@
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.75);
-  transition:
-    transform 200ms ease-out,
-    box-shadow 200ms ease-out,
-    border-color 200ms ease-out;
+  box-shadow: 0 40px 100px rgba(255, 0, 85, 0.3);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   text-align: left;
 }
 
@@ -236,14 +233,18 @@
 }
 
 .home-match-btn-title {
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--text-main);
+  font-family: 'Sora', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #000;
+  letter-spacing: -0.02em;
 }
 
 .home-match-btn-sub {
-  font-size: 0.82rem;
-  color: var(--text-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.7);
+  letter-spacing: 0.02em;
 }
 
 .home-match-btn-arrow {
@@ -273,13 +274,14 @@
 
 /* Profile & Settings cards */
 .home-card {
-  border-radius: var(--radius-md);
-  padding: 1.2rem 1.1rem;
-  background: rgba(7, 9, 26, 0.96);
+  border-radius: 20px;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  gap: 1rem;
   cursor: pointer;
   text-align: left;
   transition:
@@ -1218,28 +1220,31 @@
 }
 
 .topic-pill {
-  padding: 0.5rem 1.1rem;
-  font-size: 0.85rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text-soft);
+  padding: 0.6rem 1.4rem;
+  font-size: 0.9rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: #8b8fb0;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .topic-pill:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  transform: translateY(-2px);
 }
 
 .topic-pill.active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: linear-gradient(135deg, #ff0055, #ffae00);
+  border-color: transparent;
   color: #000;
-  font-weight: 600;
-  box-shadow: 0 4px 15px rgba(232, 177, 108, 0.3);
+  font-weight: 800;
+  box-shadow: 0 15px 35px rgba(255, 0, 85, 0.25);
+  transform: scale(1.05);
 }
 
 .topic-pill.custom {
@@ -1392,45 +1397,39 @@
 
 /* ── Home Tabs ─────────────────────────────────────────── */
 .home-tabs {
-  display: flex;
-  gap: 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 4px;
   margin-top: 1rem;
-  padding-bottom: 0.2rem;
 }
 
 .home-tab {
   background: transparent;
   border: none;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  font-weight: 500;
-  padding: 0.5rem 0.2rem;
+  color: #8b8fb0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.6rem 1.4rem;
+  border-radius: 999px;
   cursor: pointer;
-  position: relative;
-  transition: color 200ms ease;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.home-tab:hover {
-  color: var(--text-soft);
+.home-tab:hover:not(.active) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .home-tab.active {
-  color: var(--accent-strong);
-}
-
-.home-tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent-strong);
-  box-shadow: 0 0 10px rgba(251, 191, 119, 0.4);
+  background: #fff;
+  color: #020108;
+  box-shadow: 0 10px 20px rgba(255, 255, 255, 0.1);
 }
 
 .tab-badge {
@@ -1574,16 +1573,17 @@
 }
 
 .aura-badge {
-  font-size: 0.65rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 0.2rem 0.6rem;
+  letter-spacing: 0.12em;
+  padding: 0.3rem 0.8rem;
   border-radius: 999px;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.4rem;
   animation: aura-badge-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  box-shadow: 0 5px 15px currentColor;
 }
 
 @keyframes aura-badge-in {

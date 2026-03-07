@@ -55,7 +55,7 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                 <div
                     className="aura-orb aura-orb--1"
                     style={{
-                        transform: `translate3d(${mousePos.x * 1.5}px, ${scrolled * 0.2 + mousePos.y * 1.5}px, 0)`
+                        transform: `translate3d(${mousePos.x * 2.5}px, ${scrolled * 0.3 + mousePos.y * 2.5}px, 0)`
                     }}
                 />
                 <div
@@ -76,12 +76,13 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                 <div className="landing-content">
                     <div className="quiet-pulse">
                         <span className="pulse-dot" />
-                        <span className="pulse-text">{onlineCount || 0} sharing silence right now</span>
+                        <span className="pulse-text">{onlineCount || 0} log abhi online hain. Kisse miloge?</span>
                     </div>
                     <h1 className="hero-heading">
-                        <span className="heading-bold">Anonymous,</span>
-                        <span className="heading-tender">but unexpectedly tender.</span>
+                        <span className="heading-bold">Muhdikhai.</span>
+                        <span className="heading-tender">No filters, pure chaos. 🌶️</span>
                     </h1>
+                    <p className="hero-subtext">The loudest, most unfiltered random chat on the internet. Skip the small talk, seedha mudde pe aao.</p>
                     {authError && <p className="auth-error">{authError}</p>}
                     <button
                         className="btn-primary landing-btn"
@@ -89,121 +90,109 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                         disabled={authLoading}
                     >
                         <span className="btn-primary-dot" />
-                        {authLoading ? 'Signing in…' : 'Start a gentle match'}
+                        {authLoading ? 'Darwaaza khul raha hai…' : 'Bhasad shuru karein 🔥'}
                     </button>
                     <div className="hero-scroll-hint">
-                        <span className="hint-arrow">↓</span>
-                        <span className="hint-text">Scroll to breathe</span>
+                        <span className="hint-arrow" />
+                        <span className="hint-text">Neeche kya hai?</span>
                     </div>
                 </div>
             </section>
 
             <section className="pillars reveal-on-scroll">
                 <div className="pillars-header">
-                    <h2 className="pillars-title">Better rooms for smaller conversations</h2>
+                    <h2 className="pillars-title">Kyu aaye ho yahan?</h2>
                     <p className="pillars-sub">
-                        Most apps want your attention. We just want to give you a moment
-                        of genuine connection, without the noise.
+                        Because swiping is boring and algorithms are dead. We just throw you in a room with a complete stranger and see what happens.
                     </p>
                 </div>
 
                 <div className="pillar-grid">
-                    <article className="pillar-card">
-                        <div className="pillar-icon">Ⅰ</div>
-                        <h3 className="pillar-heading">Gentle by design</h3>
+                    <article className="pillar-card pillar-card-chaotic">
+                        <div className="pillar-icon">💥</div>
+                        <h3 className="pillar-heading">Zero Filter</h3>
                         <p className="pillar-copy">
-                            Every interaction is tuned for softness. No jarring alerts, no
-                            aggressive layout shifts&mdash;just a calm space for your words.
+                            Say what you want, be who you want.
                         </p>
                         <ul className="pillar-list">
-                            <li>Glassmorphic, low‑contrast interfaces.</li>
-                            <li>Subtle micro‑animations that breathe.</li>
-                            <li>A layout that respects your screen.</li>
+                            <li>Loud aesthetics, vibrant colors.</li>
+                            <li>Your Aura points decide your reputation.</li>
+                            <li>Trolls get thrown in the Troll Pool.</li>
                         </ul>
                     </article>
 
-                    <article className="pillar-card">
-                        <div className="pillar-icon">Ⅱ</div>
-                        <h3 className="pillar-heading">Truly ephemeral</h3>
+                    <article className="pillar-card pillar-card-chaotic">
+                        <div className="pillar-icon">🌪️</div>
+                        <h3 className="pillar-heading">Gayi Bhains Paani Mein</h3>
                         <p className="pillar-copy">
-                            Once you leave, the room is gone. We don&apos;t store your
-                            conversations, we don&apos;t build a profile of your interests.
+                            Once you leave the room, everything vanishes. No logs. No history.
                         </p>
                         <ul className="pillar-list">
-                            <li>Server‑side rooms that shred on exit.</li>
-                            <li>No logs, no history, no tracking.</li>
-                            <li>Purely anonymous, purely present.</li>
+                            <li>Server-side shredding on exit.</li>
+                            <li>Messages vanish if you want them to.</li>
+                            <li>Purely anonymous chaos.</li>
                         </ul>
                     </article>
 
-                    <article className="pillar-card">
-                        <div className="pillar-icon">Ⅲ</div>
-                        <h3 className="pillar-heading">Human, not content</h3>
+                    <article className="pillar-card pillar-card-chaotic">
+                        <div className="pillar-icon">👑</div>
+                        <h3 className="pillar-heading">Built for India</h3>
                         <p className="pillar-copy">
-                            You&apos;re not an avatar in a grid. You&apos;re a presence for one
-                            person at a time&mdash;with room to be unsure, quiet, or silly.
+                            Desi vibes, low-latency matching, and the power to judge.
                         </p>
                         <ul className="pillar-list">
-                            <li>Pairing logic favours slowness over volume.</li>
-                            <li>Soft prompts, not hard onboarding flows.</li>
-                            <li>Built for real evenings, not infinite scroll.</li>
+                            <li>Vote people's Aura up or down.</li>
+                            <li>Find your vibe with interest tags.</li>
+                            <li>Built for late-night unfiltered talks.</li>
                         </ul>
                     </article>
                 </div>
             </section>
 
             <section className="story-grid">
-                <article className="story-block reveal-on-scroll">
-                    <h2 className="story-heading">A tiny manifesto for gentle strangers</h2>
+                <article className="story-block reveal-on-scroll border-vibrant">
+                    <h2 className="story-heading text-gradient">The Anti-Algorithm Club</h2>
                     <p className="story-text">
-                        There are already places to shout into the void. Muhdikhai is for the nights
-                        when you want to talk to exactly one person, with the option to disappear
-                        again without a trace.
+                        Bored of reels? Tired of swiping? Muhdikhai is the ultimate wildcard. We connect you with a random stranger in milliseconds.
+                        It could be a deep philosophical debate, an intense roasting session, or your next best friend.
                     </p>
                     <p className="story-text">
-                        We care about the micro‑moments: the half‑second fade before someone appears,
-                        the way the interface breathes when you both go quiet, the reassuring glow of
-                        a single status dot.
+                        No AI matching, no premium subscriptions to see who liked you. You get a room, you get a stranger, and you make it whatever you want.
                     </p>
-                    <p className="story-note">
-                        If the UI ever makes you feel rushed, we consider that a bug.
+                    <p className="story-note font-bold">
+                        Darr lag raha hai? Toh mat aao.
                     </p>
                 </article>
 
                 <article className="story-block story-block--secondary reveal-on-scroll">
-                    <h3 className="story-heading-sm">For builders, romantics, and late‑night coders</h3>
+                    <h3 className="story-heading-sm">Built to Handle the Bhasad</h3>
                     <p className="story-text">
-                        Muhdikhai runs on a production‑grade messaging stack with end‑to‑end
-                        encryption, built for experiments like yours.
+                        Don't let the chaos fool you. Underneath, this is a highly optimized, encrypted real-time beast.
                     </p>
-                    <ul className="story-list">
-                        <li>Socket‑powered, low‑latency rooms for pairing strangers.</li>
-                        <li>Typed APIs for messages, presence, and ephemeral sessions.</li>
-                        <li>Bring your own brand, keep our gentle defaults.</li>
+                    <ul className="story-list list-loud">
+                        <li>Sub-50ms Socket.io routing powered by Redis.</li>
+                        <li>End-to-end encrypted messaging. Always.</li>
+                        <li>Automated shadow-banning for toxic users.</li>
                     </ul>
-                    <p className="story-text">
-                        Use our hosted preview, or self‑host on the PlasticWorld backend and tune the
-                        vibe to your community.
-                    </p>
                 </article>
             </section>
 
-            <section className="cta-band reveal-on-scroll">
+            <section className="cta-band reveal-on-scroll cta-band-neon">
                 <div className="cta-copy">
-                    <span className="cta-title">Ready to see who appears?</span>
+                    <span className="cta-title">Andar aana hai?</span>
                     <span className="cta-sub">
-                        Spin up a private Muhdikhai room on your own server in minutes, or join the
-                        hosted preview.
+                        Warning: Highly addictive. Don't blame us if you're up till 4 AM.
                     </span>
                 </div>
                 <button
-                    className="cta-link"
+                    className="cta-link cta-link-loud"
                     type="button"
                     onClick={onStartMatch}
                     disabled={authLoading}
                 >
-                    <span>Get early access link</span>
-                    <span>↗</span>
+                    <span style={{ fontSize: '1.2rem' }}>🚪</span>
+                    <span>Enter The Madness</span>
+                    <span>→</span>
                 </button>
             </section>
 
