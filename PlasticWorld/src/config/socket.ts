@@ -17,6 +17,7 @@ interface SocketUser {
   username?: string;
   name: string;
   profilePictureUrl?: string;
+  gender: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
 }
 
 interface AuthenticatedSocket extends Socket {
@@ -39,6 +40,8 @@ interface RandomRoom {
 interface QueuedUser {
   userId: string;
   topics: string[];
+  gender: string;
+  preference: 'male' | 'female' | 'everyone';
 }
 
 // Queue of users waiting for a random partner
@@ -137,6 +140,7 @@ export const socketAuth = async (socket: AuthenticatedSocket, next: (err?: Exten
       username: user.username,
       name: user.name,
       profilePictureUrl: user.profilePictureUrl,
+      gender: user.gender || 'prefer_not_to_say',
     };
 
     next();
@@ -201,9 +205,11 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Random chat: join the gentle queue
      */
-    socket.on('random:join', async (payload?: { topics?: string[] }) => {
+    socket.on('random:join', async (payload?: { topics?: string[]; preference?: 'male' | 'female' | 'everyone' }) => {
       try {
         const userTopics = payload?.topics || [];
+        const preference = payload?.preference || 'everyone';
+        const userGender = socket.user?.gender || 'prefer_not_to_say';
 
         // If user is already in a room, just echo back state
         const existingRoomId = userToRandomRoom.get(userId);
@@ -232,35 +238,32 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         let partnerIdx = -1;
         let matchedTopic = '';
 
-        // 1. Try to find someone with a shared topic
-        if (userTopics.length > 0) {
-          for (let i = 0; i < randomQueue.length; i++) {
-            const candidate = randomQueue[i];
+        // 1. Try to find a match that satisfies BOTH users' criteria
+        for (let i = 0; i < randomQueue.length; i++) {
+          const candidate = randomQueue[i];
 
-            // Basic sanity checks
-            if (!activeUsers.has(candidate.userId) || userToRandomRoom.has(candidate.userId)) {
-              continue;
-            }
-
-            // Find intersection
-            const shared = candidate.topics.filter(t => userTopics.includes(t));
-            if (shared.length > 0) {
-              partnerIdx = i;
-              matchedTopic = shared[0]; // Take the first shared topic
-              break;
-            }
+          // Basic sanity checks
+          if (!activeUsers.has(candidate.userId) || userToRandomRoom.has(candidate.userId)) {
+            continue;
           }
-        }
 
-        // 2. Fallback: Take the first valid person in queue if no topic match
-        if (partnerIdx === -1) {
-          for (let i = 0; i < randomQueue.length; i++) {
-            const candidate = randomQueue[i];
-            if (activeUsers.has(candidate.userId) && !userToRandomRoom.has(candidate.userId)) {
-              partnerIdx = i;
-              break;
-            }
+          // GENDER PREFERENCE CHECK (Mutual satisfaction)
+          // User A (current) must accept User B (candidate)
+          const userAPrefSatisfied = preference === 'everyone' || preference === candidate.gender;
+          // User B (candidate) must accept User A (current)
+          const userBPrefSatisfied = candidate.preference === 'everyone' || candidate.preference === userGender;
+
+          if (!userAPrefSatisfied || !userBPrefSatisfied) {
+            continue;
           }
+
+          // Topic matching (optional bonus, but we prioritize gender compatibility if both selected it)
+          const shared = candidate.topics.filter(t => userTopics.includes(t));
+
+          // Match found!
+          partnerIdx = i;
+          matchedTopic = shared.length > 0 ? shared[0] : '';
+          break;
         }
 
         // 3. Perform the match if we found someone
@@ -327,7 +330,12 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         }
 
         // No partner yet; enqueue user
-        randomQueue.push({ userId, topics: userTopics });
+        randomQueue.push({
+          userId,
+          topics: userTopics,
+          gender: userGender,
+          preference
+        });
         socket.emit('random:waiting');
       } catch (error) {
         logger.error('Failed to join random chat queue', {

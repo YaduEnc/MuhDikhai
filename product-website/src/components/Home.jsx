@@ -377,6 +377,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
 
     const [selectedTopics, setSelectedTopics] = useState([])
     const [customTopic, setCustomTopic] = useState('')
+    const [matchingPreference, setMatchingPreference] = useState('everyone') // 'male', 'female', 'everyone'
 
 
 
@@ -468,7 +469,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
 
 
     const handleStartMatch = () => {
-        onStartMatch(selectedTopics)
+        onStartMatch(selectedTopics, matchingPreference)
     }
 
     if (view === 'profile') {
@@ -558,6 +559,30 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                     />
                 </div>
 
+            </div>
+
+            {/* Gender Preference */}
+            <div className="home-topic-section gender-pref-section">
+                <div className="home-topic-header">
+                    <span className="home-topic-title">I want to match with...</span>
+                    <span className="home-topic-count">{matchingPreference === 'everyone' ? 'Everyone' : matchingPreference.charAt(0).toUpperCase() + matchingPreference.slice(1)}</span>
+                </div>
+                <div className="home-topic-grid">
+                    {[
+                        { id: 'everyone', label: 'Everyone', icon: '🌍' },
+                        { id: 'male', label: 'Male', icon: '♂' },
+                        { id: 'female', label: 'Female', icon: '♀' }
+                    ].map(pref => (
+                        <button
+                            key={pref.id}
+                            type="button"
+                            className={`topic-pill pref-pill ${matchingPreference === pref.id ? 'active' : ''}`}
+                            onClick={() => setMatchingPreference(pref.id)}
+                        >
+                            <span className="pref-pill-icon">{pref.icon}</span> {pref.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Primary action — Start Matching */}

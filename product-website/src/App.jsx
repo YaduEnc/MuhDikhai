@@ -587,12 +587,12 @@ function App() {
             session={session}
             onlineCount={onlineCount}
             isTransitioning={isTransitioning}
-            onStartMatch={(topics) => {
+            onStartMatch={(topics, preference) => {
               initAudio()
               setIsTransitioning(true)
               setSocketState((prev) => ({ ...prev, phase: 'matching' }))
               setTimeout(() => { setShowChat(true); setIsTransitioning(false); }, 600)
-              setTimeout(() => socketRef.current?.emit('random:join', { topics }), 50)
+              setTimeout(() => socketRef.current?.emit('random:join', { topics, preference }), 50)
             }}
             onSignOut={handleSignOut}
             onDeleteAccount={handleDeleteAccount}
