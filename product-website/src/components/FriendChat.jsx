@@ -114,7 +114,7 @@ const MessageMenu = memo(function MessageMenu({ m, isMine, onEdit, onDelete, onC
     )
 })
 
-const FriendBubble = memo(function FriendBubble({ m, isMine, showAvatar, friend, decodeContent, handleDelete, handleEdit, formatTime }) {
+const FriendBubble = memo(function FriendBubble({ m, isMine, showAvatar, friend, decodeContent, handleDelete, handleEdit, formatTime, mainInputRef }) {
     const [menuOpen, setMenuOpen] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
     const [editValue, setEditValue] = useState('')
@@ -146,6 +146,7 @@ const FriendBubble = memo(function FriendBubble({ m, isMine, showAvatar, friend,
                         onEditSubmit={(id, val) => {
                             if (id) handleEdit(id, val);
                             setIsEditing(false);
+                            setTimeout(() => mainInputRef.current?.focus(), 50);
                         }}
                     />
                 </div>
@@ -253,6 +254,7 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
     const [vanishMode, setVanishMode] = useState(false)
     const scrollRef = useRef(null)
     const typingTimeoutRef = useRef(null)
+    const mainInputRef = useRef(null)
 
     const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
 
@@ -495,6 +497,7 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
                                 handleDelete={handleDelete}
                                 handleEdit={handleEdit}
                                 formatTime={formatTime}
+                                mainInputRef={mainInputRef}
                             />
                         ))}
                         {partnerTyping && <div className="fc-bubble-row theirs"><div className="fc-bubble theirs"><TypingDots /></div></div>}
@@ -546,6 +549,7 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
                 <input
                     className="fc-input"
                     type="text"
+                    ref={mainInputRef}
                     placeholder="Type a message..."
                     value={input}
                     onChange={handleInputChange}

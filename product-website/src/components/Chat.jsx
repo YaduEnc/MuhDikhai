@@ -244,7 +244,7 @@ const RandomMessageContent = memo(function RandomMessageContent({ msg, isSelf, i
 })
 
 // ─── Single message bubble ────────────────────────────────────────────────────
-const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProfilePeek, onReply, onReact, onEditMessage, onDeleteMessage }) {
+const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProfilePeek, onReply, onReact, onEditMessage, onDeleteMessage, inputRef }) {
     const isSelfSent = msg.fromUserId === session?.user?.id
     const [showMenu, setShowMenu] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
@@ -290,6 +290,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
                         onEditSubmit={(id, val) => {
                             if (id) onEditMessage(id, val);
                             setIsEditing(false);
+                            setTimeout(() => inputRef.current?.focus(), 50);
                         }}
                         onTimeUp={onDeleteMessage}
                     />
@@ -740,8 +741,10 @@ export default function Chat({
                                     if (targetRoomId) {
                                         socketState.socket?.emit('random:reaction', { roomId: targetRoomId, messageId: mid, emoji })
                                     }
-
                                 }}
+                                onEditMessage={onEditMessage}
+                                onDeleteMessage={onDeleteMessage}
+                                inputRef={inputRef}
                                 partnerName={room?.partner?.name}
                             />
                         ))}
