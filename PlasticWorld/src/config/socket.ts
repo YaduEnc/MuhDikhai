@@ -492,7 +492,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
       try {
         if (data.recipientId) {
           io.to(`user:${data.recipientId}`).emit('webrtc:call-request', {
-            fromUserId: userId
+            fromUserId: userId,
+            recipientId: data.recipientId,
+            caller: { id: userId, name: (socket as AuthenticatedSocket).user?.name }
           });
           return;
         }
@@ -588,6 +590,8 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             status: fullMessage.status,
             sentAt: fullMessage.sentAt,
             replyToMessageId: fullMessage.replyToMessageId,
+            encryptedContent: fullMessage.encryptedContent ? fullMessage.encryptedContent.toString('base64') : undefined,
+            encryptedKey: fullMessage.encryptedKey ? fullMessage.encryptedKey.toString('base64') : undefined,
           },
         });
 
