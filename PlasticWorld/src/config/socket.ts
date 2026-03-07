@@ -16,6 +16,7 @@ interface SocketUser {
   deviceId: string;
   username?: string;
   name: string;
+  profilePictureUrl?: string;
 }
 
 interface AuthenticatedSocket extends Socket {
@@ -135,6 +136,7 @@ export const socketAuth = async (socket: AuthenticatedSocket, next: (err?: Exten
       deviceId: payload.deviceId,
       username: user.username,
       name: user.name,
+      profilePictureUrl: user.profilePictureUrl,
     };
 
     next();
@@ -362,6 +364,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           roomId: currentRoomId,
           fromUserId: userId,
           fromName: name,
+          fromProfilePictureUrl: socket.user?.profilePictureUrl,
           content: trimmed,
           type: (trimmed.startsWith('http') && trimmed.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i)) || trimmed.includes('giphy.com')
             ? 'image'
