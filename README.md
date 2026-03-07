@@ -8,43 +8,73 @@ MushDikhai is a sophisticated, real-time communication platform designed for sea
 
 The system is split into a high-performance Node.js backend (`PlasticWorld`) and a modern React frontend (`product-website`). Communication is handled via REST APIs for persistent data and Socket.io for all real-time interactions.
 
-### High-Level Architecture
+### High-Level Network Topology
 ```mermaid
 graph TD
-    User([User Client])
-    LB[Load Balancer / Nginx]
-    API[Node.js / Express API]
-    SIO[Socket.io Server]
-    DB[(PostgreSQL)]
-    FB[Firebase Auth]
-    RD[(Redis - Caching)]
+    UserA([User Client A])
+    UserB([User Client B])
+    
+    subgraph Cloud [Cloud Infrastructure]
+        LB[Nginx Reverse Proxy]
+        API[Node.js / Express API Cluster]
+        SIO[Socket.io Real-time Server]
+        
+        subgraph DataLayer [Persistence & Cache]
+            DB[(PostgreSQL)]
+            RD[(Redis Cluster)]
+            FB[Firebase Auth Engine]
+        end
+    end
 
-    User <--> LB
+    UserA <--> LB
+    UserB <--> LB
     LB <--> API
     LB <--> SIO
     API <--> DB
     API <--> FB
     SIO <--> DB
     SIO <--> RD
+    UserA -. P2P Video/Audio .- UserB
 ```
 
 ---
 
-## � Key Modules & Functions
+## 🔄 User Lifecycle & State Machine
 
-### 1. The Matching Engine (Robust Random Chat)
+Every user session follows a strict state transition to ensure data integrity and a smooth onboarding experience.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Unauthenticated: Open App
+    Unauthenticated --> Authenticated: Firebase Auth Login
+    Authenticated --> Onboarding: No Profile Found
+    Onboarding --> Home: Profile Completed (Gender/Avatar)
+    
+    state Home {
+        [*] --> Idle: Enter Home
+        Idle --> Queued: Join Random Chat
+        Queued --> Transitioning: Match Found
+        Transitioning --> Chatting: Room Joined
+        Chatting --> Idle: Leave Room
+    }
+    
+    Home --> FriendChat: Open Friend Conversation
+    FriendChat --> Home: Close Chat
+    Home --> [*]: Logout/Disconnect
+```
+
+---
+
+## 🚀 Key Modules & Functions
+
+### 1. Robust Matching Intelligence
 The matching system uses a "Mutual Satisfaction" handshake. It scans a global queue of waiting users and only connects them if **both** participants' gender preferences and topic interests align.
 
-**Logic Highlights:**
-- **Queue Scrubbing**: Automatically removes offline/busy users during every match attempt.
-- **Sync Locking**: Instantly marks users as "Busy" to prevent race conditions during high concurrency.
-- **Multi-Tab Safety**: Tracks active sockets per user; session state only clears when the user disconnects their *last* open tab.
-
-#### Matching Sequence
+#### Matching Sequence & Race-Condition Protection
 ```mermaid
 sequenceDiagram
     participant A as User A (Client)
-    participant S as Socket Server
+    participant S as Socket Server (Memory)
     participant B as User B (Queued)
     participant DB as Postgres
 
@@ -52,81 +82,170 @@ sequenceDiagram
     Note over S: Scan Queue for Compatibility
     
     alt Match Found (w/ User B)
-        S->>S: Atomic Lock (Mark A & B Busy)
-        S->>DB: Fetch Public Profiles
+        S->>S: 1. Atomic Lock (Mark A & B Busy)
+        S->>DB: 2. Fetch Public Profiles
         DB-->>S: Profiles Found
         
         alt Liveness Check Passed
-            S->>S: Create Ephemeral Room
+            S->>S: 3. Create Ephemeral Room
             S-->>A: random:matched (Partner: B)
             S-->>B: random:matched (Partner: A)
-            S->>DB: Record Analytics
-        else Partner Disconnected
-            S->>S: Release Lock & Cancel Match
+            S->>DB: 4. Record Analytics
+        else Partner Disconnected during DB Fetch
+            S->>S: 5. Abort & Release Busy Lock
         end
-    else No Match
-        S->>S: Add A to Queue
+    else No Match Found
+        S->>S: 6. Add A to Queue
         S-->>A: random:waiting
     end
 ```
 
 ---
 
-## 🔐 Security & Privacy
+## � Database Schema (Entity Relationship)
 
-### End-to-End Encryption (E2EE)
-MushDikhai ensures that messages between friends are encrypted on the client side before hitting the server.
-- **Key Exchange**: Uses Diffie-Hellman or pre-shared keys managed via `encryption.service.ts`.
-- **Vanish Mode**: Messages can be sent in 'Vanish Mode', which are automatically purged from both clients and memory after being read.
+The PostgreSQL schema is optimized for social connections and message history tracking.
 
-### Data Security Flow
 ```mermaid
-flowchart LR
-    subgraph ClientA [Sender Client]
-        M[Message] --> E[Encrypt with B's Key]
-    end
-    
-    subgraph Server [Backend]
-        ENC[Encrypted Blob]
-    end
-    
-    subgraph ClientB [Receiver Client]
-        D[Decrypt with Own Key] --> M2[Message]
-    end
+erDiagram
+    USERS ||--o{ FRIENDSHIPS : "has"
+    USERS ||--o{ MESSAGES : "sends"
+    USERS ||--o{ RANDOM_MATCHES : "participates"
+    MESSAGES ||--o{ MESSAGE_RECEIPTS : "tracks"
+    MESSAGES ||--o{ MESSAGE_MEDIA : "contains"
+    MESSAGES ||--o{ MESSAGE_REACTIONS : "receives"
 
-    ClientA -- Web Socket --> Server
-    Server -- Web Socket --> ClientB
+    USERS {
+        uuid id PK
+        string firebase_uid
+        string name
+        enum gender
+        int age
+        string profile_picture_url
+        int rooms_entered
+        boolean is_active
+    }
+
+    FRIENDSHIPS {
+        uuid id PK
+        uuid user_id_a FK
+        uuid user_id_b FK
+        enum status
+        timestamp created_at
+    }
+
+    MESSAGES {
+        uuid id PK
+        uuid sender_id FK
+        uuid recipient_id FK
+        bytea encrypted_content
+        bytea encrypted_key
+        boolean is_vanish
+        timestamp sent_at
+    }
 ```
 
 ---
 
-## 📱 Frontend Ecosystem
+## 🔐 Security & Real-time Delivery
 
-The frontend is a visual-first React application focusing on "Rich Aesthetics" and "Dynamic Transitions."
+### End-to-End Encryption (E2EE) Pipeline
+Messages between friends never exist in plain text on the server. MushDikhai utilizes a client-side encryption layer.
 
-**Core Components:**
-- **Onboarding**: Multi-step flow for identity (Gender) collection and avatar selection.
-- **Home Hub**: Topic selection, live presence tracking, and matching controls.
-- **Chat Interface**: Supports replies, reactions, media uploads, and real-time typing indicators.
+```mermaid
+flowchart TD
+    subgraph Sender [Client A]
+        K[Get B's Public Key] --> PL[Plaintext Msg]
+        PL --> ENC[Encrypt Content]
+        ENC --> SIGN[Sign Message]
+    end
+    
+    subgraph Relay [Socket.io Server]
+        RB[Store Encrypted Blob] --> NOT[Notify Recipient]
+    end
+    
+    subgraph Receiver [Client B]
+        DEC[Decrypt with Private Key] --> PL2[Plaintext Msg]
+        PL2 --> DISP[Display to User]
+    end
+
+    Sender -- "Secure Socket (TLS)" --> Relay
+    Relay -- "Secure Socket (TLS)" --> Receiver
+```
+
+### WebRTC Signaling (P2P Connectivity)
+For direct calling, the socket server acts as a signaling broker to establish the P2P connection.
+
+```mermaid
+sequenceDiagram
+    participant A as Caller
+    participant S as Socket Broker
+    participant B as Callee
+
+    A->>S: webrtc:call-request
+    S-->>B: webrtc:call-request (Incoming!)
+    B->>S: webrtc:call-response (Accept)
+    S-->>A: webrtc:call-response (Accepted)
+    
+    Note over A,B: SDP Handshake (Signaling)
+    A->>S: webrtc:signal (Offer/ICE)
+    S-->>B: webrtc:signal (Offer/ICE)
+    B->>S: webrtc:signal (Answer/ICE)
+    S-->>A: webrtc:signal (Answer/ICE)
+    
+    Note over A,B: P2P Tunnel Established
+    A<->>B: Media Stream (Video/Audio)
+```
 
 ---
 
-## � Project Structure
+## 📱 Frontend Ecosystem Structure
+
+The frontend is a visual-first React application focusing on "Rich Aesthetics" and "Dynamic Transitions."
+
+```mermaid
+graph LR
+    subgraph AppContainer [App.jsx]
+        H[Home.jsx]
+        C[Chat.jsx]
+        F[FriendChat.jsx]
+        O[Onboarding.jsx]
+    end
+
+    subgraph Hooks [Custom Logic]
+        W[useWebRTC]
+        SC[useSocket]
+        AF[useAuth]
+    end
+
+    O --> H
+    H --> C
+    H --> F
+    SC <--> H
+    SC <--> C
+    SC <--> F
+    W <--> F
+    W <--> C
+```
+
+---
+
+## 📂 Project Directory Map
 
 ```bash
-├── PlasticWorld/              # Backend Services
+├── PlasticWorld/              # Backend Services (Node/TS)
 │   ├── src/
-│   │   ├── config/           # Database, Socket, Redis config
-│   │   ├── migrations/       # SQL Schema evolutions
-│   │   ├── routes/           # REST API endpoints
-│   │   ├── services/         # Business logic (User, Match, Message)
-│   │   └── utils/            # Shared helpers & Loggers
-├── product-website/           # Frontend Application
+│   │   ├── config/           # Database, Socket, Redis, Firebase
+│   │   ├── migrations/       # SQL Schema (001-018)
+│   │   ├── routes/           # REST Endpoints (Auth, User, Friend)
+│   │   ├── services/         # Logic (E2EE, Matching, Sessions)
+│   │   └── utils/            # Shared Logging & Error Handling
+├── product-website/           # Frontend Application (React)
 │   ├── src/
-│   │   ├── components/       # UI Components (Chat, Home, Profile)
-│   │   ├── hooks/            # Custom React hooks (WebRTC, Sockets)
-│   │   └── assets/           # Styles & Media
-└── README.md                  # This documentation
+│   │   ├── components/       # UI (Reactions, Bubbles, Profiles)
+│   │   ├── hooks/            # Signaling & Real-time listeners
+│   │   └── assets/           # Premium Theme CSS & Icons
+└── README.md                  # System Documentation
 ```
 
 ---
@@ -135,16 +254,17 @@ The frontend is a visual-first React application focusing on "Rich Aesthetics" a
 
 | Layer | Technology |
 | :--- | :--- |
-| **Frontend** | React, Vite, Vanilla CSS (Premium Themes) |
+| **Frontend** | React, Vite, Vanilla CSS (Glassmorphism) |
 | **Backend** | Node.js, TypeScript, Express |
-| **Real-time** | Socket.io |
-| **Database** | PostgreSQL |
-| **Auth** | Firebase Authentication |
-| **P2P Video/Audio** | WebRTC |
+| **Real-time** | Socket.io (WebSockets) |
+| **Database** | PostgreSQL v14+ |
+| **Auth** | Firebase Admin SDK |
+| **P2P Video/Audio** | WebRTC (Signaling) |
+| **Encryption** | Crypto-JS / Web Crypto API |
 
 ---
 
-## � Future Roadmap
+## 📈 Future Roadmap
 1. **AI Moderation**: Real-time content filtering for safe chat environments.
 2. **Encrypted Media**: Extending E2EE to image and video uploads.
 3. **Presence 2.0**: Visualized 3D space for waiting users.
