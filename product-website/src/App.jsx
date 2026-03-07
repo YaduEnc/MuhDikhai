@@ -258,8 +258,9 @@ function App() {
       })
       return
     }
-    if (!room?.roomId && !room?.partner?.id) return
-    socketRef.current?.emit('random:message', { roomId: room.roomId, content, replyToMessageId })
+    const targetRoomId = room?.roomId || room?.id
+    if (!targetRoomId) return
+    socketRef.current?.emit('random:message', { roomId: targetRoomId, content, replyToMessageId })
   }
 
   const handleTyping = (isTyping) => {
@@ -267,8 +268,9 @@ function App() {
       socketRef.current?.emit(isTyping ? 'typing:start' : 'typing:stop', { recipientId: activeFriend.user.id })
       return
     }
-    if (!room?.roomId && !room?.partner?.id) return
-    socketRef.current?.emit(isTyping ? 'typing:start' : 'typing:stop', { roomId: room.roomId })
+    const targetRoomId = room?.roomId || room?.id
+    if (!targetRoomId) return
+    socketRef.current?.emit(isTyping ? 'typing:start' : 'typing:stop', { roomId: targetRoomId })
   }
 
   const handleAuth = async () => {

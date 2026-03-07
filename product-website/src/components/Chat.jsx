@@ -166,10 +166,10 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
 
     const mediaUrl = isGif ? msg.content.replace('__GIF__', '') : msg.content
 
-    const time = new Date(msg.sentAt).toLocaleTimeString([], {
+    const time = msg.sentAt ? new Date(msg.sentAt).toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
-    })
+    }) : '--:--'
 
     // Group reactions by emoji
     const reactionCounts = (msg.reactions || []).reduce((acc, r) => {
@@ -765,29 +765,41 @@ export default function Chat({
                         <button
                             className={`input-action-btn${showEmoji ? ' active' : ''}`}
                             type="button"
-                            title="Emoji"
+                            title="Emoji Picker"
                             onClick={() => { setShowEmoji((v) => !v); setShowGif(false) }}
                             disabled={!isMatched}
                         >
-                            😊
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                                <line x1="9" y1="9" x2="9.01" y2="9" />
+                                <line x1="15" y1="9" x2="15.01" y2="9" />
+                            </svg>
                         </button>
                         <button
                             className={`input-action-btn${showGif ? ' active' : ''}`}
                             type="button"
-                            title="GIF"
+                            title="Send GIF"
                             onClick={() => { setShowGif((v) => !v); setShowEmoji(false) }}
                             disabled={!isMatched}
                         >
-                            GIF
+                            <span style={{ fontSize: '0.7rem', fontWeight: 900 }}>GIF</span>
                         </button>
                         <button
                             className="input-action-btn"
                             type="button"
-                            title="Share image"
+                            title="Share Media"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={!isMatched || uploading}
                         >
-                            {uploading ? '...' : '📸'}
+                            {uploading ? (
+                                <span className="upload-spinner" />
+                            ) : (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                    <circle cx="12" cy="13" r="4" />
+                                </svg>
+                            )}
                         </button>
                         <input
                             type="file"

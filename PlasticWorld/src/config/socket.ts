@@ -363,7 +363,11 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           fromUserId: userId,
           fromName: name,
           content: trimmed,
-          type: trimmed.startsWith('http') && (trimmed.match(/\.(jpeg|jpg|gif|png|webp)$/) || trimmed.includes('giphy.com')) ? 'image' : 'text',
+          type: trimmed.startsWith('http') && (trimmed.match(/\.(jpeg|jpg|gif|png|webp)$/) || trimmed.includes('giphy.com'))
+            ? 'image'
+            : trimmed.startsWith('http') && trimmed.match(/\.(mp4|webm|mov)$/)
+              ? 'video'
+              : 'text',
           sentAt: new Date().toISOString(),
           replyToMessageId: (data as any).replyToMessageId, // Support replies
         });

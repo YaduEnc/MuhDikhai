@@ -86,6 +86,52 @@ function isImageUrl(text) {
     return /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)/i.test(text) || text.includes('giphy.com')
 }
 
+// ─── Message Content Renderer ────────────────────────────────────────────────
+const MessageContent = memo(function MessageContent({ m, isMine, decodeContent }) {
+    const content = decodeContent(m.encryptedContent || m.content)
+    const [revealed, setRevealed] = useState(isMine) // Auto-reveal own media
+
+    if (!content) return <span className="fc-msg-hidden">Message unavailable</span>
+
+    const isGif = content.startsWith('__GIF__')
+    const isImage = m.messageType === 'image' || isGif || /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)/i.test(content) || content.includes('giphy.com')
+    const isVideo = m.messageType === 'video' || content.endsWith('.mp4') || content.endsWith('.webm')
+
+    if (!isImage && !isVideo) return <span>{content}</span>
+
+    const mediaUrl = isGif ? content.replace('__GIF__', '') : content
+
+    return (
+        <div className={`media-privacy-wrap ${revealed ? 'revealed' : ''}`} onClick={(e) => {
+            if (!revealed) {
+                e.stopPropagation()
+                setRevealed(true)
+            }
+        }}>
+            {isVideo ? (
+                <video
+                    className="fc-msg-image blur-media"
+                    src={mediaUrl}
+                    controls={revealed}
+                    autoPlay={revealed}
+                    loop
+                    muted
+                    playsInline
+                />
+            ) : (
+                <img src={mediaUrl} alt="shared" className="fc-msg-image blur-media" loading="lazy" />
+            )}
+
+            {!revealed && (
+                <div className="blur-overlay">
+                    <span className="blur-icon">{isVideo ? '🎬' : '📷'}</span>
+                    <span className="blur-text">Click to reveal</span>
+                </div>
+            )}
+        </div>
+    )
+})
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function FriendChat({ session, friend, onBack, socket, authedFetch, onInitiateCall }) {
     const [messages, setMessages] = useState([])
@@ -233,52 +279,6 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
             if (fileInputRef.current) fileInputRef.current.value = ''
         }
     }
-
-    // ─── Message Content Renderer ────────────────────────────────────────────────
-    const MessageContent = memo(function MessageContent({ m, isMine, decodeContent }) {
-        const content = decodeContent(m.encryptedContent || m.content)
-        const [revealed, setRevealed] = useState(isMine) // Auto-reveal own media
-
-        if (!content) return <span className="fc-msg-hidden">Message unavailable</span>
-
-        const isGif = content.startsWith('__GIF__')
-        const isImage = m.messageType === 'image' || isGif || /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)/i.test(content) || content.includes('giphy.com')
-        const isVideo = m.messageType === 'video' || content.endsWith('.mp4') || content.endsWith('.webm')
-
-        if (!isImage && !isVideo) return <span>{content}</span>
-
-        const mediaUrl = isGif ? content.replace('__GIF__', '') : content
-
-        return (
-            <div className={`media-privacy-wrap ${revealed ? 'revealed' : ''}`} onClick={(e) => {
-                if (!revealed) {
-                    e.stopPropagation()
-                    setRevealed(true)
-                }
-            }}>
-                {isVideo ? (
-                    <video
-                        className="fc-msg-image blur-media"
-                        src={mediaUrl}
-                        controls={revealed}
-                        autoPlay={revealed}
-                        loop
-                        muted
-                        playsInline
-                    />
-                ) : (
-                    <img src={mediaUrl} alt="shared" className="fc-msg-image blur-media" loading="lazy" />
-                )}
-
-                {!revealed && (
-                    <div className="blur-overlay">
-                        <span className="blur-icon">{isVideo ? '🎬' : '📷'}</span>
-                        <span className="blur-text">Click to reveal</span>
-                    </div>
-                )}
-            </div>
-        )
-    })
 
     const formatTime = (date) => {
         return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
