@@ -1,76 +1,150 @@
-# MushDikhai - Matching System Architecture
+# MushDikhai: A Premium Real-Time Interactive Platform
 
-MushDikhai uses a robust, real-time matching system built on **Socket.io** and **Node.js**. It is designed to handle high concurrency, multi-tab sessions, and privacy-focused identity matching.
+MushDikhai is a sophisticated, real-time communication platform designed for seamless connectivity, high privacy, and premium user experience. It leverages a modern tech stack to provide both random matching and friend-based interactions with end-to-end encryption.
 
-## 🛠 Matching Flow Architecture
+---
 
-The matching system operates on a "Mutual Satisfaction" principle. A match is only created if **both** participants' criteria are met.
+## 🏛 System Architecture Overview
 
-### Sequence Diagram
+The system is split into a high-performance Node.js backend (`PlasticWorld`) and a modern React frontend (`product-website`). Communication is handled via REST APIs for persistent data and Socket.io for all real-time interactions.
 
+### High-Level Architecture
+```mermaid
+graph TD
+    User([User Client])
+    LB[Load Balancer / Nginx]
+    API[Node.js / Express API]
+    SIO[Socket.io Server]
+    DB[(PostgreSQL)]
+    FB[Firebase Auth]
+    RD[(Redis - Caching)]
+
+    User <--> LB
+    LB <--> API
+    LB <--> SIO
+    API <--> DB
+    API <--> FB
+    SIO <--> DB
+    SIO <--> RD
+```
+
+---
+
+## � Key Modules & Functions
+
+### 1. The Matching Engine (Robust Random Chat)
+The matching system uses a "Mutual Satisfaction" handshake. It scans a global queue of waiting users and only connects them if **both** participants' gender preferences and topic interests align.
+
+**Logic Highlights:**
+- **Queue Scrubbing**: Automatically removes offline/busy users during every match attempt.
+- **Sync Locking**: Instantly marks users as "Busy" to prevent race conditions during high concurrency.
+- **Multi-Tab Safety**: Tracks active sockets per user; session state only clears when the user disconnects their *last* open tab.
+
+#### Matching Sequence
 ```mermaid
 sequenceDiagram
-    participant UserA as User A (Client)
-    participant Server as Socket Server
-    participant UserB as User B (Queued)
-    participant DB as PostgreSQL
+    participant A as User A (Client)
+    participant S as Socket Server
+    participant B as User B (Queued)
+    participant DB as Postgres
 
-    UserA->>Server: random:join(topics, preference)
+    A->>S: random:join(topics, preference)
+    Note over S: Scan Queue for Compatibility
     
-    Note over Server: 1. Scrub offline/busy users from Queue
-    Server->>Server: 2. Scan Queue for Criteria Match
-    
-    Note over Server: Criteria: Gender Preference (A's Pref == B's Gender) <br/> AND (B's Pref == A's Gender)
-    
-    alt Match Found (with User B)
-        Server->>Server: 3. Remove User B from Queue
-        Server->>Server: 4. Mark A & B as 'Busy' (Atomic Sync)
+    alt Match Found (w/ User B)
+        S->>S: Atomic Lock (Mark A & B Busy)
+        S->>DB: Fetch Public Profiles
+        DB-->>S: Profiles Found
         
-        Server->>DB: 5. Fetch Public Profiles
-        DB-->>Server: Profiles Result
-        
-        alt Both Still Online? (Liveness Check)
-            Server->>Server: 6. Create Virtual Room (UUID)
-            Server-->>UserA: random:matched (Partner: B)
-            Server-->>UserB: random:matched (Partner: A)
-            Server->>DB: Log Match & Update Analytics
+        alt Liveness Check Passed
+            S->>S: Create Ephemeral Room
+            S-->>A: random:matched (Partner: B)
+            S-->>B: random:matched (Partner: A)
+            S->>DB: Record Analytics
         else Partner Disconnected
-            Server->>Server: 7. Abort & Clear Busy State
+            S->>S: Release Lock & Cancel Match
         end
-        
-    else No Compatible Partner
-        Server->>Server: 8. Add User A to Queue
-        Server-->>UserA: random:waiting
+    else No Match
+        S->>S: Add A to Queue
+        S-->>A: random:waiting
     end
 ```
 
 ---
 
-## 🏗 Key Components
+## 🔐 Security & Privacy
 
-### 1. Robust Queue Management
-- **In-Memory Queue**: Fast matching using a standard JavaScript array (`randomQueue`).
-- **Scrubbing**: The server automatically removes users from the queue if they go offline or get matched elsewhere during the scan. This ensures User A never tries to match with a "ghost" user.
+### End-to-End Encryption (E2EE)
+MushDikhai ensures that messages between friends are encrypted on the client side before hitting the server.
+- **Key Exchange**: Uses Diffie-Hellman or pre-shared keys managed via `encryption.service.ts`.
+- **Vanish Mode**: Messages can be sent in 'Vanish Mode', which are automatically purged from both clients and memory after being read.
 
-### 2. Multi-Tab Session Stability
-- **Active Socket Tracking**: Uses a `Map<string, Set<string>>` to track every open tab for a user.
-- **Protection**: Cleanup logic (leaving rooms, ending matches) only triggers when the **last** tab for a user is closed. Users can refresh or open multiple tabs without breaking their active chat.
+### Data Security Flow
+```mermaid
+flowchart LR
+    subgraph ClientA [Sender Client]
+        M[Message] --> E[Encrypt with B's Key]
+    end
+    
+    subgraph Server [Backend]
+        ENC[Encrypted Blob]
+    end
+    
+    subgraph ClientB [Receiver Client]
+        D[Decrypt with Own Key] --> M2[Message]
+    end
 
-### 3. Mutual Satisfaction Matching
-- **Gender Preferences**: Matches respect identity boundaries (`Everyone`, `Male`, `Female`).
-- **Topic Overlap**: If multiple partners satisfy gender criteria, the system prioritizes those sharing the same conversation topics.
+    ClientA -- Web Socket --> Server
+    Server -- Web Socket --> ClientB
+```
 
 ---
 
-## 🔒 Security & Performance
-- **Atomic Locking**: Users are marked as "Busy" the millisecond a match is found, preventing a third user from stealing a partner during the asynchronous profile fetching phase.
-- **Liveness Guard**: An extra check is performed after database calls to ensure no network jitter caused a disconnect during the matching handshake.
-- **Ephemeral Rooms**: Random chat rooms exist only in memory; they are automatically purged upon the last user leaving to maintain privacy.
+## 📱 Frontend Ecosystem
+
+The frontend is a visual-first React application focusing on "Rich Aesthetics" and "Dynamic Transitions."
+
+**Core Components:**
+- **Onboarding**: Multi-step flow for identity (Gender) collection and avatar selection.
+- **Home Hub**: Topic selection, live presence tracking, and matching controls.
+- **Chat Interface**: Supports replies, reactions, media uploads, and real-time typing indicators.
 
 ---
 
-## 💻 Code Reference
-The matching logic is primarily located in:
-- `PlasticWorld/src/config/socket.ts`: Core Matching Engine.
-- `product-website/src/components/Home.jsx`: Preference Selection UI.
-- `product-website/src/App.jsx`: State Orchestration.
+## � Project Structure
+
+```bash
+├── PlasticWorld/              # Backend Services
+│   ├── src/
+│   │   ├── config/           # Database, Socket, Redis config
+│   │   ├── migrations/       # SQL Schema evolutions
+│   │   ├── routes/           # REST API endpoints
+│   │   ├── services/         # Business logic (User, Match, Message)
+│   │   └── utils/            # Shared helpers & Loggers
+├── product-website/           # Frontend Application
+│   ├── src/
+│   │   ├── components/       # UI Components (Chat, Home, Profile)
+│   │   ├── hooks/            # Custom React hooks (WebRTC, Sockets)
+│   │   └── assets/           # Styles & Media
+└── README.md                  # This documentation
+```
+
+---
+
+## 🛠 Tech Stack
+
+| Layer | Technology |
+| :--- | :--- |
+| **Frontend** | React, Vite, Vanilla CSS (Premium Themes) |
+| **Backend** | Node.js, TypeScript, Express |
+| **Real-time** | Socket.io |
+| **Database** | PostgreSQL |
+| **Auth** | Firebase Authentication |
+| **P2P Video/Audio** | WebRTC |
+
+---
+
+## � Future Roadmap
+1. **AI Moderation**: Real-time content filtering for safe chat environments.
+2. **Encrypted Media**: Extending E2EE to image and video uploads.
+3. **Presence 2.0**: Visualized 3D space for waiting users.
