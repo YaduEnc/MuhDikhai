@@ -529,7 +529,8 @@
 
 .fc-gif-toggle:hover,
 .fc-gif-toggle.active,
-.fc-upload-btn:hover {
+.fc-upload-btn:hover,
+.fc-upload-btn.active {
     background: rgba(251, 191, 119, 0.1);
     border-color: rgba(251, 191, 119, 0.3);
     color: #fbbf77;

@@ -440,6 +440,36 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     });
 
     /**
+     * Random chat: Mutual Doodle Board (Scratch Pad)
+     */
+    socket.on('random:doodle:draw', (data: { roomId: string; x1: number; y1: number; x2: number; y2: number; color: string; width: number }) => {
+      try {
+        const currentRoomId = userToRandomRoom.get(userId);
+        if (!currentRoomId || currentRoomId !== data.roomId) return;
+
+        // Relay drawing coordinates to the other partner
+        socket.to(currentRoomId).emit('random:doodle:draw', {
+          ...data,
+          userId,
+          name
+        });
+      } catch (error) {
+        logger.error('Failed to relay doodle draw', { userId, error });
+      }
+    });
+
+    socket.on('random:doodle:clear', (data: { roomId: string }) => {
+      try {
+        const currentRoomId = userToRandomRoom.get(userId);
+        if (!currentRoomId || currentRoomId !== data.roomId) return;
+
+        io.to(currentRoomId).emit('random:doodle:clear', { roomId: currentRoomId });
+      } catch (error) {
+        logger.error('Failed to relay doodle clear', { userId, error });
+      }
+    });
+
+    /**
      * Random chat: Delete message locally
      */
     socket.on('random:delete', (data: { roomId: string; messageId: string }) => {
@@ -614,6 +644,29 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           error: error instanceof Error ? error.message : 'Unknown error',
           userId
         });
+      }
+    });
+
+    /**
+     * Friend Chat: Mutual Doodle Board (Scratch Pad)
+     */
+    socket.on('friend:doodle:draw', (data: { recipientId: string; x1: number; y1: number; x2: number; y2: number; color: string; width: number }) => {
+      try {
+        io.to(`user:${data.recipientId}`).emit('friend:doodle:draw', {
+          ...data,
+          userId,
+          name
+        });
+      } catch (error) {
+        logger.error('Failed to relay friend doodle draw', { userId, error });
+      }
+    });
+
+    socket.on('friend:doodle:clear', (data: { recipientId: string }) => {
+      try {
+        io.to(`user:${data.recipientId}`).emit('friend:doodle:clear', { userId });
+      } catch (error) {
+        logger.error('Failed to relay friend doodle clear', { userId, error });
       }
     });
 

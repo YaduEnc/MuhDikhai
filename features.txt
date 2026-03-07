@@ -13,6 +13,7 @@
 - **E2E Encrypted Messaging**: Secure text chat available within every random room.
 - **Match History (Recents)**: Dashboard view of your last 10 chat partners, allowing you to see shared topics from past encounters.
 - **Post-Match Friending**: Quick-action "Add Friend" buttons in the recents list to re-connect with people you enjoyed talking to.
+- **Mutual Doodle Board**: A real-time, collaborative scratch pad within the chat for "shared moments" and low-pressure icebreaking.
 
 ## 3. Advanced UI/UX
 - **"Liquid" Parallax Hero**: Background elements that respond to cursor movement in real-time.
