@@ -9,6 +9,8 @@ import userService from '../services/user.service';
 import messageService from '../services/message.service';
 import matchService from '../services/match.service';
 import logger from '../utils/logger';
+import { createAdapter } from '@socket.io/redis-adapter';
+import redisClient from './redis';
 import { ExtendedError } from 'socket.io/dist/namespace';
 
 interface SocketUser {
@@ -18,6 +20,26 @@ interface SocketUser {
   name: string;
   profilePictureUrl?: string;
   gender: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
+  auraPoints?: number;
+}
+
+export interface PartyMember {
+  id: string;
+  name: string;
+  profilePictureUrl?: string;
+  auraPoints?: number;
+}
+
+export interface PartyRoom {
+  id: string;
+  name: string;
+  hostId: string;
+  hostName: string;
+  capacity: number;
+  members: PartyMember[];
+  requests: PartyMember[];
+  isLocked: boolean;
+  createdAt: number;
 }
 
 interface AuthenticatedSocket extends Socket {
@@ -29,6 +51,9 @@ const activeUsers = new Map<string, Set<string>>();
 
 // Store typing indicators (conversationId -> Set of userIds)
 const typingUsers = new Map<string, Set<string>>();
+
+// Store disconnect timeouts for connection state recovery
+const disconnectTimeouts = new Map<string, NodeJS.Timeout>();
 
 // Random chat state (ephemeral, in-memory)
 interface RandomRoom {
@@ -45,13 +70,13 @@ interface QueuedUser {
 }
 
 // Queue of users waiting for a random partner
-const randomQueue: QueuedUser[] = [];
+// const randomQueue: QueuedUser[] = [];
 
 // Map userId -> current random roomId (if any)
-const userToRandomRoom = new Map<string, string>();
+// const userToRandomRoom = new Map<string, string>();
 
 // Map roomId -> room metadata
-const randomRooms = new Map<string, RandomRoom>();
+// const randomRooms = new Map<string, RandomRoom>();
 
 // Ephemeral media tracking (roomId -> Set of filenames)
 const roomMedia = new Map<string, Set<string>>();
@@ -59,14 +84,30 @@ const roomMedia = new Map<string, Set<string>>();
 /**
  * Emit stats about the matching system to all connected users
  */
-function emitMatchingStats(io: any) {
-  const stats = {
-    online: activeUsers.size,
-    inQueue: randomQueue.length,
-    matched: userToRandomRoom.size, // count of users currently matched
-  };
-  io.emit('random:stats', stats);
+
+async function emitMatchingStats(io: any) {
+  try {
+    const pubClient = redisClient.getClient();
+    const queueLen = await pubClient.hlen('random:queue');
+    const matchedLen = await pubClient.hlen('random:user_rooms');
+    const stats = {
+      online: activeUsers.size,
+      inQueue: queueLen,
+      matched: Math.floor(matchedLen / 2),
+    };
+    io.emit('random:stats', stats);
+  } catch (e) { /* ignore */ }
 }
+
+export async function emitActiveParties(io: any) {
+  try {
+    const pubClient = redisClient.getClient();
+    const roomsStr = await pubClient.hgetall('party:rooms');
+    const activeParties = Object.values(roomsStr).map(str => JSON.parse(str));
+    io.emit('party:list', activeParties);
+  } catch (e) { /* ignore */ }
+}
+
 
 /**
  * Track a file uploaded to a specific room
@@ -153,6 +194,7 @@ export const socketAuth = async (socket: AuthenticatedSocket, next: (err?: Exten
       name: user.name,
       profilePictureUrl: user.profilePictureUrl,
       gender: user.gender || 'prefer_not_to_say',
+      auraPoints: user.auraPoints,
     };
 
     next();
@@ -168,6 +210,65 @@ export const socketAuth = async (socket: AuthenticatedSocket, next: (err?: Exten
 /**
  * Initialize Socket.io server
  */
+
+export function startMatchmakerWorker(io: SocketIOServer, pubClient: any) {
+  setInterval(async () => {
+    try {
+      const lock = await pubClient.set('matchmaker:lock', '1', 'EX', 2, 'NX');
+      if (!lock) return;
+      const queueMap = await pubClient.hgetall('random:queue');
+      const queueIds = Object.keys(queueMap);
+      if (queueIds.length < 2) return;
+      const queue: QueuedUser[] = queueIds.map((id: string) => JSON.parse(queueMap[id]));
+      const activeRooms = await pubClient.hgetall('random:user_rooms');
+      const validQueue = queue.filter((q: QueuedUser) => !activeRooms[q.userId]);
+      const matchedPairs = [];
+      const toRemove = new Set<string>();
+      for (let i = 0; i < validQueue.length; i++) {
+        const userA = validQueue[i];
+        if (toRemove.has(userA.userId)) continue;
+        for (let j = i + 1; j < validQueue.length; j++) {
+          const userB = validQueue[j];
+          if (toRemove.has(userB.userId)) continue;
+          const aPrefSatisfied = userA.preference === 'everyone' || userA.preference === userB.gender;
+          const bPrefSatisfied = userB.preference === 'everyone' || userB.preference === userA.gender;
+          if (aPrefSatisfied && bPrefSatisfied) {
+            const shared = userB.topics.filter((t: string) => userA.topics.includes(t));
+            matchedPairs.push({ u1: userA, u2: userB, topic: shared[0] || '' });
+            toRemove.add(userA.userId);
+            toRemove.add(userB.userId);
+            break;
+          }
+        }
+      }
+      for (const match of matchedPairs) {
+        const roomId = `random:${[match.u1.userId, match.u2.userId].sort().join(':')}:${Date.now()}`;
+        await pubClient.hset('random:user_rooms', match.u1.userId, roomId);
+        await pubClient.hset('random:user_rooms', match.u2.userId, roomId);
+        await pubClient.hdel('random:queue', match.u1.userId, match.u2.userId);
+        const room: RandomRoom = { id: roomId, users: [match.u1.userId, match.u2.userId], topic: match.topic || undefined };
+        await pubClient.hset('random:rooms', roomId, JSON.stringify(room));
+        const [profileA, profileB] = await Promise.all([
+          userService.getPublicUserProfile(match.u1.userId),
+          userService.getPublicUserProfile(match.u2.userId)
+        ]);
+        io.in(`user:${match.u1.userId}`).socketsJoin(roomId);
+        io.in(`user:${match.u2.userId}`).socketsJoin(roomId);
+        io.to(`user:${match.u1.userId}`).emit('random:matched', { roomId, partner: profileB, topic: match.topic });
+        io.to(`user:${match.u2.userId}`).emit('random:matched', { roomId, partner: profileA, topic: match.topic });
+        await Promise.all([
+          userService.incrementRoomsEntered(match.u1.userId),
+          userService.incrementRoomsEntered(match.u2.userId),
+          matchService.recordMatch(match.u1.userId, match.u2.userId, roomId, match.topic || undefined)
+        ]);
+      }
+      if (matchedPairs.length > 0) emitMatchingStats(io);
+    } catch (err) {
+      logger.error('Matchmaker error', err);
+    }
+  }, 2000);
+}
+
 export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
   const io = new SocketIOServer(httpServer, {
     cors: {
@@ -189,7 +290,15 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
   });
 
   // Authentication middleware
+
+  const pubClient = redisClient.getClient();
+  const subClient = pubClient.duplicate();
+  io.adapter(createAdapter(pubClient, subClient));
+
+  startMatchmakerWorker(io, pubClient);
+
   io.use(socketAuth);
+
 
   io.on('connection', (socket: AuthenticatedSocket) => {
     if (!socket.user) {
@@ -200,6 +309,13 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     const { userId, name } = socket.user;
 
     logger.info('Socket connected', { userId, socketId: socket.id });
+
+    // Connection state recovery: Clear any pending disconnect timeout
+    if (disconnectTimeouts.has(userId)) {
+      clearTimeout(disconnectTimeouts.get(userId)!);
+      disconnectTimeouts.delete(userId);
+      logger.info('User reconnected within recovery window, canceling cleanup', { userId });
+    }
 
     // Add user to active users
     if (!activeUsers.has(userId)) {
@@ -219,146 +335,35 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
      */
     socket.on('random:join', async (payload?: { topics?: string[]; preference?: 'male' | 'female' | 'everyone' }) => {
       try {
+        const pubClient = redisClient.getClient();
         emitMatchingStats(io);
         const userTopics = payload?.topics || [];
         const preference = payload?.preference || 'everyone';
         const userGender = socket.user?.gender || 'prefer_not_to_say';
 
-        // If user is already in a room, just echo back state
-        const existingRoomId = userToRandomRoom.get(userId);
+        const existingRoomId = await pubClient.hget('random:user_rooms', userId);
         if (existingRoomId) {
-          const room = randomRooms.get(existingRoomId);
-          if (room) {
-            const partnerId = room.users.find((id) => id !== userId);
+          const roomStr = await pubClient.hget('random:rooms', existingRoomId);
+          if (roomStr) {
+            const room = JSON.parse(roomStr);
+            const partnerId = room.users.find((id: string) => id !== userId);
             const partner = partnerId ? await userService.getPublicUserProfile(partnerId) : null;
             socket.join(existingRoomId);
-            socket.emit('random:matched', {
-              roomId: existingRoomId,
-              partner,
-              topic: room.topic,
-            });
+            socket.emit('random:matched', { roomId: existingRoomId, partner, topic: room.topic });
             return;
           }
         }
 
-        // If already queued, do nothing
-        if (randomQueue.find(q => q.userId === userId)) {
+        const isQueued = await pubClient.hexists('random:queue', userId);
+        if (isQueued) {
           socket.emit('random:waiting');
           return;
         }
 
-        // --- Matching Logic ---
-        let partnerIdx = -1;
-        let matchedTopic = '';
+        await pubClient.hset('random:queue', userId, JSON.stringify({
+          userId, topics: userTopics, gender: userGender, preference
+        }));
 
-        // 1. Try to find a match that satisfies BOTH users' criteria
-        for (let i = 0; i < randomQueue.length; i++) {
-          const candidate = randomQueue[i];
-
-          // Scrub stale or busy entries from queue
-          if (!activeUsers.has(candidate.userId) || userToRandomRoom.has(candidate.userId)) {
-            randomQueue.splice(i, 1);
-            i--;
-            continue;
-          }
-
-          // GENDER PREFERENCE CHECK (Mutual satisfaction)
-          // User A (current) must accept User B (candidate)
-          const userAPrefSatisfied = preference === 'everyone' || preference === candidate.gender;
-          // User B (candidate) must accept User A (current)
-          const userBPrefSatisfied = candidate.preference === 'everyone' || candidate.preference === userGender;
-
-          if (!userAPrefSatisfied || !userBPrefSatisfied) {
-            continue;
-          }
-
-          // Match found!
-          partnerIdx = i;
-          const shared = candidate.topics.filter(t => userTopics.includes(t));
-          matchedTopic = shared.length > 0 ? shared[0] : '';
-          break;
-        }
-
-        // 3. Perform the match if we found someone
-        if (partnerIdx !== -1) {
-          const [{ userId: candidateId }] = randomQueue.splice(partnerIdx, 1);
-
-          // Mark as busy immediately (Sync check)
-          const roomId = `random:${[userId, candidateId].sort().join(':')}:${Date.now()}`;
-          userToRandomRoom.set(userId, roomId);
-          userToRandomRoom.set(candidateId, roomId);
-
-          // Fetch partner profiles
-          const [selfProfile, partnerProfile] = await Promise.all([
-            userService.getPublicUserProfile(userId),
-            userService.getPublicUserProfile(candidateId),
-          ]);
-
-          // Liveness check: Ensure both still around after async profile fetch
-          if (!activeUsers.has(userId) || !activeUsers.has(candidateId)) {
-            userToRandomRoom.delete(userId);
-            userToRandomRoom.delete(candidateId);
-            return;
-          }
-
-          const room: RandomRoom = {
-            id: roomId,
-            users: [userId, candidateId],
-            topic: matchedTopic || undefined,
-          };
-
-          randomRooms.set(roomId, room);
-
-          // Join all sockets for both users to the room
-          const thisSockets = activeUsers.get(userId) ?? new Set<string>();
-          const partnerSockets = activeUsers.get(candidateId) ?? new Set<string>();
-
-          for (const id of thisSockets) {
-            const s = io.sockets.sockets.get(id);
-            if (s) {
-              s.join(roomId);
-              s.emit('random:matched', {
-                roomId,
-                partner: partnerProfile,
-              });
-            }
-          }
-
-          for (const id of partnerSockets) {
-            const s = io.sockets.sockets.get(id);
-            if (s) {
-              s.join(roomId);
-              s.emit('random:matched', {
-                roomId,
-                partner: selfProfile,
-              });
-            }
-          }
-
-          logger.info('Random chat match created', {
-            roomId,
-            userA: userId,
-            userB: candidateId,
-          });
-
-          // Increment rooms_entered for both users
-          await Promise.all([
-            userService.incrementRoomsEntered(userId),
-            userService.incrementRoomsEntered(candidateId),
-            matchService.recordMatch(userId, candidateId, roomId, matchedTopic || undefined),
-          ]);
-
-          emitMatchingStats(io);
-          return;
-        }
-
-        // No partner yet; enqueue user
-        randomQueue.push({
-          userId,
-          topics: userTopics,
-          gender: userGender,
-          preference
-        });
         socket.emit('random:waiting');
         emitMatchingStats(io);
       } catch (error) {
@@ -375,9 +380,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Random chat: send message within current room
      */
-    socket.on('random:message', (data: { roomId: string; content: string; replyToMessageId?: string; isVanish?: boolean }) => {
+    socket.on('random:message', async (data: { roomId: string; content: string; replyToMessageId?: string; isVanish?: boolean }) => {
       try {
-        const currentRoomId = userToRandomRoom.get(userId);
+        const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
         if (!currentRoomId || currentRoomId !== data.roomId) {
           return;
         }
@@ -418,9 +423,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Random chat: handle message reaction
      */
-    socket.on('random:reaction', (data: { roomId: string; messageId: string; emoji: string }) => {
+    socket.on('random:reaction', async (data: { roomId: string; messageId: string; emoji: string }) => {
       try {
-        const currentRoomId = userToRandomRoom.get(userId);
+        const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
         if (!currentRoomId || currentRoomId !== data.roomId) {
           return;
         }
@@ -442,9 +447,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Random chat: Mutual Doodle Board (Scratch Pad)
      */
-    socket.on('random:doodle:draw', (data: { roomId: string; x1: number; y1: number; x2: number; y2: number; color: string; width: number }) => {
+    socket.on('random:doodle:draw', async (data: { roomId: string; x1: number; y1: number; x2: number; y2: number; color: string; width: number }) => {
       try {
-        const currentRoomId = userToRandomRoom.get(userId);
+        const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
         if (!currentRoomId || currentRoomId !== data.roomId) return;
 
         // Relay drawing coordinates to the other partner
@@ -458,9 +463,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
       }
     });
 
-    socket.on('random:doodle:clear', (data: { roomId: string }) => {
+    socket.on('random:doodle:clear', async (data: { roomId: string }) => {
       try {
-        const currentRoomId = userToRandomRoom.get(userId);
+        const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
         if (!currentRoomId || currentRoomId !== data.roomId) return;
 
         io.to(currentRoomId).emit('random:doodle:clear', { roomId: currentRoomId });
@@ -472,9 +477,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Random chat: Delete message locally
      */
-    socket.on('random:delete', (data: { roomId: string; messageId: string }) => {
+    socket.on('random:delete', async (data: { roomId: string; messageId: string }) => {
       try {
-        const currentRoomId = userToRandomRoom.get(userId);
+        const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
         if (!currentRoomId || currentRoomId !== data.roomId) return;
         io.to(currentRoomId).emit('random:deleted', { messageId: data.messageId, userId });
       } catch (err) {
@@ -485,9 +490,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Random chat: Edit message content
      */
-    socket.on('random:edit', (data: { roomId: string; messageId: string; content: string }) => {
+    socket.on('random:edit', async (data: { roomId: string; messageId: string; content: string }) => {
       try {
-        const currentRoomId = userToRandomRoom.get(userId);
+        const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
         if (!currentRoomId || currentRoomId !== data.roomId) return;
         io.to(currentRoomId).emit('random:edited', {
           messageId: data.messageId,
@@ -502,47 +507,31 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Random chat: leave current room / queue
      */
-    socket.on('random:leave', () => {
+    socket.on('random:leave', async () => {
       try {
-        // Remove from queue if waiting
-        const queueIndex = randomQueue.findIndex(q => q.userId === userId);
-        if (queueIndex !== -1) {
-          randomQueue.splice(queueIndex, 1);
-          emitMatchingStats(io);
-        }
+        const pubClient = redisClient.getClient();
+        await pubClient.hdel('random:queue', userId);
 
-        const roomId = userToRandomRoom.get(userId);
+        const roomId = await pubClient.hget('random:user_rooms', userId);
         if (!roomId) {
           socket.emit('random:ended');
+          emitMatchingStats(io);
           return;
         }
 
-        const room = randomRooms.get(roomId);
-        userToRandomRoom.delete(userId);
+        const roomStr = await pubClient.hget('random:rooms', roomId);
+        if (roomStr) {
+          const room = JSON.parse(roomStr);
+          const otherUserId = room.users.find((id: string) => id !== userId);
 
-        if (room) {
-          const otherUserId = room.users.find((id) => id !== userId);
+          io.to(roomId).emit('random:left', { roomId, userId });
 
-          // Notify the room that somebody left
-          io.to(roomId).emit('random:left', {
-            roomId,
-            userId,
-          });
-
-          randomRooms.delete(roomId);
+          await pubClient.hdel('random:user_rooms', userId);
+          await pubClient.hdel('random:rooms', roomId);
 
           if (otherUserId) {
-            userToRandomRoom.delete(otherUserId);
-            // Sockets will leave automatically when the next join happens or on disconnect
-            // but we can explicitly clear them from the room for cleanliness
-            const otherSockets = activeUsers.get(otherUserId) ?? new Set<string>();
-            for (const id of otherSockets) {
-              const s = io.sockets.sockets.get(id);
-              if (s) s.leave(roomId);
-            }
+            await pubClient.hdel('random:user_rooms', otherUserId);
           }
-
-          // Trigger ephemeral media cleanup
           cleanupRoomMedia(roomId);
         }
 
@@ -550,6 +539,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         socket.emit('random:ended', { roomId });
         emitMatchingStats(io);
       } catch (error) {
+
         logger.error('Failed to leave random chat', {
           error: error instanceof Error ? error.message : 'Unknown error',
           userId,
@@ -560,7 +550,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * WebRTC: Signaling relay for P2P connection
      */
-    socket.on('webrtc:signal', (data: { roomId?: string; recipientId?: string; signal: any }) => {
+    socket.on('webrtc:signal', async (data: { roomId?: string; recipientId?: string; signal: any }) => {
       try {
         if (data.recipientId) {
           // Direct friend call signaling
@@ -571,7 +561,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           return;
         }
 
-        const currentRoomId = userToRandomRoom.get(userId);
+        const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
         if (!currentRoomId || currentRoomId !== data.roomId) return;
 
         // Relay to everyone else in the room
@@ -590,7 +580,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * WebRTC: Call Request (Initiate a call)
      */
-    socket.on('webrtc:call-request', (data: { roomId?: string; recipientId?: string }) => {
+    socket.on('webrtc:call-request', async (data: { roomId?: string; recipientId?: string }) => {
       try {
         if (data.recipientId) {
           io.to(`user:${data.recipientId}`).emit('webrtc:call-request', {
@@ -601,7 +591,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           return;
         }
 
-        const currentRoomId = userToRandomRoom.get(userId);
+        const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
         if (!currentRoomId || currentRoomId !== data.roomId) return;
 
         // Notify the partner of the incoming call
@@ -621,7 +611,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * WebRTC: Call Response (Accept or Decline)
      */
-    socket.on('webrtc:call-response', (data: { roomId?: string; recipientId?: string; status: 'accepted' | 'declined' }) => {
+    socket.on('webrtc:call-response', async (data: { roomId?: string; recipientId?: string; status: 'accepted' | 'declined' }) => {
       try {
         if (data.recipientId) {
           io.to(`user:${data.recipientId}`).emit('webrtc:call-response', {
@@ -631,7 +621,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           return;
         }
 
-        const currentRoomId = userToRandomRoom.get(userId);
+        const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
         if (!currentRoomId || currentRoomId !== data.roomId) return;
 
         // Relay the response back to the caller
@@ -905,6 +895,220 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     });
 
     /**
+     * PARTY ROOMS (Group Chat)
+     */
+    socket.on('party:create', async (data: { name: string; capacity: number; isLocked: boolean }) => {
+      try {
+        const pubClient = redisClient.getClient();
+
+        // Ensure user isn't already in a party
+        const existingPartyId = await pubClient.hget('party:user_rooms', userId);
+        if (existingPartyId) {
+          // Already in a party, they should leave first
+          socket.emit('party:error', { error: 'You are already in a party' });
+          return;
+        }
+
+        const partyId = `party:${uuidv4()}`;
+        const newParty: PartyRoom = {
+          id: partyId,
+          name: data.name || 'Chill Vibes Only',
+          hostId: userId,
+          hostName: name,
+          capacity: data.capacity || 5,
+          members: [{ id: userId, name, profilePictureUrl: socket.user?.profilePictureUrl, auraPoints: socket.user?.auraPoints }],
+          requests: [],
+          isLocked: data.isLocked || false,
+          createdAt: Date.now()
+        };
+
+        await pubClient.hset('party:rooms', partyId, JSON.stringify(newParty));
+        await pubClient.hset('party:user_rooms', userId, partyId);
+
+        socket.join(partyId);
+        socket.emit('party:created', newParty);
+        emitActiveParties(io);
+      } catch (e) {
+        logger.error('Failed to create party', { error: e });
+      }
+    });
+
+    socket.on('party:list', async () => {
+      emitActiveParties(io);
+    });
+
+    socket.on('party:request_join', async (data: { partyId: string }) => {
+      try {
+        const pubClient = redisClient.getClient();
+
+        const existingPartyId = await pubClient.hget('party:user_rooms', userId);
+        if (existingPartyId) {
+          socket.emit('party:error', { error: 'You are already in a party' });
+          return;
+        }
+
+        const partyStr = await pubClient.hget('party:rooms', data.partyId);
+        if (!partyStr) {
+          socket.emit('party:error', { error: 'Party not found' });
+          return;
+        }
+
+        const party: PartyRoom = JSON.parse(partyStr);
+
+        if (party.members.length >= party.capacity) {
+          socket.emit('party:error', { error: 'Party is full' });
+          return;
+        }
+
+        const requester: PartyMember = {
+          id: userId,
+          name,
+          profilePictureUrl: socket.user?.profilePictureUrl,
+          auraPoints: socket.user?.auraPoints
+        };
+
+        if (party.isLocked) {
+          // Bouncer Mode: Add to requests queue
+          if (!party.requests.find(r => r.id === userId)) {
+            party.requests.push(requester);
+            await pubClient.hset('party:rooms', data.partyId, JSON.stringify(party));
+            // Notify host
+            io.to(`user:${party.hostId}`).emit('party:join_requested', { partyId: data.partyId, requester });
+            socket.emit('party:waiting_approval');
+          }
+        } else {
+          // Open Door Mode: Auto-join
+          party.members.push(requester);
+          await pubClient.hset('party:rooms', data.partyId, JSON.stringify(party));
+          await pubClient.hset('party:user_rooms', userId, data.partyId);
+          socket.join(data.partyId);
+          io.to(data.partyId).emit('party:updated', party);
+          emitActiveParties(io);
+        }
+      } catch (e) {
+        logger.error('Failed to request join party', { error: e });
+      }
+    });
+
+    socket.on('party:action', async (data: { partyId: string; targetUserId: string; action: 'accept' | 'decline' }) => {
+      try {
+        const pubClient = redisClient.getClient();
+        const partyStr = await pubClient.hget('party:rooms', data.partyId);
+        if (!partyStr) return;
+
+        const party: PartyRoom = JSON.parse(partyStr);
+        if (party.hostId !== userId) return; // Only host can do this
+
+        const requestIndex = party.requests.findIndex(r => r.id === data.targetUserId);
+        if (requestIndex === -1) return;
+
+        const requester = party.requests[requestIndex];
+        party.requests.splice(requestIndex, 1);
+
+        if (data.action === 'accept') {
+          if (party.members.length < party.capacity) {
+            party.members.push(requester);
+            const targetSockets = activeUsers.get(data.targetUserId);
+            if (targetSockets) {
+              for (const sId of targetSockets) {
+                const s = io.sockets.sockets.get(sId);
+                if (s) s.join(data.partyId);
+              }
+            }
+            await pubClient.hset('party:user_rooms', data.targetUserId, data.partyId);
+            io.to(`user:${data.targetUserId}`).emit('party:accepted', party);
+          } else {
+            io.to(`user:${data.targetUserId}`).emit('party:error', { error: 'Party is fully at capacity now' });
+          }
+        } else {
+          io.to(`user:${data.targetUserId}`).emit('party:declined', { partyId: data.partyId });
+        }
+
+        await pubClient.hset('party:rooms', data.partyId, JSON.stringify(party));
+        io.to(data.partyId).emit('party:updated', party);
+      } catch (e) { }
+    });
+
+    socket.on('party:leave', async (data: { partyId: string }) => {
+      try {
+        const pubClient = redisClient.getClient();
+        const partyStr = await pubClient.hget('party:rooms', data.partyId);
+        if (!partyStr) return;
+
+        const party: PartyRoom = JSON.parse(partyStr);
+        await pubClient.hdel('party:user_rooms', userId);
+        socket.leave(data.partyId);
+
+        if (party.hostId === userId) {
+          // Host left! Destroy party
+          party.members.forEach(async (m) => {
+            await pubClient.hdel('party:user_rooms', m.id);
+          });
+          io.to(data.partyId).emit('party:destroyed');
+          await pubClient.hdel('party:rooms', data.partyId);
+          emitActiveParties(io);
+        } else {
+          // Normal member left
+          party.members = party.members.filter(m => m.id !== userId);
+          party.requests = party.requests.filter(m => m.id !== userId);
+          await pubClient.hset('party:rooms', data.partyId, JSON.stringify(party));
+          io.to(data.partyId).emit('party:updated', party);
+          emitActiveParties(io);
+        }
+      } catch (e) { }
+    });
+
+    socket.on('party:kick', async (data: { partyId: string; targetUserId: string }) => {
+      try {
+        const pubClient = redisClient.getClient();
+        const partyStr = await pubClient.hget('party:rooms', data.partyId);
+        if (!partyStr) return;
+
+        const party: PartyRoom = JSON.parse(partyStr);
+        if (party.hostId !== userId || userId === data.targetUserId) return;
+
+        party.members = party.members.filter(m => m.id !== data.targetUserId);
+        await pubClient.hdel('party:user_rooms', data.targetUserId);
+
+        await pubClient.hset('party:rooms', data.partyId, JSON.stringify(party));
+        io.to(data.partyId).emit('party:updated', party);
+
+        const targetSockets = activeUsers.get(data.targetUserId);
+        if (targetSockets) {
+          for (const sId of targetSockets) {
+            const s = io.sockets.sockets.get(sId);
+            if (s) {
+              s.emit('party:kicked');
+              s.leave(data.partyId);
+            }
+          }
+        }
+        emitActiveParties(io);
+      } catch (e) { }
+    });
+
+    socket.on('party:message', (data: { partyId: string; content: string }) => {
+      io.to(data.partyId).emit('party:message', {
+        id: uuidv4(),
+        partyId: data.partyId,
+        fromUserId: userId,
+        fromName: name,
+        fromProfilePictureUrl: socket.user?.profilePictureUrl,
+        content: data.content,
+        sentAt: new Date().toISOString()
+      });
+    });
+
+    // WebRTC signaling for parties (Audio Mesh)
+    socket.on('party:audio:signal', (data: { partyId: string; targetUserId: string; signal: any }) => {
+      io.to(`user:${data.targetUserId}`).emit('party:audio:signal', {
+        fromUserId: userId,
+        partyId: data.partyId,
+        signal: data.signal
+      });
+    });
+
+    /**
      * Handle status updates
      */
     socket.on('status:update', async (data: { status: 'online' | 'away' | 'offline' }) => {
@@ -932,50 +1136,88 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           userSockets.delete(socket.id);
           if (userSockets.size === 0) {
             // ONLY clean up state if this was the last active socket for this user
-            logger.info('Last user socket disconnected, cleaning up session', { userId });
+            // Implementing gracefully delay of 5 seconds to support connection recovery/drops
+            logger.info('Last user socket disconnected, starting 5s grace period', { userId });
 
-            // Clean up random queue
-            const queueIndex = randomQueue.findIndex(q => q.userId === userId);
-            if (queueIndex !== -1) {
-              randomQueue.splice(queueIndex, 1);
-            }
+            const timeout = setTimeout(async () => {
+              disconnectTimeouts.delete(userId);
+              logger.info('Grace period expired, cleaning up session permanently', { userId });
 
-            // Clean up random room
-            const roomId = userToRandomRoom.get(userId);
-            if (roomId) {
-              const room = randomRooms.get(roomId);
-              userToRandomRoom.delete(userId);
-              randomRooms.delete(roomId);
+              try {
+                const pubClient = redisClient.getClient();
 
-              if (room) {
-                const otherUserId = room.users.find((id) => id !== userId);
+                // Clean up random queue
+                await pubClient.hdel('random:queue', userId);
 
-                // Notify the room that somebody left/disconnected
-                io.to(roomId).emit('random:left', {
-                  roomId,
-                  userId,
-                });
+                // Clean up random room
+                const roomId = await pubClient.hget('random:user_rooms', userId);
+                if (roomId) {
+                  const roomStr = await pubClient.hget('random:rooms', roomId);
+                  if (roomStr) {
+                    const room = JSON.parse(roomStr);
+                    const otherUserId = room.users.find((id: string) => id !== userId);
 
-                if (otherUserId) {
-                  userToRandomRoom.delete(otherUserId);
-                  const otherSockets = activeUsers.get(otherUserId) ?? new Set<string>();
-                  for (const id of otherSockets) {
-                    const s = io.sockets.sockets.get(id);
-                    if (s) s.leave(roomId);
+                    // Notify the room that somebody left/disconnected
+                    io.to(roomId).emit('random:left', {
+                      roomId,
+                      userId,
+                    });
+
+                    await pubClient.hdel('random:user_rooms', userId);
+                    await pubClient.hdel('random:rooms', roomId);
+
+                    if (otherUserId) {
+                      await pubClient.hdel('random:user_rooms', otherUserId);
+                      const otherSockets = activeUsers.get(otherUserId) ?? new Set<string>();
+                      for (const id of otherSockets) {
+                        const s = io.sockets.sockets.get(id);
+                        if (s) s.leave(roomId);
+                      }
+                    }
+
+                    // Trigger ephemeral media cleanup
+                    cleanupRoomMedia(roomId);
+                  } else {
+                    await pubClient.hdel('random:user_rooms', userId);
                   }
                 }
 
-                // Trigger ephemeral media cleanup
-                cleanupRoomMedia(roomId);
-              }
-            }
+                // Clean up party room
+                const userPartyId = await pubClient.hget('party:user_rooms', userId);
+                if (userPartyId) {
+                  const partyStr = await pubClient.hget('party:rooms', userPartyId);
+                  if (partyStr) {
+                    const party: PartyRoom = JSON.parse(partyStr);
+                    await pubClient.hdel('party:user_rooms', userId);
 
-            // User is no longer online
-            activeUsers.delete(userId);
-            await userService.updateStatus(userId, 'offline');
-            io.emit('user:offline', { userId, name });
-            io.emit('presence:count', { count: activeUsers.size });
-            emitMatchingStats(io);
+                    if (party.hostId === userId) {
+                      party.members.forEach(async (m) => {
+                        await pubClient.hdel('party:user_rooms', m.id);
+                      });
+                      io.to(userPartyId).emit('party:destroyed');
+                      await pubClient.hdel('party:rooms', userPartyId);
+                    } else {
+                      party.members = party.members.filter(m => m.id !== userId);
+                      party.requests = party.requests.filter(m => m.id !== userId);
+                      await pubClient.hset('party:rooms', userPartyId, JSON.stringify(party));
+                      io.to(userPartyId).emit('party:updated', party);
+                    }
+                    emitActiveParties(io);
+                  }
+                }
+
+                // User is no longer online
+                activeUsers.delete(userId);
+                await userService.updateStatus(userId, 'offline');
+                io.emit('user:offline', { userId, name });
+                io.emit('presence:count', { count: activeUsers.size });
+                emitMatchingStats(io);
+              } catch (e) {
+                logger.error('Failed to cleanup user session', { error: e });
+              }
+            }, 5000);
+
+            disconnectTimeouts.set(userId, timeout);
           }
         }
 

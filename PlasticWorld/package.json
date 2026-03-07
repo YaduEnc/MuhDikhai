@@ -30,6 +30,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "@stablelib/chacha20poly1305": "^2.0.1",
     "@stablelib/hkdf": "^2.0.1",
     "@stablelib/x25519": "^2.0.1",
