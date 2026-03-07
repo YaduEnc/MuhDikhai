@@ -32,9 +32,10 @@ export default function CallOverlay({
 
     // Sync WebRTC with call status
     useEffect(() => {
-        if (callState.status === 'active') {
+        if (callState.status === 'requesting' && callState.isInitiator && !localStream) {
+            prepareLocalMedia()
         }
-    }, [callState.status])
+    }, [callState.status, callState.isInitiator, localStream, prepareLocalMedia])
 
     // Special handler for acceptance
     const handleAccept = async () => {

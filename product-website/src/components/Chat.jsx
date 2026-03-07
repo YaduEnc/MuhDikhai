@@ -412,6 +412,7 @@ export default function Chat({
     socketState,
     chatMessages,
     partnerTyping,
+    onSendMessage,
     onTyping,
     onLeave,
     onSearchAgain,

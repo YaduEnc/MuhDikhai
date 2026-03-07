@@ -195,7 +195,7 @@ function App() {
             // For friend calls, the backend sends metadata
             return {
               status: 'incoming',
-              partner: data.caller || roomRef.current?.partner,
+              partner: { ...(data.caller || roomRef.current?.partner), roomId: data.roomId },
               type: data.recipientId ? 'friend' : 'random',
               isInitiator: false
             }
