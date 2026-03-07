@@ -502,7 +502,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
 
         // Notify the partner of the incoming call
         socket.to(currentRoomId).emit('webrtc:call-request', {
-          fromUserId: userId
+          fromUserId: userId,
+          roomId: currentRoomId,
+          caller: { id: userId, name: (socket as AuthenticatedSocket).user?.name }
         });
       } catch (error) {
         logger.error('Failed to relay WebRTC call request', {

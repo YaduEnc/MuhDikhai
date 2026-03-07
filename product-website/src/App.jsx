@@ -192,10 +192,11 @@ function App() {
           setCallOverlayState(current => {
             if (current.status !== 'idle') return current
 
-            // For friend calls, the backend sends metadata
+            // Use roomId from backend, fall back to current room
+            const callRoomId = data.roomId || roomRef.current?.roomId
             return {
               status: 'incoming',
-              partner: { ...(data.caller || roomRef.current?.partner), roomId: data.roomId },
+              partner: { ...(data.caller || roomRef.current?.partner), roomId: callRoomId },
               type: data.recipientId ? 'friend' : 'random',
               isInitiator: false
             }
@@ -420,9 +421,16 @@ function App() {
     const roomId = partner.roomId || partner.id
     const recipientId = type === 'friend' ? (partner.user?.id || partner.id) : null
 
+    // For random chats, partner is the room object — extract the actual partner
+    const partnerInfo = type === 'random' && partner.partner
+      ? { ...partner.partner, roomId: partner.roomId }
+      : partner.user
+        ? { ...partner.user, id: partner.user.id }
+        : partner
+
     setCallOverlayState({
       status: 'requesting',
-      partner: partner.user ? { ...partner.user, id: partner.user.id } : partner,
+      partner: partnerInfo,
       type,
       isInitiator: true
     })
