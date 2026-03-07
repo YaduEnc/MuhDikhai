@@ -1362,3 +1362,126 @@
     padding: 1.2rem;
   }
 }
+
+/* ── Home Tabs ─────────────────────────────────────────── */
+.home-tabs {
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 1rem;
+  padding-bottom: 0.2rem;
+}
+
+.home-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.5rem 0.2rem;
+  cursor: pointer;
+  position: relative;
+  transition: color 200ms ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.home-tab:hover {
+  color: var(--text-soft);
+}
+
+.home-tab.active {
+  color: var(--accent-strong);
+}
+
+.home-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent-strong);
+  box-shadow: 0 0 10px rgba(251, 191, 119, 0.4);
+}
+
+.tab-badge {
+  background: #f87171;
+  color: #000;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.home-tab-content {
+  min-height: 100px;
+}
+
+.home-loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.friends-empty {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  margin-top: 1rem;
+}
+
+.friends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.friend-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.friend-accept-btn {
+  background: rgba(48, 209, 88, 0.15);
+  border: 1px solid rgba(48, 209, 88, 0.3);
+  color: #30d158;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.friend-accept-btn:hover {
+  background: rgba(48, 209, 88, 0.25);
+  border-color: rgba(48, 209, 88, 0.5);
+}
+
+.friend-deny-btn {
+  background: rgba(255, 69, 58, 0.1);
+  border: 1px solid rgba(255, 69, 58, 0.2);
+  color: #ff453a;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.friend-deny-btn:hover {
+  background: rgba(255, 69, 58, 0.15);
+  border-color: rgba(255, 69, 58, 0.3);
+}

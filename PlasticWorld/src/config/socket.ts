@@ -458,8 +458,17 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * WebRTC: Signaling relay for P2P connection
      */
-    socket.on('webrtc:signal', (data: { roomId: string; signal: any }) => {
+    socket.on('webrtc:signal', (data: { roomId?: string; recipientId?: string; signal: any }) => {
       try {
+        if (data.recipientId) {
+          // Direct friend call signaling
+          io.to(`user:${data.recipientId}`).emit('webrtc:signal', {
+            fromUserId: userId,
+            signal: data.signal
+          });
+          return;
+        }
+
         const currentRoomId = userToRandomRoom.get(userId);
         if (!currentRoomId || currentRoomId !== data.roomId) return;
 
@@ -479,8 +488,15 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * WebRTC: Call Request (Initiate a call)
      */
-    socket.on('webrtc:call-request', (data: { roomId: string }) => {
+    socket.on('webrtc:call-request', (data: { roomId?: string; recipientId?: string }) => {
       try {
+        if (data.recipientId) {
+          io.to(`user:${data.recipientId}`).emit('webrtc:call-request', {
+            fromUserId: userId
+          });
+          return;
+        }
+
         const currentRoomId = userToRandomRoom.get(userId);
         if (!currentRoomId || currentRoomId !== data.roomId) return;
 
@@ -499,8 +515,16 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * WebRTC: Call Response (Accept or Decline)
      */
-    socket.on('webrtc:call-response', (data: { roomId: string, status: 'accepted' | 'declined' }) => {
+    socket.on('webrtc:call-response', (data: { roomId?: string; recipientId?: string; status: 'accepted' | 'declined' }) => {
       try {
+        if (data.recipientId) {
+          io.to(`user:${data.recipientId}`).emit('webrtc:call-response', {
+            fromUserId: userId,
+            status: data.status
+          });
+          return;
+        }
+
         const currentRoomId = userToRandomRoom.get(userId);
         if (!currentRoomId || currentRoomId !== data.roomId) return;
 

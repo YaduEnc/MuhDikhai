@@ -309,44 +309,64 @@ function SettingsView({ session, onBack, onSignOut, onDeleteRequest }) {
 
 const PREDEFINED_TOPICS = ['Deep talk', 'Music', 'Coding', 'Movies', 'Vent', 'Silence']
 
-function RecentMatches({ matches, onAddFriend }) {
-    if (!matches || matches.length === 0) return null;
+function FriendRequests({ requests, onRespond }) {
+    if (!requests || requests.length === 0) {
+        return <div className="friends-empty">No pending requests</div>
+    }
 
     return (
-        <div className="home-recents-section">
-            <div className="home-topic-header">
-                <span className="home-topic-title">Recent encounters</span>
-                <span className="home-topic-count">{matches.length} people</span>
-            </div>
-            <div className="recents-list">
-                {matches.map((match) => (
-                    <div key={match.id} className="recent-match-card">
-                        <div className="recent-avatar">
-                            {match.partner?.profilePictureUrl ? (
-                                <img src={match.partner.profilePictureUrl} alt="avatar" />
-                            ) : (
-                                <span className="avatar-placeholder">{match.partner?.name?.[0]?.toUpperCase() || 'S'}</span>
-                            )}
-                        </div>
-                        <div className="recent-info">
-                            <span className="recent-name">{match.partner?.name || 'Stranger'}</span>
-                            {match.sharedTopic && <span className="recent-topic">Talked about {match.sharedTopic}</span>}
-                        </div>
-                        <button
-                            className="recent-add-btn"
-                            title="Send Friend Request"
-                            onClick={() => onAddFriend(match.partner.id)}
-                        >
-                            + Friend
-                        </button>
+        <div className="friends-list">
+            {requests.map((req) => (
+                <div key={req.id} className="recent-match-card">
+                    <div className="recent-avatar">
+                        {req.user?.profilePictureUrl ? (
+                            <img src={req.user.profilePictureUrl} alt="avatar" />
+                        ) : (
+                            <span className="avatar-placeholder">{req.user?.name?.[0]?.toUpperCase() || 'S'}</span>
+                        )}
                     </div>
-                ))}
-            </div>
+                    <div className="recent-info">
+                        <span className="recent-name">{req.user?.name || 'Stranger'}</span>
+                        <span className="recent-topic">Wants to be your friend</span>
+                    </div>
+                    <div className="friend-actions">
+                        <button className="friend-accept-btn" onClick={() => onRespond(req.id, 'accept')}>Accept</button>
+                        <button className="friend-deny-btn" onClick={() => onRespond(req.id, 'deny')}>Deny</button>
+                    </div>
+                </div>
+            ))}
         </div>
-    );
+    )
 }
 
-export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onFetchMatches, onAddFriend }) {
+function FriendsList({ friends, onOpenChat }) {
+    if (!friends || friends.length === 0) {
+        return <div className="friends-empty">No friends yet. Start matching!</div>
+    }
+
+    return (
+        <div className="friends-list">
+            {friends.map((friend) => (
+                <div key={friend.id} className="recent-match-card">
+                    <div className="recent-avatar">
+                        {friend.user?.profilePictureUrl ? (
+                            <img src={friend.user.profilePictureUrl} alt="avatar" />
+                        ) : (
+                            <span className="avatar-placeholder">{friend.user?.name?.[0]?.toUpperCase() || 'S'}</span>
+                        )}
+                    </div>
+                    <div className="recent-info">
+                        <span className="recent-name">{friend.user?.name || 'Stranger'}</span>
+                        <span className="recent-topic">Friend</span>
+                    </div>
+                    <button className="recent-add-btn" onClick={() => onOpenChat(friend)}>Message</button>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat }) {
 
     const [selectedTopics, setSelectedTopics] = useState([])
     const [customTopic, setCustomTopic] = useState('')
@@ -355,19 +375,50 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
 
 
     const [view, setView] = useState('home') // 'home' | 'profile' | 'settings'
+    const [homeTab, setHomeTab] = useState('matches') // 'matches' | 'friends' | 'requests'
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [recentMatches, setRecentMatches] = useState([])
-    const [loadingRecents, setLoadingRecents] = useState(false)
+    const [friendships, setFriendships] = useState([])
+    const [friendRequests, setFriendRequests] = useState([])
+    const [loadingHome, setLoadingHome] = useState(false)
+
+    const refreshHomeData = useCallback(async () => {
+        setLoadingHome(true);
+        try {
+            if (homeTab === 'matches') {
+                const matches = await onFetchMatches();
+                setRecentMatches(matches);
+            } else if (homeTab === 'friends') {
+                const friends = await onFetchFriendships('accepted');
+                setFriendships(friends);
+            } else if (homeTab === 'requests') {
+                const requests = await onFetchFriendships('pending');
+                // Only show received requests if backend doesn't filter by direction
+                // Based on route: it returns all. Logic: if you are requester, keep as is.
+                // But usually "Requests" tab means incoming.
+                setFriendRequests(requests.filter(r => !r.isRequester));
+            }
+        } catch (err) {
+            console.error('Failed to fetch home data:', err);
+        } finally {
+            setLoadingHome(false);
+        }
+    }, [homeTab, onFetchMatches, onFetchFriendships]);
 
     useEffect(() => {
         if (view === 'home') {
-            setLoadingRecents(true);
-            onFetchMatches().then(matches => {
-                setRecentMatches(matches);
-                setLoadingRecents(false);
-            });
+            refreshHomeData();
         }
-    }, [view, onFetchMatches]);
+    }, [view, refreshHomeData]);
+
+    const handleRespond = async (friendshipId, action) => {
+        try {
+            await onRespondToFriendRequest(friendshipId, action);
+            refreshHomeData();
+        } catch (err) {
+            alert(err.message || `Failed to ${action} request`);
+        }
+    };
 
     const handleRecentAddFriend = async (userId) => {
         try {
@@ -516,10 +567,74 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                 <span className="home-match-btn-arrow">↗</span>
             </button>
 
-            {/* Recent Matches */}
-            {!loadingRecents && recentMatches.length > 0 && (
-                <RecentMatches matches={recentMatches} onAddFriend={handleRecentAddFriend} />
-            )}
+            {/* Home Tabs */}
+            <div className="home-tabs">
+                <button
+                    className={`home-tab ${homeTab === 'matches' ? 'active' : ''}`}
+                    onClick={() => setHomeTab('matches')}
+                >
+                    Matches
+                </button>
+                <button
+                    className={`home-tab ${homeTab === 'friends' ? 'active' : ''}`}
+                    onClick={() => setHomeTab('friends')}
+                >
+                    Friends
+                </button>
+                <button
+                    className={`home-tab ${homeTab === 'requests' ? 'active' : ''}`}
+                    onClick={() => setHomeTab('requests')}
+                >
+                    Requests {friendRequests.length > 0 && <span className="tab-badge">{friendRequests.length}</span>}
+                </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="home-tab-content">
+                {loadingHome ? (
+                    <div className="home-loading">Finding your people...</div>
+                ) : (
+                    <>
+                        {homeTab === 'matches' && (
+                            recentMatches.length > 0 ? (
+                                <div className="home-recents-section">
+                                    <div className="recents-list">
+                                        {recentMatches.map((match) => (
+                                            <div key={match.id} className="recent-match-card">
+                                                <div className="recent-avatar">
+                                                    {match.partner?.profilePictureUrl ? (
+                                                        <img src={match.partner.profilePictureUrl} alt="avatar" />
+                                                    ) : (
+                                                        <span className="avatar-placeholder">{match.partner?.name?.[0]?.toUpperCase() || 'S'}</span>
+                                                    )}
+                                                </div>
+                                                <div className="recent-info">
+                                                    <span className="recent-name">{match.partner?.name || 'Stranger'}</span>
+                                                    {match.sharedTopic && <span className="recent-topic">Talked about {match.sharedTopic}</span>}
+                                                </div>
+                                                <button
+                                                    className="recent-add-btn"
+                                                    title="Send Friend Request"
+                                                    onClick={() => handleRecentAddFriend(match.partner.id)}
+                                                >
+                                                    + Friend
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="home-hint" style={{ textAlign: 'center', marginTop: '1rem' }}>
+                                    No recent encounters. Start a match to find someone to talk to.
+                                </div>
+                            )
+                        )}
+
+                        {homeTab === 'friends' && <FriendsList friends={friendships} onOpenChat={onOpenChat} />}
+                        {homeTab === 'requests' && <FriendRequests requests={friendRequests} onRespond={handleRespond} />}
+                    </>
+                )}
+            </div>
 
             {/* Secondary card grid */}
             <div className="home-card-grid">
