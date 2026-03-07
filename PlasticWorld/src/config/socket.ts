@@ -20,26 +20,6 @@ interface SocketUser {
   name: string;
   profilePictureUrl?: string;
   gender: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
-  auraPoints?: number;
-}
-
-export interface PartyMember {
-  id: string;
-  name: string;
-  profilePictureUrl?: string;
-  auraPoints?: number;
-}
-
-export interface PartyRoom {
-  id: string;
-  name: string;
-  hostId: string;
-  hostName: string;
-  capacity: number;
-  members: PartyMember[];
-  requests: PartyMember[];
-  isLocked: boolean;
-  createdAt: number;
 }
 
 interface AuthenticatedSocket extends Socket {
@@ -96,15 +76,6 @@ async function emitMatchingStats(io: any) {
       matched: Math.floor(matchedLen / 2),
     };
     io.emit('random:stats', stats);
-  } catch (e) { /* ignore */ }
-}
-
-export async function emitActiveParties(io: any) {
-  try {
-    const pubClient = redisClient.getClient();
-    const roomsStr = await pubClient.hgetall('party:rooms');
-    const activeParties = Object.values(roomsStr).map(str => JSON.parse(str));
-    io.emit('party:list', activeParties);
   } catch (e) { /* ignore */ }
 }
 
@@ -194,7 +165,6 @@ export const socketAuth = async (socket: AuthenticatedSocket, next: (err?: Exten
       name: user.name,
       profilePictureUrl: user.profilePictureUrl,
       gender: user.gender || 'prefer_not_to_say',
-      auraPoints: user.auraPoints,
     };
 
     next();
@@ -895,220 +865,6 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     });
 
     /**
-     * PARTY ROOMS (Group Chat)
-     */
-    socket.on('party:create', async (data: { name: string; capacity: number; isLocked: boolean }) => {
-      try {
-        const pubClient = redisClient.getClient();
-
-        // Ensure user isn't already in a party
-        const existingPartyId = await pubClient.hget('party:user_rooms', userId);
-        if (existingPartyId) {
-          // Already in a party, they should leave first
-          socket.emit('party:error', { error: 'You are already in a party' });
-          return;
-        }
-
-        const partyId = `party:${uuidv4()}`;
-        const newParty: PartyRoom = {
-          id: partyId,
-          name: data.name || 'Chill Vibes Only',
-          hostId: userId,
-          hostName: name,
-          capacity: data.capacity || 5,
-          members: [{ id: userId, name, profilePictureUrl: socket.user?.profilePictureUrl, auraPoints: socket.user?.auraPoints }],
-          requests: [],
-          isLocked: data.isLocked || false,
-          createdAt: Date.now()
-        };
-
-        await pubClient.hset('party:rooms', partyId, JSON.stringify(newParty));
-        await pubClient.hset('party:user_rooms', userId, partyId);
-
-        socket.join(partyId);
-        socket.emit('party:created', newParty);
-        emitActiveParties(io);
-      } catch (e) {
-        logger.error('Failed to create party', { error: e });
-      }
-    });
-
-    socket.on('party:list', async () => {
-      emitActiveParties(io);
-    });
-
-    socket.on('party:request_join', async (data: { partyId: string }) => {
-      try {
-        const pubClient = redisClient.getClient();
-
-        const existingPartyId = await pubClient.hget('party:user_rooms', userId);
-        if (existingPartyId) {
-          socket.emit('party:error', { error: 'You are already in a party' });
-          return;
-        }
-
-        const partyStr = await pubClient.hget('party:rooms', data.partyId);
-        if (!partyStr) {
-          socket.emit('party:error', { error: 'Party not found' });
-          return;
-        }
-
-        const party: PartyRoom = JSON.parse(partyStr);
-
-        if (party.members.length >= party.capacity) {
-          socket.emit('party:error', { error: 'Party is full' });
-          return;
-        }
-
-        const requester: PartyMember = {
-          id: userId,
-          name,
-          profilePictureUrl: socket.user?.profilePictureUrl,
-          auraPoints: socket.user?.auraPoints
-        };
-
-        if (party.isLocked) {
-          // Bouncer Mode: Add to requests queue
-          if (!party.requests.find(r => r.id === userId)) {
-            party.requests.push(requester);
-            await pubClient.hset('party:rooms', data.partyId, JSON.stringify(party));
-            // Notify host
-            io.to(`user:${party.hostId}`).emit('party:join_requested', { partyId: data.partyId, requester });
-            socket.emit('party:waiting_approval');
-          }
-        } else {
-          // Open Door Mode: Auto-join
-          party.members.push(requester);
-          await pubClient.hset('party:rooms', data.partyId, JSON.stringify(party));
-          await pubClient.hset('party:user_rooms', userId, data.partyId);
-          socket.join(data.partyId);
-          io.to(data.partyId).emit('party:updated', party);
-          emitActiveParties(io);
-        }
-      } catch (e) {
-        logger.error('Failed to request join party', { error: e });
-      }
-    });
-
-    socket.on('party:action', async (data: { partyId: string; targetUserId: string; action: 'accept' | 'decline' }) => {
-      try {
-        const pubClient = redisClient.getClient();
-        const partyStr = await pubClient.hget('party:rooms', data.partyId);
-        if (!partyStr) return;
-
-        const party: PartyRoom = JSON.parse(partyStr);
-        if (party.hostId !== userId) return; // Only host can do this
-
-        const requestIndex = party.requests.findIndex(r => r.id === data.targetUserId);
-        if (requestIndex === -1) return;
-
-        const requester = party.requests[requestIndex];
-        party.requests.splice(requestIndex, 1);
-
-        if (data.action === 'accept') {
-          if (party.members.length < party.capacity) {
-            party.members.push(requester);
-            const targetSockets = activeUsers.get(data.targetUserId);
-            if (targetSockets) {
-              for (const sId of targetSockets) {
-                const s = io.sockets.sockets.get(sId);
-                if (s) s.join(data.partyId);
-              }
-            }
-            await pubClient.hset('party:user_rooms', data.targetUserId, data.partyId);
-            io.to(`user:${data.targetUserId}`).emit('party:accepted', party);
-          } else {
-            io.to(`user:${data.targetUserId}`).emit('party:error', { error: 'Party is fully at capacity now' });
-          }
-        } else {
-          io.to(`user:${data.targetUserId}`).emit('party:declined', { partyId: data.partyId });
-        }
-
-        await pubClient.hset('party:rooms', data.partyId, JSON.stringify(party));
-        io.to(data.partyId).emit('party:updated', party);
-      } catch (e) { }
-    });
-
-    socket.on('party:leave', async (data: { partyId: string }) => {
-      try {
-        const pubClient = redisClient.getClient();
-        const partyStr = await pubClient.hget('party:rooms', data.partyId);
-        if (!partyStr) return;
-
-        const party: PartyRoom = JSON.parse(partyStr);
-        await pubClient.hdel('party:user_rooms', userId);
-        socket.leave(data.partyId);
-
-        if (party.hostId === userId) {
-          // Host left! Destroy party
-          party.members.forEach(async (m) => {
-            await pubClient.hdel('party:user_rooms', m.id);
-          });
-          io.to(data.partyId).emit('party:destroyed');
-          await pubClient.hdel('party:rooms', data.partyId);
-          emitActiveParties(io);
-        } else {
-          // Normal member left
-          party.members = party.members.filter(m => m.id !== userId);
-          party.requests = party.requests.filter(m => m.id !== userId);
-          await pubClient.hset('party:rooms', data.partyId, JSON.stringify(party));
-          io.to(data.partyId).emit('party:updated', party);
-          emitActiveParties(io);
-        }
-      } catch (e) { }
-    });
-
-    socket.on('party:kick', async (data: { partyId: string; targetUserId: string }) => {
-      try {
-        const pubClient = redisClient.getClient();
-        const partyStr = await pubClient.hget('party:rooms', data.partyId);
-        if (!partyStr) return;
-
-        const party: PartyRoom = JSON.parse(partyStr);
-        if (party.hostId !== userId || userId === data.targetUserId) return;
-
-        party.members = party.members.filter(m => m.id !== data.targetUserId);
-        await pubClient.hdel('party:user_rooms', data.targetUserId);
-
-        await pubClient.hset('party:rooms', data.partyId, JSON.stringify(party));
-        io.to(data.partyId).emit('party:updated', party);
-
-        const targetSockets = activeUsers.get(data.targetUserId);
-        if (targetSockets) {
-          for (const sId of targetSockets) {
-            const s = io.sockets.sockets.get(sId);
-            if (s) {
-              s.emit('party:kicked');
-              s.leave(data.partyId);
-            }
-          }
-        }
-        emitActiveParties(io);
-      } catch (e) { }
-    });
-
-    socket.on('party:message', (data: { partyId: string; content: string }) => {
-      io.to(data.partyId).emit('party:message', {
-        id: uuidv4(),
-        partyId: data.partyId,
-        fromUserId: userId,
-        fromName: name,
-        fromProfilePictureUrl: socket.user?.profilePictureUrl,
-        content: data.content,
-        sentAt: new Date().toISOString()
-      });
-    });
-
-    // WebRTC signaling for parties (Audio Mesh)
-    socket.on('party:audio:signal', (data: { partyId: string; targetUserId: string; signal: any }) => {
-      io.to(`user:${data.targetUserId}`).emit('party:audio:signal', {
-        fromUserId: userId,
-        partyId: data.partyId,
-        signal: data.signal
-      });
-    });
-
-    /**
      * Handle status updates
      */
     socket.on('status:update', async (data: { status: 'online' | 'away' | 'offline' }) => {
@@ -1179,30 +935,6 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
                     cleanupRoomMedia(roomId);
                   } else {
                     await pubClient.hdel('random:user_rooms', userId);
-                  }
-                }
-
-                // Clean up party room
-                const userPartyId = await pubClient.hget('party:user_rooms', userId);
-                if (userPartyId) {
-                  const partyStr = await pubClient.hget('party:rooms', userPartyId);
-                  if (partyStr) {
-                    const party: PartyRoom = JSON.parse(partyStr);
-                    await pubClient.hdel('party:user_rooms', userId);
-
-                    if (party.hostId === userId) {
-                      party.members.forEach(async (m) => {
-                        await pubClient.hdel('party:user_rooms', m.id);
-                      });
-                      io.to(userPartyId).emit('party:destroyed');
-                      await pubClient.hdel('party:rooms', userPartyId);
-                    } else {
-                      party.members = party.members.filter(m => m.id !== userId);
-                      party.requests = party.requests.filter(m => m.id !== userId);
-                      await pubClient.hset('party:rooms', userPartyId, JSON.stringify(party));
-                      io.to(userPartyId).emit('party:updated', party);
-                    }
-                    emitActiveParties(io);
                   }
                 }
 

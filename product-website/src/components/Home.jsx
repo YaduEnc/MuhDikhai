@@ -49,69 +49,6 @@ function DeleteConfirmationModal({ onConfirm, onCancel }) {
     );
 }
 
-function CreatePartyModal({ onConfirm, onCancel }) {
-    const [name, setName] = useState('');
-    const [capacity, setCapacity] = useState(5);
-    const [isLocked, setIsLocked] = useState(false);
-
-    return (
-        <div className="modal-overlay delete-modal-overlay">
-            <div className="modal-card delete-modal-card">
-                <div className="delete-modal-icon">🎉</div>
-                <h3 style={{ marginBottom: '0.5rem' }}>Start a Party</h3>
-                <p style={{ color: '#8e8e93', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Create a space for group voice & text chat.</p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left', marginBottom: '2rem' }}>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Room Name</label>
-                        <input
-                            className="home-topic-input"
-                            style={{ width: '100%', boxSizing: 'border-box' }}
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                            placeholder="e.g. Late Night Vibes"
-                            maxLength={30}
-                        />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Max Capacity (2-10)</label>
-                        <input
-                            type="number"
-                            min="2"
-                            max="10"
-                            className="home-topic-input"
-                            style={{ width: '100%', boxSizing: 'border-box' }}
-                            value={capacity}
-                            onChange={e => setCapacity(Number(e.target.value) || 5)}
-                        />
-                    </div>
-                    <label className="pref-toggle" style={{ marginTop: '0.5rem', cursor: 'pointer' }} onClick={() => setIsLocked(!isLocked)}>
-                        <span className="pref-label">Require approval to enter</span>
-                        <span className={`toggle-pill ${isLocked ? 'active' : ''}`} />
-                    </label>
-                </div>
-
-                <div className="modal-actions-v2">
-                    <button
-                        className="btn-danger-v2"
-                        style={{ background: '#30d158', color: '#000', borderColor: '#30d158' }}
-                        onClick={() => onConfirm({
-                            name: name.trim() || 'Chill Vibes Only',
-                            capacity: Math.min(10, Math.max(2, capacity)),
-                            isLocked
-                        })}
-                    >
-                        Start Party
-                    </button>
-                    <button className="btn-ghost-v2" onClick={onCancel}>
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
     const [bio, setBio] = useState(session?.user?.bio || '')
     const [gender, setGender] = useState(session?.user?.gender || 'prefer_not_to_say')
@@ -472,7 +409,7 @@ function FriendsList({ friends, onOpenChat, unreadCounts = {} }) {
     )
 }
 
-export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts, activeParties, socket }) {
+export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts }) {
 
     const [selectedTopics, setSelectedTopics] = useState([])
     const [customTopic, setCustomTopic] = useState('')
@@ -482,9 +419,8 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
 
 
     const [view, setView] = useState('home') // 'home' | 'profile' | 'settings'
-    const [homeTab, setHomeTab] = useState('parties') // 'parties' | 'matches' | 'friends' | 'requests'
+    const [homeTab, setHomeTab] = useState('matches') // 'matches' | 'friends' | 'requests'
     const [showDeleteModal, setShowDeleteModal] = useState(false)
-    const [showPartyModal, setShowPartyModal] = useState(false)
     const [recentMatches, setRecentMatches] = useState([])
     const [friendships, setFriendships] = useState([])
     const [friendRequests, setFriendRequests] = useState([])
@@ -505,8 +441,6 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                 // Based on route: it returns all. Logic: if you are requester, keep as is.
                 // But usually "Requests" tab means incoming.
                 setFriendRequests(requests.filter(r => !r.isRequester));
-            } else if (homeTab === 'parties') {
-                socket?.emit('party:list');
             }
         } catch (err) {
             console.error('Failed to fetch home data:', err);
@@ -602,11 +536,6 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                 )}
             </>
         )
-    }
-
-    const handleCreateParty = (config) => {
-        socket?.emit('party:create', config);
-        setShowPartyModal(false);
     }
 
     return (
@@ -709,12 +638,6 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
             {/* Home Tabs */}
             <div className="home-tabs">
                 <button
-                    className={`home-tab ${homeTab === 'parties' ? 'active' : ''}`}
-                    onClick={() => setHomeTab('parties')}
-                >
-                    Parties
-                </button>
-                <button
                     className={`home-tab ${homeTab === 'matches' ? 'active' : ''}`}
                     onClick={() => setHomeTab('matches')}
                 >
@@ -736,45 +659,10 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
 
             {/* Tab Content */}
             <div className="home-tab-content">
-                {loadingHome && homeTab !== 'parties' ? (
+                {loadingHome ? (
                     <div className="home-loading">Finding your people...</div>
                 ) : (
                     <>
-                        {homeTab === 'parties' && (
-                            <div className="home-recents-section">
-                                <button className="recent-add-btn" style={{ marginBottom: '1.5rem', width: '100%', padding: '1rem', background: '#30d158', color: '#000', borderRadius: '12px', fontSize: '1rem', fontWeight: 600, border: 'none' }} onClick={() => setShowPartyModal(true)}>
-                                    ✦ Host a Party
-                                </button>
-                                {activeParties && activeParties.length > 0 ? (
-                                    <div className="recents-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-                                        {activeParties.map((party) => (
-                                            <div key={party.id} className="recent-match-card" style={{ flexDirection: 'column', alignItems: 'flex-start', padding: '1rem' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '0.5rem' }}>
-                                                    <span className="recent-name" style={{ fontSize: '1.1rem' }}>{party.name}</span>
-                                                    {party.isLocked && <span style={{ fontSize: '0.8rem', color: '#ff453a', background: 'rgba(255, 69, 58, 0.1)', padding: '2px 8px', borderRadius: '10px' }}>Bouncer</span>}
-                                                </div>
-                                                <span className="recent-topic" style={{ marginBottom: '1rem' }}>
-                                                    Host: {party.hostName} • {party.members.length}/{party.capacity} joined
-                                                </span>
-                                                <button
-                                                    className="recent-add-btn"
-                                                    style={{ width: '100%', justifyContent: 'center' }}
-                                                    disabled={party.members.length >= party.capacity}
-                                                    onClick={() => socket?.emit('party:request_join', { partyId: party.id })}
-                                                >
-                                                    {party.members.length >= party.capacity ? 'Full' : party.isLocked ? 'Request to Join' : '+ Join Party'}
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="home-hint" style={{ textAlign: 'center', marginTop: '2rem' }}>
-                                        No active parties right now. Be the first to start one!
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
                         {homeTab === 'matches' && (
                             recentMatches.length > 0 ? (
                                 <div className="home-recents-section">
@@ -901,12 +789,6 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
             <p className="home-hint">
                 Tap <strong>Start a gentle match</strong> when you&apos;re ready. You can leave any room with a single key — no pressure, no history.
             </p>
-
-            {
-                showPartyModal && (
-                    <CreatePartyModal onConfirm={handleCreateParty} onCancel={() => setShowPartyModal(false)} />
-                )
-            }
-        </div >
+        </div>
     )
 }

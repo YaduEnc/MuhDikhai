@@ -8,7 +8,6 @@ import AdminDashboard from './admin/AdminDashboard'
 import FriendChat from './components/FriendChat'
 import CallOverlay from './components/CallOverlay'
 import VibeCheckModal from './components/VibeCheckModal'
-import PartyChat from './components/PartyChat'
 
 import {
   signInWithGoogle,
@@ -80,9 +79,6 @@ function App() {
     partner: null,
     roomId: null
   })
-  const [activeParties, setActiveParties] = useState([])
-  const [activeParty, setActiveParty] = useState(null)
-  const [partyMessages, setPartyMessages] = useState([])
 
   const socketRef = useRef(null)
   const sessionRef = useRef(session)
@@ -169,49 +165,6 @@ function App() {
         socket.on('presence:count', (payload) => setOnlineCount(payload.count))
         socket.on('random:stats', (stats) => setMatchingStats(stats))
         socket.on('random:waiting', () => setSocketState((prev) => ({ ...prev, phase: 'matching' })))
-        socket.on('party:list', (parties) => setActiveParties(parties))
-
-        socket.on('party:created', (party) => {
-          setActiveParty(party)
-          setPartyMessages([])
-          setSocketState((prev) => ({ ...prev, phase: 'party-chat' }))
-        })
-        socket.on('party:joined', (party) => {
-          setActiveParty(party)
-          setPartyMessages([])
-          setSocketState((prev) => ({ ...prev, phase: 'party-chat' }))
-        })
-        socket.on('party:accepted', (party) => {
-          setActiveParty(party)
-          setPartyMessages([])
-          setSocketState((prev) => ({ ...prev, phase: 'party-chat' }))
-        })
-        socket.on('party:declined', () => {
-          alert('Your request to join the party was declined.')
-        })
-        socket.on('party:waiting_approval', () => {
-          alert('Request sent! Waiting for the host to approve your entry...')
-        })
-        socket.on('party:updated', (party) => {
-          setActiveParty(party)
-        })
-        socket.on('party:kicked', () => {
-          setActiveParty(null)
-          setSocketState((prev) => ({ ...prev, phase: 'idle' }))
-          alert('You have been removed from the party.')
-        })
-        socket.on('party:destroyed', () => {
-          setActiveParty(null)
-          setSocketState((prev) => ({ ...prev, phase: 'idle' }))
-          alert('The host has ended the party.')
-        })
-        socket.on('party:message', (msg) => {
-          setPartyMessages((prev) => [...prev, msg])
-        })
-        socket.on('party:error', ({ message }) => {
-          alert(message || 'Party error occurred')
-        })
-
         socket.on('random:matched', (payload) => {
           setRoom(payload)
           setSocketState((prev) => ({ ...prev, phase: 'matched' }))
@@ -637,45 +590,6 @@ function App() {
     )
   }
 
-  if (session && socketState.phase === 'party-chat' && activeParty) {
-    return (
-      <div className="app-shell">
-        <PartyChat
-          session={session}
-          party={activeParty}
-          messages={partyMessages}
-          socket={socketRef.current}
-          onLeave={() => {
-            socketRef.current?.emit('party:leave', { partyId: activeParty.id })
-            setActiveParty(null)
-            setSocketState((prev) => ({ ...prev, phase: 'idle' }))
-          }}
-          onKick={(userId) => {
-            socketRef.current?.emit('party:kick', { partyId: activeParty.id, targetId: userId })
-          }}
-          onRespondRequest={(requestId, action) => {
-            if (action === 'accept') {
-              socketRef.current?.emit('party:action', { partyId: activeParty.id, targetUserId: requestId, action: 'accept' })
-            } else {
-              socketRef.current?.emit('party:action', { partyId: activeParty.id, targetUserId: requestId, action: 'decline' })
-            }
-          }}
-        />
-        {callOverlayState.status !== 'idle' && (
-          <CallOverlay
-            socket={socketRef.current}
-            session={session}
-            callState={callOverlayState}
-            partner={callOverlayState.partner}
-            onAccept={handleAcceptCall}
-            onDecline={handleEndCall}
-            onEnd={handleEndCall}
-          />
-        )}
-      </div>
-    )
-  }
-
   return (
     <div className="page">
       <header className="nav">
@@ -723,8 +637,6 @@ function App() {
             onRespondToFriendRequest={handleRespondToFriendRequest}
             onOpenChat={handleOpenFriendChat}
             unreadCounts={unreadCounts}
-            activeParties={activeParties}
-            socket={socketRef.current}
           />
         )}
         {needsOnboarding && (
