@@ -155,10 +155,16 @@ const ReactionPicker = memo(function ReactionPicker({ onSelect, onClose }) {
 
 // ─── Single message bubble ────────────────────────────────────────────────────
 const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProfilePeek, onReply, onReact }) {
-    const isGif = msg.content?.startsWith('__GIF__') || msg.type === 'image'
     const isSelfSent = msg.fromUserId === session?.user?.id
-    const gifUrl = msg.content?.startsWith('__GIF__') ? msg.content.replace('__GIF__', '') : (msg.type === 'image' ? msg.content : null)
+    const [revealed, setRevealed] = useState(isSelfSent) // Auto-reveal own media
     const [showReactions, setShowReactions] = useState(false)
+
+    // Detect media type
+    const isGif = msg.content?.startsWith('__GIF__')
+    const isImage = msg.type === 'image' || isGif
+    const isVideo = msg.type === 'video' || msg.content?.endsWith('.mp4') || msg.content?.endsWith('.webm')
+
+    const mediaUrl = isGif ? msg.content.replace('__GIF__', '') : msg.content
 
     const time = new Date(msg.sentAt).toLocaleTimeString([], {
         hour: '2-digit',
@@ -170,6 +176,40 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
         acc[r.emoji] = (acc[r.emoji] || 0) + 1
         return acc
     }, {})
+
+    const renderMedia = () => {
+        if (!isImage && !isVideo) return <span>{msg.content}</span>
+
+        return (
+            <div className={`media-privacy-wrap ${revealed ? 'revealed' : ''}`} onClick={(e) => {
+                if (!revealed) {
+                    e.stopPropagation()
+                    setRevealed(true)
+                }
+            }}>
+                {isVideo ? (
+                    <video
+                        className="msg-gif blur-media"
+                        src={mediaUrl}
+                        controls={revealed}
+                        autoPlay={revealed}
+                        loop
+                        muted
+                        playsInline
+                    />
+                ) : (
+                    <img className="msg-gif blur-media" src={mediaUrl} alt="Shared media" />
+                )}
+
+                {!revealed && (
+                    <div className="blur-overlay">
+                        <span className="blur-icon">{isVideo ? '🎬' : '📷'}</span>
+                        <span className="blur-text">Click to reveal</span>
+                    </div>
+                )}
+            </div>
+        )
+    }
 
     return (
         <li className={`msg-row${isSelf ? ' msg-row--self' : ''}`}>
@@ -189,9 +229,8 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
             <div className="msg-content">
                 {!isSelf && <span className="msg-sender">{msg.fromName || 'Stranger'}</span>}
 
-
                 <div
-                    className={`msg-bubble${isSelf ? ' msg-bubble--self' : ''}${msg.type === 'image' ? ' msg-bubble--image' : ''}`}
+                    className={`msg-bubble${isSelf ? ' msg-bubble--self' : ''}${isImage || isVideo ? ' msg-bubble--image' : ''}`}
                     onContextMenu={(e) => { e.preventDefault(); setShowReactions(!showReactions); }}
                 >
                     {/* Quoted Reply */}
@@ -202,11 +241,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
                         </div>
                     )}
 
-                    {isGif ? (
-                        <img className="msg-gif" src={gifUrl} alt="Shared media" />
-                    ) : (
-                        <span>{msg.content}</span>
-                    )}
+                    {renderMedia()}
 
 
                     {/* Reaction Overlay */}
@@ -758,7 +793,7 @@ export default function Chat({
                             type="file"
                             ref={fileInputRef}
                             style={{ display: 'none' }}
-                            accept="image/*"
+                            accept="image/*,video/*"
                             onChange={handleImageUpload}
                         />
                     </div>

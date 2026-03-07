@@ -58,3 +58,75 @@ button {
 button:active {
   transform: scale(0.96);
 }
+
+/* ── Sensitive Media Blur ────────────────────────────── */
+.media-privacy-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  cursor: pointer;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.blur-media {
+  filter: blur(40px);
+  opacity: 0.6;
+  transition: filter 300ms ease, opacity 300ms ease;
+  max-width: 100%;
+  display: block;
+}
+
+.blur-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 2;
+  transition: opacity 200ms ease;
+}
+
+.blur-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.blur-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 12px;
+  border-radius: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.media-privacy-wrap:hover .blur-overlay {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.media-privacy-wrap:hover .blur-text {
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.revealed .blur-media {
+  filter: blur(0);
+  opacity: 1;
+}
+
+.revealed .blur-overlay {
+  opacity: 0;
+  pointer-events: none;
+}

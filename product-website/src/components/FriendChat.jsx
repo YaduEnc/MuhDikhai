@@ -200,20 +200,85 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
         }
     }
 
-    const renderMessageContent = (m) => {
-        const decoded = decodeContent(m.encryptedContent || m.content)
-        if (!decoded) return <span className="fc-msg-hidden">Message unavailable</span>
+    const [uploading, setUploading] = useState(false)
+    const fileInputRef = useRef(null)
 
-        if (isImageUrl(decoded)) {
-            return (
-                <div className="fc-msg-image-wrap">
-                    <img src={decoded} alt="shared" className="fc-msg-image" loading="lazy" />
-                </div>
-            )
+    const handleMediaUpload = async (e) => {
+        const file = e.target.files?.[0]
+        if (!file || !socket) return
+
+        setUploading(true)
+        const formData = new FormData()
+        formData.append('media', file)
+
+        try {
+            const res = await authedFetch(`${BACKEND_URL}/api/v1/messages/upload`, {
+                method: 'POST',
+                body: formData
+            })
+            const json = await res.json()
+            if (json.success) {
+                socket.emit('message:send', {
+                    recipientId: friend.user.id,
+                    encryptedContent: btoa(json.data.url),
+                    encryptedKey: btoa('media-key'),
+                    messageType: json.data.type || 'image'
+                })
+            }
+        } catch (err) {
+            console.error('Upload failed', err)
+            alert('Failed to share media.')
+        } finally {
+            setUploading(false)
+            if (fileInputRef.current) fileInputRef.current.value = ''
         }
-
-        return <span>{decoded}</span>
     }
+
+    // ─── Message Content Renderer ────────────────────────────────────────────────
+    const MessageContent = memo(function MessageContent({ m, isMine, decodeContent }) {
+        const content = decodeContent(m.encryptedContent || m.content)
+        const [revealed, setRevealed] = useState(isMine) // Auto-reveal own media
+
+        if (!content) return <span className="fc-msg-hidden">Message unavailable</span>
+
+        const isGif = content.startsWith('__GIF__')
+        const isImage = m.messageType === 'image' || isGif || /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)/i.test(content) || content.includes('giphy.com')
+        const isVideo = m.messageType === 'video' || content.endsWith('.mp4') || content.endsWith('.webm')
+
+        if (!isImage && !isVideo) return <span>{content}</span>
+
+        const mediaUrl = isGif ? content.replace('__GIF__', '') : content
+
+        return (
+            <div className={`media-privacy-wrap ${revealed ? 'revealed' : ''}`} onClick={(e) => {
+                if (!revealed) {
+                    e.stopPropagation()
+                    setRevealed(true)
+                }
+            }}>
+                {isVideo ? (
+                    <video
+                        className="fc-msg-image blur-media"
+                        src={mediaUrl}
+                        controls={revealed}
+                        autoPlay={revealed}
+                        loop
+                        muted
+                        playsInline
+                    />
+                ) : (
+                    <img src={mediaUrl} alt="shared" className="fc-msg-image blur-media" loading="lazy" />
+                )}
+
+                {!revealed && (
+                    <div className="blur-overlay">
+                        <span className="blur-icon">{isVideo ? '🎬' : '📷'}</span>
+                        <span className="blur-text">Click to reveal</span>
+                    </div>
+                )}
+            </div>
+        )
+    })
 
     const formatTime = (date) => {
         return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -284,7 +349,7 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
                                 )}
                                 <div className={`fc-bubble ${isMine ? 'mine' : 'theirs'}`}>
                                     <div className="fc-bubble-content">
-                                        {renderMessageContent(m)}
+                                        <MessageContent m={m} isMine={isMine} decodeContent={decodeContent} />
                                     </div>
                                     <div className="fc-bubble-meta">
                                         <span className="fc-bubble-time">{formatTime(m.sentAt)}</span>
@@ -322,6 +387,27 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
                 >
                     GIF
                 </button>
+                <button
+                    type="button"
+                    className="fc-upload-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    title="Share Photo or Video"
+                >
+                    {uploading ? '...' : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <circle cx="12" cy="13" r="4" />
+                        </svg>
+                    )}
+                </button>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    accept="image/*,video/*"
+                    onChange={handleMediaUpload}
+                />
                 <input
                     className="fc-input"
                     type="text"

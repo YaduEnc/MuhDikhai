@@ -112,18 +112,22 @@ router.post(
       trackRoomMedia(roomId, req.file.filename);
     }
 
+    const isImage = req.file.mimetype.startsWith('image/');
+    const isVideo = req.file.mimetype.startsWith('video/');
+
     logger.info('Chat media uploaded', {
       userId: req.user!.id,
       filename: req.file.filename,
       size: req.file.size,
       roomId,
+      type: isImage ? 'image' : isVideo ? 'video' : 'file'
     });
 
     res.status(200).json({
       success: true,
       data: {
         url: mediaUrl,
-        type: req.file.mimetype.startsWith('image/') ? 'image' : 'file',
+        type: isImage ? 'image' : isVideo ? 'video' : 'file',
       },
     });
   })

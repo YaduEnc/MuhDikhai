@@ -525,10 +525,34 @@
 }
 
 .fc-gif-toggle:hover,
-.fc-gif-toggle.active {
+.fc-gif-toggle.active,
+.fc-upload-btn:hover {
     background: rgba(251, 191, 119, 0.1);
     border-color: rgba(251, 191, 119, 0.3);
     color: #fbbf77;
+}
+
+.fc-upload-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    height: 38px;
+    width: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+}
+
+.fc-upload-btn svg {
+    opacity: 0.8;
+}
+
+.fc-upload-btn:hover svg {
+    opacity: 1;
 }
 
 .fc-input {
