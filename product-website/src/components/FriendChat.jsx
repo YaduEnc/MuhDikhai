@@ -86,10 +86,104 @@ function isImageUrl(text) {
     return /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)/i.test(text) || text.includes('giphy.com')
 }
 
+const MessageMenu = memo(function MessageMenu({ m, isMine, onEdit, onDelete, onClose }) {
+    return (
+        <div className="fc-menu">
+            <div className="fc-menu-reactions">
+                {['👍', '❤️', '😂', '😮', '😢', '🔥'].map(emoji => (
+                    <button key={emoji} className="reaction-option" onClick={() => onClose()}>{emoji}</button>
+                ))}
+            </div>
+            {isMine && (
+                <>
+                    <button className="fc-menu-btn" onClick={() => { onEdit(); onClose(); }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                        Edit Message
+                    </button>
+                    <button className="fc-menu-btn delete" onClick={() => { onDelete(m.id); onClose(); }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 0 0 1-2-2V6m3 0V4a2 0 0 1 2-2h4a2 0 0 1 2 2v2" />
+                        </svg>
+                        Unsend
+                    </button>
+                </>
+            )}
+        </div>
+    )
+})
+
+const FriendBubble = memo(function FriendBubble({ m, isMine, showAvatar, friend, decodeContent, handleDelete, handleEdit, formatTime }) {
+    const [menuOpen, setMenuOpen] = useState(false)
+    const [isEditing, setIsEditing] = useState(false)
+    const [editValue, setEditValue] = useState('')
+
+    return (
+        <div className={`fc-bubble-row ${isMine ? 'mine' : 'theirs'}`}>
+            {showAvatar && (
+                <div className="fc-bubble-avatar">
+                    {friend.user.profilePictureUrl ? (
+                        <img src={friend.user.profilePictureUrl} alt={friend.user.name} />
+                    ) : (
+                        friend.user.name[0].toUpperCase()
+                    )}
+                </div>
+            )}
+            <div
+                className={`fc-bubble ${isMine ? 'mine' : 'theirs'} ${m.isVanish ? 'vanish' : ''}`}
+                onContextMenu={(e) => { e.preventDefault(); setMenuOpen(!menuOpen); }}
+            >
+                <div className="fc-bubble-content">
+                    <MessageContent
+                        m={m}
+                        isMine={isMine}
+                        decodeContent={decodeContent}
+                        onTimeUp={handleDelete}
+                        isEditing={isEditing}
+                        editValue={editValue}
+                        setEditValue={setEditValue}
+                        onEditSubmit={(id, val) => {
+                            if (id) handleEdit(id, val);
+                            setIsEditing(false);
+                        }}
+                    />
+                </div>
+                <div className="fc-bubble-meta">
+                    <span className="fc-bubble-time">{formatTime(m.sentAt)}</span>
+                    {isMine && m.status === 'read' && (
+                        <span className="fc-bubble-read">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
+                        </span>
+                    )}
+                </div>
+                {menuOpen && (
+                    <MessageMenu
+                        m={m}
+                        isMine={isMine}
+                        onEdit={() => { setIsEditing(true); setEditValue(decodeContent(m.encryptedContent || m.content)); }}
+                        onDelete={handleDelete}
+                        onClose={() => setMenuOpen(false)}
+                    />
+                )}
+            </div>
+        </div>
+    )
+})
+
 // ─── Message Content Renderer ────────────────────────────────────────────────
-const MessageContent = memo(function MessageContent({ m, isMine, decodeContent }) {
+const MessageContent = memo(function MessageContent({ m, isMine, decodeContent, onTimeUp, isEditing, editValue, setEditValue, onEditSubmit }) {
     const content = decodeContent(m.encryptedContent || m.content)
-    const [revealed, setRevealed] = useState(isMine) // Auto-reveal own media
+    const [revealed, setRevealed] = useState(isMine || !m.isVanish)
+    const [timeLeft, setTimeLeft] = useState(m.isVanish ? 10 : null)
+
+    useEffect(() => {
+        if (m.isVanish && revealed && timeLeft > 0) {
+            const timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000)
+            return () => clearInterval(timer)
+        }
+        if (timeLeft === 0) onTimeUp(m.id)
+    }, [m.isVanish, revealed, timeLeft, m.id, onTimeUp])
 
     if (!content) return <span className="fc-msg-hidden">Message unavailable</span>
 
@@ -97,7 +191,31 @@ const MessageContent = memo(function MessageContent({ m, isMine, decodeContent }
     const isImage = m.messageType === 'image' || isGif || /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i.test(content) || content.includes('giphy.com')
     const isVideo = m.messageType === 'video' || content?.match(/\.(mp4|webm|mov)(\?.*)?$/i)
 
-    if (!isImage && !isVideo) return <span>{content}</span>
+    if (isEditing) {
+        return (
+            <textarea
+                className="fc-edit-area"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        onEditSubmit(m.id, editValue)
+                    }
+                    if (e.key === 'Escape') onEditSubmit(null)
+                }}
+                autoFocus
+            />
+        )
+    }
+
+    if (!isImage && !isVideo) return (
+        <span className="fc-text-wrap">
+            {content}
+            {m.isEdited && <span className="msg-edited-tag">(edited)</span>}
+            {timeLeft !== null && <div className="fc-vanish-timer">{timeLeft}</div>}
+        </span>
+    )
 
     const mediaUrl = isGif ? content.replace('__GIF__', '') : content
 
@@ -109,15 +227,7 @@ const MessageContent = memo(function MessageContent({ m, isMine, decodeContent }
             }
         }}>
             {isVideo ? (
-                <video
-                    className="fc-msg-image blur-media"
-                    src={mediaUrl}
-                    controls={revealed}
-                    autoPlay={revealed}
-                    loop
-                    muted
-                    playsInline
-                />
+                <video className="fc-msg-image blur-media" src={mediaUrl} controls={revealed} autoPlay={revealed} loop muted playsInline />
             ) : (
                 <img src={mediaUrl} alt="shared" className="fc-msg-image blur-media" loading="lazy" />
             )}
@@ -128,6 +238,7 @@ const MessageContent = memo(function MessageContent({ m, isMine, decodeContent }
                     <span className="blur-text">Click to reveal</span>
                 </div>
             )}
+            {timeLeft !== null && revealed && <div className="fc-vanish-timer">{timeLeft}</div>}
         </div>
     )
 })
@@ -139,6 +250,7 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
     const [loading, setLoading] = useState(true)
     const [partnerTyping, setPartnerTyping] = useState(false)
     const [showGifPicker, setShowGifPicker] = useState(false)
+    const [vanishMode, setVanishMode] = useState(false)
     const scrollRef = useRef(null)
     const typingTimeoutRef = useRef(null)
 
@@ -180,14 +292,26 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
             if (payload.userId === friend.user.id) setPartnerTyping(false)
         }
 
+        const handleEdited = (data) => {
+            setMessages((prev) => prev.map((m) => m.id === data.messageId ? { ...m, encryptedContent: btoa(data.content), isEdited: true } : m))
+        }
+
+        const handleDeleted = (data) => {
+            setMessages((prev) => prev.filter((m) => m.id !== data.messageId))
+        }
+
         socket.on('message:received', handleMessage)
         socket.on('message:sent', handleMessage)
+        socket.on('message:edited', handleEdited)
+        socket.on('message:deleted', handleDeleted)
         socket.on('typing:start', handleTypingStart)
         socket.on('typing:stop', handleTypingStop)
 
         return () => {
             socket.off('message:received', handleMessage)
             socket.off('message:sent', handleMessage)
+            socket.off('message:edited', handleEdited)
+            socket.off('message:deleted', handleDeleted)
             socket.off('typing:start', handleTypingStart)
             socket.off('typing:stop', handleTypingStop)
         }
@@ -216,12 +340,30 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
             recipientId: friend.user.id,
             encryptedContent: btoa(trimmed),
             encryptedKey: btoa('placeholder-key'),
-            messageType: 'text'
+            messageType: 'text',
+            isVanish: vanishMode
         })
 
         setInput('')
         clearTimeout(typingTimeoutRef.current)
         socket.emit('typing:stop', { recipientId: friend.user.id })
+    }
+
+    const handleEdit = (messageId, newContent) => {
+        if (!socket) return
+        socket.emit('message:edit', {
+            messageId,
+            content: newContent,
+            recipientId: friend.user.id
+        })
+    }
+
+    const handleDelete = (messageId) => {
+        if (!socket) return
+        socket.emit('message:delete', {
+            messageId,
+            recipientId: friend.user.id
+        })
     }
 
     const handleGifSelect = (gifUrl) => {
@@ -311,6 +453,15 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
                     </div>
                 </div>
 
+                <button
+                    className={`fc-vanish-toggle ${vanishMode ? 'active' : ''}`}
+                    onClick={() => setVanishMode(!vanishMode)}
+                    title="Vanish Mode (Messages disappear in 10s)"
+                >
+                    <span className="fc-vanish-icon">✨</span>
+                    <span className="fc-vanish-label">Vanish</span>
+                </button>
+
                 <button className="fc-call-btn" onClick={onInitiateCall} title="Video Call">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polygon points="23 7 16 12 23 17 23 7" />
@@ -332,40 +483,24 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
                         <p>No messages yet. Say hello!</p>
                     </div>
                 ) : (
-                    messages.map((m, i) => {
-                        const isMine = m.senderId === session.user.id
-                        const showAvatar = !isMine && (i === 0 || messages[i - 1]?.senderId !== m.senderId)
-
-                        return (
-                            <div key={m.id || i} className={`fc-bubble-row ${isMine ? 'mine' : 'theirs'}`}>
-                                {!isMine && (
-                                    <div className={`fc-bubble-avatar ${showAvatar ? '' : 'invisible'}`}>
-                                        {friend.user.profilePictureUrl ? (
-                                            <img src={friend.user.profilePictureUrl} alt="" />
-                                        ) : (
-                                            <span>{friend.user.name?.[0]}</span>
-                                        )}
-                                    </div>
-                                )}
-                                <div className={`fc-bubble ${isMine ? 'mine' : 'theirs'}`}>
-                                    <div className="fc-bubble-content">
-                                        <MessageContent m={m} isMine={isMine} decodeContent={decodeContent} />
-                                    </div>
-                                    <div className="fc-bubble-meta">
-                                        <span className="fc-bubble-time">{formatTime(m.sentAt)}</span>
-                                        {isMine && (
-                                            <span className="fc-bubble-status">
-                                                {m.status === 'read' ? '✓✓' : m.status === 'delivered' ? '✓✓' : '✓'}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )
-                    })
+                    <>
+                        {messages.map((m, i) => (
+                            <FriendBubble
+                                key={m.id || i}
+                                m={m}
+                                isMine={m.senderId === session?.user?.id}
+                                showAvatar={m.senderId !== session?.user?.id && (i === 0 || messages[i - 1]?.senderId !== m.senderId)}
+                                friend={friend}
+                                decodeContent={decodeContent}
+                                handleDelete={handleDelete}
+                                handleEdit={handleEdit}
+                                formatTime={formatTime}
+                            />
+                        ))}
+                        {partnerTyping && <div className="fc-bubble-row theirs"><div className="fc-bubble theirs"><TypingDots /></div></div>}
+                    </>
                 )}
 
-                {partnerTyping && <TypingDots name={friend.user.name?.split(' ')[0]} />}
                 <div ref={scrollRef} />
             </main>
 

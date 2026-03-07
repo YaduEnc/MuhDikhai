@@ -183,6 +183,12 @@ function App() {
             })
           )
         })
+        socket.on('random:edited', (data) => {
+          setChatMessages((prev) => prev.map((m) => m.id === data.messageId ? { ...m, content: data.content, isEdited: true } : m))
+        })
+        socket.on('random:deleted', (data) => {
+          setChatMessages((prev) => prev.filter((m) => m.id !== data.messageId))
+        })
         socket.on('random:read', (payload) => {
           setChatMessages((prev) => prev.map((m) => (m.id === payload.messageId ? { ...m, read: true } : m)))
         })
@@ -190,6 +196,16 @@ function App() {
         socket.on('typing:start', () => setPartnerTyping(true))
         socket.on('typing:stop', () => setPartnerTyping(false))
 
+        socket.on('message:sent', (payload) => {
+          // No-op if this is handled in component, but good to have sync
+        })
+        socket.on('message:edited', (data) => {
+          // We need a way to update FriendChat's local state as well
+          // This usually happens via a global store or passing down setMessages
+        })
+        socket.on('message:deleted', (data) => {
+          // Same as above
+        })
         // Track unread messages when NOT in that friend's chat
         socket.on('message:received', (payload) => {
           const senderId = payload.message?.senderId
@@ -261,6 +277,25 @@ function App() {
     const targetRoomId = room?.roomId || room?.id
     if (!targetRoomId) return
     socketRef.current?.emit('random:message', { roomId: targetRoomId, content, replyToMessageId })
+  }
+
+  const handleEditRandomMessage = (messageId, content) => {
+    const targetRoomId = room?.roomId || room?.id
+    if (!socketRef.current || !targetRoomId) return
+    socketRef.current.emit('random:edit', {
+      roomId: targetRoomId,
+      messageId,
+      content
+    })
+  }
+
+  const handleDeleteRandomMessage = (messageId) => {
+    const targetRoomId = room?.roomId || room?.id
+    if (!socketRef.current || !targetRoomId) return
+    socketRef.current.emit('random:delete', {
+      roomId: targetRoomId,
+      messageId
+    })
   }
 
   const handleTyping = (isTyping) => {
@@ -587,6 +622,8 @@ function App() {
             chatMessages={chatMessages}
             partnerTyping={partnerTyping}
             onSendMessage={handleSendMessage}
+            onEditMessage={handleEditRandomMessage}
+            onDeleteMessage={handleDeleteRandomMessage}
             onTyping={handleTyping}
             onLeave={handleLeaveChat}
             onInitiateCall={() => handleInitiateCall(room, 'random')}

@@ -20,6 +20,7 @@ export interface Message {
   editedAt?: Date;
   isDeleted: boolean;
   deletedAt?: Date;
+  isVanish?: boolean;
   createdAt: Date;
   // Joined data
   sender?: {
@@ -49,6 +50,7 @@ export interface CreateMessageData {
   mediaUrl?: string;
   mediaSizeBytes?: number;
   replyToMessageId?: string;
+  isVanish?: boolean;
 }
 
 export interface UpdateMessageData {
@@ -122,8 +124,8 @@ class MessageService {
       const result = await database.query<Message>(
         `INSERT INTO messages (
           sender_id, recipient_id, encrypted_content, encrypted_key,
-          message_type, media_url, media_size_bytes, status, reply_to_message_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          message_type, media_url, media_size_bytes, status, reply_to_message_id, is_vanish
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING 
           id, sender_id as "senderId", recipient_id as "recipientId",
           encrypted_content as "encryptedContent", encrypted_key as "encryptedKey",
@@ -132,7 +134,7 @@ class MessageService {
           sent_at as "sentAt", delivered_at as "deliveredAt", read_at as "readAt",
           reply_to_message_id as "replyToMessageId", is_edited as "isEdited",
           edited_at as "editedAt", is_deleted as "isDeleted", deleted_at as "deletedAt",
-          created_at as "createdAt"`,
+          is_vanish as "isVanish", created_at as "createdAt"`,
         [
           senderId,
           data.recipientId,
@@ -143,6 +145,7 @@ class MessageService {
           data.mediaSizeBytes || null,
           'sent',
           data.replyToMessageId || null,
+          data.isVanish || false,
         ]
       );
 
@@ -260,7 +263,7 @@ class MessageService {
           m.sent_at as "sentAt", m.delivered_at as "deliveredAt", m.read_at as "readAt",
           m.reply_to_message_id as "replyToMessageId", m.is_edited as "isEdited",
           m.edited_at as "editedAt", m.is_deleted as "isDeleted", m.deleted_at as "deletedAt",
-          m.created_at as "createdAt",
+          m.is_vanish as "isVanish", m.created_at as "createdAt",
           
           -- Sender info
           s.id as "sender.id",
@@ -774,5 +777,6 @@ class MessageService {
   }
 }
 
+// Export singleton instance
 const messageService = new MessageService();
 export default messageService;

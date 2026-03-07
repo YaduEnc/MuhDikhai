@@ -620,3 +620,128 @@
         max-width: 200px;
     }
 }
+
+/* ── Vanish Mode Toggle ────────────────────────────────────────── */
+.fc-vanish-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.fc-vanish-toggle.active {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.4);
+    box-shadow: 0 0 15px rgba(139, 92, 246, 0.15);
+}
+
+.fc-vanish-icon {
+    font-size: 0.9rem;
+    filter: grayscale(1);
+    transition: filter 0.2s;
+}
+
+.fc-vanish-toggle.active .fc-vanish-icon {
+    filter: grayscale(0);
+}
+
+.fc-vanish-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.fc-vanish-toggle.active .fc-vanish-label {
+    color: #a78bfa;
+}
+
+/* ── Vanish Countdown Timer ────────────────────────────────────────── */
+.fc-vanish-timer {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    width: 24px;
+    height: 24px;
+    background: #1e1b4b;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #a78bfa;
+    border: 2px solid rgba(139, 92, 246, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    z-index: 10;
+}
+
+/* ── Friend Chat Menu ────────────────────────────────────────── */
+.fc-menu {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -105%);
+    background: rgba(15, 20, 45, 0.98);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    min-width: 140px;
+    z-index: 1000;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.fc-menu-reactions {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 8px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fc-menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.fc-menu-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+}
+
+.fc-menu-btn.delete:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+}
+
+.fc-edit-area {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: #fff;
+    padding: 10px;
+    max-width: 100%;
+    min-height: 50px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: none;
+}

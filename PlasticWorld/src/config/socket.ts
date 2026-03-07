@@ -407,6 +407,36 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     });
 
     /**
+     * Random chat: Delete message locally
+     */
+    socket.on('random:delete', (data: { roomId: string; messageId: string }) => {
+      try {
+        const currentRoomId = userToRandomRoom.get(userId);
+        if (!currentRoomId || currentRoomId !== data.roomId) return;
+        io.to(currentRoomId).emit('random:deleted', { messageId: data.messageId, userId });
+      } catch (err) {
+        logger.error('Random delete failed', { userId, err });
+      }
+    });
+
+    /**
+     * Random chat: Edit message content
+     */
+    socket.on('random:edit', (data: { roomId: string; messageId: string; content: string }) => {
+      try {
+        const currentRoomId = userToRandomRoom.get(userId);
+        if (!currentRoomId || currentRoomId !== data.roomId) return;
+        io.to(currentRoomId).emit('random:edited', {
+          messageId: data.messageId,
+          content: data.content,
+          userId
+        });
+      } catch (err) {
+        logger.error('Random edit failed', { userId, err });
+      }
+    });
+
+    /**
      * Random chat: leave current room / queue
      */
     socket.on('random:leave', () => {
@@ -563,6 +593,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
       mediaUrl?: string;
       mediaSizeBytes?: number;
       replyToMessageId?: string;
+      isVanish?: boolean;
     }) => {
       try {
         // Convert base64 to Buffer
@@ -578,6 +609,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           mediaUrl: data.mediaUrl,
           mediaSizeBytes: data.mediaSizeBytes,
           replyToMessageId: data.replyToMessageId,
+          isVanish: data.isVanish,
         });
 
         // Get full message with sender/recipient info
@@ -599,6 +631,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             replyToMessageId: fullMessage.replyToMessageId,
             encryptedContent: fullMessage.encryptedContent ? fullMessage.encryptedContent.toString('base64') : undefined,
             encryptedKey: fullMessage.encryptedKey ? fullMessage.encryptedKey.toString('base64') : undefined,
+            isVanish: fullMessage.isVanish,
           },
         });
 
@@ -615,6 +648,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             sender: fullMessage.sender,
             encryptedContent: fullMessage.encryptedContent ? fullMessage.encryptedContent.toString('base64') : undefined,
             encryptedKey: fullMessage.encryptedKey ? fullMessage.encryptedKey.toString('base64') : undefined,
+            isVanish: fullMessage.isVanish,
           },
         });
 
@@ -639,6 +673,39 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         socket.emit('message:error', {
           error: error instanceof Error ? error.message : 'Failed to send message',
         });
+      }
+    });
+
+    /**
+     * Friend Chat: Delete message for everyone
+     */
+    socket.on('message:delete', async (data: { messageId: string; recipientId: string }) => {
+      try {
+        await messageService.deleteMessage(data.messageId, userId);
+
+        // Notify both parties
+        const payload = { messageId: data.messageId, userId };
+        socket.emit('message:deleted', payload);
+        io.to(`user:${data.recipientId}`).emit('message:deleted', payload);
+      } catch (err) {
+        logger.error('Delete failed', { userId, err });
+      }
+    });
+
+    /**
+     * Friend Chat: Edit message content
+     */
+    socket.on('message:edit', async (data: { messageId: string; content: string; recipientId: string }) => {
+      try {
+        const encryptedContent = Buffer.from(btoa(data.content), 'base64');
+        await messageService.editMessage(data.messageId, userId, { encryptedContent });
+
+        // Notify both parties
+        const payload = { messageId: data.messageId, content: data.content, userId };
+        socket.emit('message:edited', payload);
+        io.to(`user:${data.recipientId}`).emit('message:edited', payload);
+      } catch (err) {
+        logger.error('Edit failed', { userId, err });
       }
     });
 
