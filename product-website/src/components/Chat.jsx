@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { playIncomingDrop, playOutgoingTick } from '../utils/soundEngine'
-import { useWebRTC } from '../hooks/useWebRTC'
 import './Chat.css'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -413,10 +412,11 @@ export default function Chat({
     socketState,
     chatMessages,
     partnerTyping,
-    onSendMessage,
     onTyping,
     onLeave,
     onSearchAgain,
+    onInitiateCall,
+    callOverlayStatus,
 }) {
     const [input, setInput] = useState('')
     const [showEmoji, setShowEmoji] = useState(false)
@@ -432,80 +432,6 @@ export default function Chat({
     const isMatched = socketState.phase === 'matched'
     const isMatching = socketState.phase === 'matching'
     const hasLeft = socketState.phase === 'partner-left'
-
-    const [callState, setCallState] = useState('idle') // idle, requesting, incoming, active
-
-    // ─── WebRTC Hook ───
-    const {
-        localStream,
-        remoteStream,
-        isMuted,
-        isVideoOff,
-        toggleMute,
-        toggleVideo,
-        prepareLocalMedia,
-        establishConnection,
-        stopLocalMedia
-    } = useWebRTC(socketState.socket, room?.roomId || room?.id, session?.user?.id)
-
-    // Call Request Flow Listeners
-    useEffect(() => {
-        if (!socketState.socket || !room?.roomId) return
-
-        const handleCallRequest = (data) => {
-            if (data.fromUserId !== session?.user?.id) {
-                setCallState('incoming')
-                playIncomingDrop()
-            }
-        }
-
-        const handleCallResponse = (data) => {
-            if (data.fromUserId !== session?.user?.id) {
-                if (data.status === 'accepted') {
-                    setCallState('active')
-                    establishConnection(true) // Caller initiates P2P connection after acceptance
-                } else {
-                    setCallState('idle')
-                    stopLocalMedia()
-                    alert(`${room?.partner?.name || 'Partner'} declined the video request.`)
-                }
-            }
-        }
-
-        socketState.socket.on('webrtc:call-request', handleCallRequest)
-        socketState.socket.on('webrtc:call-response', handleCallResponse)
-
-        return () => {
-            socketState.socket.off('webrtc:call-request', handleCallRequest)
-            socketState.socket.off('webrtc:call-response', handleCallResponse)
-        }
-    }, [socketState.socket, room?.roomId, session?.user?.id, establishConnection, stopLocalMedia, room?.partner?.name])
-
-    const initiateCall = async () => {
-        const success = await prepareLocalMedia()
-        if (!success) return
-
-        setCallState('requesting')
-        const roomId = room?.roomId || room?.id
-        socketState.socket.emit('webrtc:call-request', { roomId })
-    }
-
-    const acceptCall = async () => {
-        const success = await prepareLocalMedia()
-        if (!success) {
-            declineCall()
-            return
-        }
-
-        setCallState('active')
-        socketState.socket.emit('webrtc:call-response', { roomId: room?.roomId || room?.id, status: 'accepted' })
-        // Callee waits for offer, starts media in handleSignal automatically on offer receipt
-    }
-
-    const declineCall = () => {
-        setCallState('idle')
-        socketState.socket.emit('webrtc:call-response', { roomId: room?.roomId || room?.id, status: 'declined' })
-    }
 
     // Auto-scroll to latest message and play sound for incoming messages
     useEffect(() => {
@@ -661,12 +587,12 @@ export default function Chat({
                     </div>
                 </div>
                 <div className="chat-header-right">
-                    {isMatched && callState === 'idle' && (
-                        <button className="video-request-btn" onClick={initiateCall}>
+                    {isMatched && callOverlayStatus === 'idle' && (
+                        <button className="video-request-btn" onClick={onInitiateCall}>
                             🎥 Switch to Video
                         </button>
                     )}
-                    {isMatched && callState === 'requesting' && (
+                    {isMatched && callOverlayStatus === 'requesting' && (
                         <span className="video-request-status">Calling...</span>
                     )}
                     <div className={`chat-conn-dot${isMatched ? ' live' : ''}`} />
@@ -676,73 +602,9 @@ export default function Chat({
                 </div>
             </div>
 
-            {/* Video Portals (The Reveal) */}
-            {/* Incoming Video Request Banner */}
-            {callState === 'incoming' && (
-                <div className="video-incoming-banner">
-                    <span className="banner-text">🎥 <strong>{room?.partner?.name}</strong> is inviting you to a video call.</span>
-                    <div className="banner-actions">
-                        <button className="banner-btn accept" onClick={acceptCall}>Accept</button>
-                        <button className="banner-btn decline" onClick={declineCall}>Decline</button>
-                    </div>
-                </div>
-            )}
+            {/* Messages area */}
 
-            {/* Video Portals (Active Call) */}
-            {callState === 'active' && (
-                <div className="video-call-container">
-                    <div className="video-grid">
-                        {/* Remote Video */}
-                        <div className="video-tile remote-tile">
-                            {remoteStream ? (
-                                <video
-                                    autoPlay
-                                    playsInline
-                                    ref={el => { if (el) el.srcObject = remoteStream }}
-                                />
-                            ) : (
-                                <div className="video-placeholder">
-                                    <div className="placeholder-aura" />
-                                    <span>Connecting video…</span>
-                                </div>
-                            )}
-                            <div className="tile-label">
-                                <span>{room?.partner?.name || 'Partner'}</span>
-                            </div>
-                        </div>
-
-                        {/* Local Video */}
-                        <div className="video-tile local-tile">
-                            {localStream ? (
-                                <video
-                                    autoPlay
-                                    playsInline
-                                    muted
-                                    ref={el => { if (el) el.srcObject = localStream }}
-                                />
-                            ) : (
-                                <div className="video-placeholder" />
-                            )}
-                            <div className="tile-label">
-                                <span>You</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Call Controls Bar */}
-                    <div className="call-controls-bar">
-                        <button className={`call-ctrl-btn ${isMuted ? 'off' : ''}`} onClick={toggleMute} title={isMuted ? 'Unmute' : 'Mute'}>
-                            {isMuted ? '🔇' : '🎤'}
-                        </button>
-                        <button className={`call-ctrl-btn ${isVideoOff ? 'off' : ''}`} onClick={toggleVideo} title={isVideoOff ? 'Turn Video On' : 'Turn Video Off'}>
-                            {isVideoOff ? '�' : '🎥'}
-                        </button>
-                        <button className="call-ctrl-btn end-call" onClick={() => { stopLocalMedia(); setCallState('idle') }} title="End Call">
-                            📞
-                        </button>
-                    </div>
-                </div>
-            )}
+            {/* Video Portals (Active Call) - REMOVED, now globally in CallOverlay */}
 
             {/* Messages area */}
             <div className="chat-messages-area" ref={messagesAreaRef}>
@@ -819,25 +681,31 @@ export default function Chat({
             </div>
 
             {/* Pickers (emoji / gif) */}
-            {showEmoji && (
-                <div className="picker-overlay">
-                    <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setShowEmoji(false)} />
-                </div>
-            )}
-            {showGif && (
-                <div className="picker-overlay">
-                    <GifPicker onSelect={handleGifSelect} onClose={() => setShowGif(false)} />
-                </div>
-            )}
+            {
+                showEmoji && (
+                    <div className="picker-overlay">
+                        <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setShowEmoji(false)} />
+                    </div>
+                )
+            }
+            {
+                showGif && (
+                    <div className="picker-overlay">
+                        <GifPicker onSelect={handleGifSelect} onClose={() => setShowGif(false)} />
+                    </div>
+                )
+            }
 
             {/* Profile Modal */}
-            {showProfile && (
-                <ProfileModal
-                    partnerId={showProfile}
-                    session={session}
-                    onClose={() => setShowProfile(null)}
-                />
-            )}
+            {
+                showProfile && (
+                    <ProfileModal
+                        partnerId={showProfile}
+                        session={session}
+                        onClose={() => setShowProfile(null)}
+                    />
+                )
+            }
 
             {/* Input bar */}
             <div className="chat-input-container">
@@ -917,6 +785,6 @@ export default function Chat({
                     </button>
                 </div>
             </div>
-        </div>
+        </div >
     )
 }

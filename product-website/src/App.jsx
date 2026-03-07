@@ -6,6 +6,7 @@ import Onboarding from './components/Onboarding'
 import Landing from './components/Landing'
 import AdminDashboard from './admin/AdminDashboard'
 import FriendChat from './components/FriendChat'
+import CallOverlay from './components/CallOverlay'
 
 import {
   signInWithGoogle,
@@ -61,6 +62,13 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [socketVersion, setSocketVersion] = useState(0)
   const [isAdminView, setIsAdminView] = useState(window.location.pathname === '/admin')
+
+  const [callOverlayState, setCallOverlayState] = useState({
+    status: 'idle', // 'idle', 'requesting', 'incoming', 'active'
+    partner: null,
+    type: 'random', // 'random' or 'friend'
+    isInitiator: false
+  })
 
   const socketRef = useRef(null)
   const sessionRef = useRef(session)
@@ -176,6 +184,35 @@ function App() {
         socket.on('typing:start', () => setPartnerTyping(true))
         socket.on('typing:stop', () => setPartnerTyping(false))
         socket.on('disconnect', () => setSocketState((prev) => ({ ...prev, status: 'disconnected' })))
+
+        // Global Call Signaling
+        socket.on('webrtc:call-request', (data) => {
+          // If we are already in a call or requesting, auto-decline or ignore?
+          // For now, only show if idle
+          setCallOverlayState(current => {
+            if (current.status !== 'idle') return current
+
+            // For friend calls, the backend sends metadata
+            return {
+              status: 'incoming',
+              partner: data.caller || roomRef.current?.partner,
+              type: data.recipientId ? 'friend' : 'random',
+              isInitiator: false
+            }
+          })
+          playIncomingDrop()
+        })
+
+        socket.on('webrtc:call-response', (data) => {
+          if (data.status === 'accepted') {
+            setCallOverlayState(prev => ({ ...prev, status: 'active' }))
+          } else {
+            setCallOverlayState(prev => ({ ...prev, status: 'idle', partner: null }))
+            if (data.status === 'declined') {
+              // Optional: show a small toast or just reset
+            }
+          }
+        })
 
       } catch (err) {
         console.error('Socket connect setup failed:', err)
@@ -378,6 +415,47 @@ function App() {
     setSocketState(prev => ({ ...prev, phase: 'idle' }))
   }
 
+  const handleInitiateCall = (partner, type) => {
+    if (!socketRef.current) return
+    const roomId = partner.roomId || partner.id
+    const recipientId = type === 'friend' ? (partner.user?.id || partner.id) : null
+
+    setCallOverlayState({
+      status: 'requesting',
+      partner: partner.user ? { ...partner.user, id: partner.user.id } : partner,
+      type,
+      isInitiator: true
+    })
+
+    socketRef.current.emit('webrtc:call-request', {
+      roomId,
+      recipientId
+    })
+    playOutgoingTick()
+  }
+
+  const handleAcceptCall = () => {
+    if (!socketRef.current) return
+    const roomId = roomRef.current?.roomId || roomRef.current?.id || callOverlayState.partner?.id
+    socketRef.current.emit('webrtc:call-response', {
+      roomId,
+      recipientId: callOverlayState.type === 'friend' ? callOverlayState.partner.id : null,
+      status: 'accepted'
+    })
+    setCallOverlayState(prev => ({ ...prev, status: 'active' }))
+  }
+
+  const handleEndCall = () => {
+    if (!socketRef.current) return
+    const roomId = roomRef.current?.roomId || roomRef.current?.id || callOverlayState.partner?.id
+    socketRef.current.emit('webrtc:call-response', {
+      roomId,
+      recipientId: callOverlayState.type === 'friend' ? callOverlayState.partner.id : null,
+      status: 'declined' // used for ending too
+    })
+    setCallOverlayState({ status: 'idle', partner: null, type: 'random', isInitiator: false })
+  }
+
   const isSignedIn = Boolean(session?.user)
   const isHome = Boolean(isSignedIn && !showChat && session.user.gender)
   const isInChat = Boolean(showChat && isSignedIn && session.user.gender)
@@ -392,7 +470,19 @@ function App() {
           socket={socketRef.current}
           authedFetch={authedFetch}
           onBack={handleBackFromFriendChat}
+          onInitiateCall={() => handleInitiateCall(activeFriend, 'friend')}
         />
+        {callOverlayState.status !== 'idle' && (
+          <CallOverlay
+            socket={socketRef.current}
+            session={session}
+            callState={callOverlayState}
+            partner={callOverlayState.partner}
+            onAccept={handleAcceptCall}
+            onDecline={handleEndCall}
+            onEnd={handleEndCall}
+          />
+        )}
       </div>
     )
   }
@@ -463,12 +553,26 @@ function App() {
             onSendMessage={handleSendMessage}
             onTyping={handleTyping}
             onLeave={handleLeaveChat}
+            onInitiateCall={() => handleInitiateCall(room, 'random')}
+            callOverlayStatus={callOverlayState.status}
             onSearchAgain={() => {
               setSocketState((prev) => ({ ...prev, phase: 'matching' })); setRoom(null); setChatMessages([]); socketRef.current?.emit('random:join');
             }}
           />
         )}
       </main>
+
+      {callOverlayState.status !== 'idle' && (
+        <CallOverlay
+          socket={socketRef.current}
+          session={session}
+          callState={callOverlayState}
+          partner={callOverlayState.partner}
+          onAccept={handleAcceptCall}
+          onDecline={handleEndCall}
+          onEnd={handleEndCall}
+        />
+      )}
 
       {!isAdminView && (
         <footer className="footer">

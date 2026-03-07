@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './FriendChat.css'
 
-export default function FriendChat({ session, friend, onBack, socket, authedFetch }) {
+export default function FriendChat({ session, friend, onBack, socket, authedFetch, onInitiateCall }) {
     const [messages, setMessages] = useState([])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(true)
@@ -109,7 +109,13 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
                         </span>
                     </div>
                 </div>
-                <button className="call-btn" title="Start Video Call">📞</button>
+                <button
+                    className="call-btn"
+                    title="Start Video Call"
+                    onClick={onInitiateCall}
+                >
+                    📞
+                </button>
             </header>
 
             <main className="friend-chat-messages">
