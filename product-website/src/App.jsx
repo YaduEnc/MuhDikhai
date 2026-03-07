@@ -698,13 +698,13 @@ function App() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  targetId: vibeCheckState.partner.id,
+                  targetId: vibeCheckState.partner?.id || vibeCheckState.partner?.uid,
                   roomId: vibeCheckState.roomId,
                   vibe
                 })
               })
               const json = await res.json()
-              if (!json.success) throw new Error(json.error?.message)
+              if (!json.success) throw new Error(json.error?.message || 'Vote failed')
 
               // Optionally update own level if feedback affects us? 
               // No, it affects the target. But we might want to refresh our own aura points later.
