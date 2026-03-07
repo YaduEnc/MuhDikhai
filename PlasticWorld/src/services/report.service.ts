@@ -71,8 +71,8 @@ class ReportService {
                 `SELECT 
           r.id, r.reason, r.details, r.status,
           r.created_at as "createdAt", r.updated_at as "updatedAt",
-          u1.id as "reporterId", u1.name as "reporterName", u1.email as "reporterEmail",
-          u2.id as "reportedId", u2.name as "reportedName", u2.email as "reportedEmail"
+          u1.id as "reporterId", u1.name as "reporterName", u1.email as "reporterEmail", u1.aura_points as "reporterAura",
+          u2.id as "reportedId", u2.name as "reportedName", u2.email as "reportedEmail", u2.aura_points as "reportedAura"
         FROM reports r
         JOIN users u1 ON r.reporter_id = u1.id
         JOIN users u2 ON r.reported_id = u2.id

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useWebRTC } from '../hooks/useWebRTC'
 import { playIncomingDrop, playOutgoingTick } from '../utils/soundEngine'
+import { calculateAuraLevel } from '../utils/aura'
 import './CallOverlay.css'
 
 export default function CallOverlay({
@@ -74,7 +75,19 @@ export default function CallOverlay({
                             )}
                         </div>
                         <h3>Incoming Video Call</h3>
-                        <p>{partner?.name} is calling you...</p>
+                        <p>
+                            {partner?.name}
+                            {partner?.auraPoints !== undefined && (
+                                <span
+                                    className="partner-aura-badge"
+                                    title={`Aura: ${calculateAuraLevel(partner.auraPoints).name}`}
+                                    style={{ color: calculateAuraLevel(partner.auraPoints).color, fontSize: '0.8rem', marginLeft: '0.4rem' }}
+                                >
+                                    ✧
+                                </span>
+                            )}
+                            is calling you...
+                        </p>
                         <div className="call-actions">
                             <button className="call-btn accept" onClick={handleAccept}>Accept</button>
                             <button className="call-btn decline" onClick={onDecline}>Decline</button>
@@ -92,7 +105,19 @@ export default function CallOverlay({
                             )}
                         </div>
                         <h3>Calling...</h3>
-                        <p>Waiting for {partner?.name} to answer</p>
+                        <p>
+                            Waiting for {partner?.name}
+                            {partner?.auraPoints !== undefined && (
+                                <span
+                                    className="partner-aura-badge"
+                                    title={`Aura: ${calculateAuraLevel(partner.auraPoints).name}`}
+                                    style={{ color: calculateAuraLevel(partner.auraPoints).color, fontSize: '0.8rem', marginLeft: '0.4rem' }}
+                                >
+                                    ✧
+                                </span>
+                            )}
+                            to answer
+                        </p>
                         <div className="call-actions">
                             <button className="call-btn decline" onClick={onEnd}>Cancel</button>
                         </div>

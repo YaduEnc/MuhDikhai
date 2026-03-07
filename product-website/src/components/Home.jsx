@@ -730,7 +730,18 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                     </div>
                     <div className="home-card-body">
                         <span className="home-card-label">Your profile</span>
-                        <span className="home-card-title">{session?.user?.name || 'Anonymous'}</span>
+                        <span className="home-card-title">
+                            {session?.user?.name || 'Anonymous'}
+                            {session?.user?.auraPoints !== undefined && (
+                                <span
+                                    className="partner-aura-badge"
+                                    title={`Aura: ${calculateAuraLevel(session.user.auraPoints).name}`}
+                                    style={{ color: calculateAuraLevel(session.user.auraPoints).color, fontSize: '0.8rem', marginLeft: '0.4rem' }}
+                                >
+                                    ✧
+                                </span>
+                            )}
+                        </span>
                         <span className="home-card-sub">Preferences &amp; identity</span>
                     </div>
                     <span className="home-card-arrow">→</span>

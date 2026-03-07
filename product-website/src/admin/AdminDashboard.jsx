@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { calculateAuraLevel } from '../utils/aura';
 import './AdminDashboard.css';
 
 const AdminDashboard = ({ session }) => {
@@ -153,13 +154,35 @@ const AdminDashboard = ({ session }) => {
                                     <tr key={r.id}>
                                         <td>
                                             <div className="user-info-cell">
-                                                <strong>{r.reporterName}</strong>
+                                                <strong>
+                                                    {r.reporterName}
+                                                    {r.reporterAura !== undefined && (
+                                                        <span
+                                                            className="partner-aura-badge"
+                                                            title={`Aura: ${calculateAuraLevel(r.reporterAura).name}`}
+                                                            style={{ color: calculateAuraLevel(r.reporterAura).color, fontSize: '0.7rem', marginLeft: '0.3rem' }}
+                                                        >
+                                                            ✧
+                                                        </span>
+                                                    )}
+                                                </strong>
                                                 <span>{r.reporterEmail}</span>
                                             </div>
                                         </td>
                                         <td>
                                             <div className="user-info-cell">
-                                                <strong>{r.reportedName}</strong>
+                                                <strong>
+                                                    {r.reportedName}
+                                                    {r.reportedAura !== undefined && (
+                                                        <span
+                                                            className="partner-aura-badge"
+                                                            title={`Aura: ${calculateAuraLevel(r.reportedAura).name}`}
+                                                            style={{ color: calculateAuraLevel(r.reportedAura).color, fontSize: '0.7rem', marginLeft: '0.3rem' }}
+                                                        >
+                                                            ✧
+                                                        </span>
+                                                    )}
+                                                </strong>
                                                 <span>{r.reportedEmail}</span>
                                             </div>
                                         </td>

@@ -6,7 +6,7 @@ export const AURA_LEVELS = [
     { level: 5, name: 'Lighthouse', minPoints: 500, color: '#8b5cf6' },       // Purple/Premium
 ];
 
-export function calculateAuraLevel(points = 50) {
+export function calculateAuraLevel(points = 0) {
     const reverseLevels = [...AURA_LEVELS].reverse();
     const current = reverseLevels.find(l => points >= l.minPoints) || AURA_LEVELS[0];
 
