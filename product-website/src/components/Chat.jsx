@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { playIncomingDrop, playOutgoingTick } from '../utils/soundEngine'
+import { calculateAuraLevel } from '../utils/aura'
 import DoodleBoard from './DoodleBoard'
 import './Chat.css'
 
@@ -659,6 +660,15 @@ export default function Chat({
                     <div className="chat-partner-info">
                         <span className="chat-partner-name">
                             {room?.partner?.name || 'Finding someone…'}
+                            {isMatched && room?.partner?.auraPoints !== undefined && (
+                                <span
+                                    className="partner-aura-badge"
+                                    title={`Aura: ${calculateAuraLevel(room.partner.auraPoints).name}`}
+                                    style={{ color: calculateAuraLevel(room.partner.auraPoints).color }}
+                                >
+                                    ✧
+                                </span>
+                            )}
                         </span>
                         <span className={`chat-partner-status${isMatched ? ' live' : ''}`}>
                             {isMatching

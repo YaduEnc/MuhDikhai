@@ -7,6 +7,7 @@ import Landing from './components/Landing'
 import AdminDashboard from './admin/AdminDashboard'
 import FriendChat from './components/FriendChat'
 import CallOverlay from './components/CallOverlay'
+import VibeCheckModal from './components/VibeCheckModal'
 
 import {
   signInWithGoogle,
@@ -67,10 +68,14 @@ function App() {
   const [matchPrefs, setMatchPrefs] = useState({ topics: [], preference: 'everyone' })
 
   const [callOverlayState, setCallOverlayState] = useState({
-    status: 'idle', // 'idle', 'requesting', 'incoming', 'active'
-    partner: null,
     type: 'random', // 'random' or 'friend'
     isInitiator: false
+  })
+
+  const [vibeCheckState, setVibeCheckState] = useState({
+    show: false,
+    partner: null,
+    roomId: null
   })
 
   const socketRef = useRef(null)
@@ -195,7 +200,17 @@ function App() {
         socket.on('random:read', (payload) => {
           setChatMessages((prev) => prev.map((m) => (m.id === payload.messageId ? { ...m, read: true } : m)))
         })
-        socket.on('random:left', () => setSocketState((prev) => ({ ...prev, phase: 'partner-left' })))
+        socket.on('random:left', () => {
+          const currentRoom = roomRef.current
+          if (currentRoom?.partner) {
+            setVibeCheckState({
+              show: true,
+              partner: currentRoom.partner,
+              roomId: currentRoom.roomId || currentRoom.id
+            })
+          }
+          setSocketState((prev) => ({ ...prev, phase: 'partner-left' }))
+        })
         socket.on('typing:start', () => setPartnerTyping(true))
         socket.on('typing:stop', () => setPartnerTyping(false))
 
@@ -341,7 +356,18 @@ function App() {
   }
 
   const handleLeaveChat = () => {
+    const currentRoom = roomRef.current
     if (socketRef.current) socketRef.current.emit('random:leave')
+
+    // Trigger vibe check if we were in a match
+    if (socketState.phase === 'matched' && currentRoom?.partner) {
+      setVibeCheckState({
+        show: true,
+        partner: currentRoom.partner,
+        roomId: currentRoom.roomId || currentRoom.id
+      })
+    }
+
     setShowChat(false)
     setIsTransitioning(false)
     setRoom(null)
@@ -634,8 +660,18 @@ function App() {
             onInitiateCall={() => handleInitiateCall(room, 'random')}
             callOverlayStatus={callOverlayState.status}
             onSearchAgain={() => {
+              const currentRoom = roomRef.current;
               // Leave current first
               socketRef.current?.emit('random:leave');
+
+              // Trigger vibe check if we were in a match
+              if (socketState.phase === 'matched' && currentRoom?.partner) {
+                setVibeCheckState({
+                  show: true,
+                  partner: currentRoom.partner,
+                  roomId: currentRoom.roomId || currentRoom.id
+                });
+              }
 
               // Then join new with same prefs
               setSocketState((prev) => ({ ...prev, phase: 'matching' }));
@@ -648,6 +684,37 @@ function App() {
           />
         )}
       </main>
+
+      {vibeCheckState.show && (
+        <VibeCheckModal
+          partner={vibeCheckState.partner}
+          roomId={vibeCheckState.roomId}
+          onVote={async (vibe) => {
+            try {
+              const res = await authedFetch(`${BACKEND_URL}/api/v1/users/aura/vote`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  targetId: vibeCheckState.partner.id,
+                  roomId: vibeCheckState.roomId,
+                  vibe
+                })
+              })
+              const json = await res.json()
+              if (!json.success) throw new Error(json.error?.message)
+
+              // Optionally update own level if feedback affects us? 
+              // No, it affects the target. But we might want to refresh our own aura points later.
+            } catch (err) {
+              console.error('Vote failed:', err)
+              throw err
+            }
+          }
+          }
+          onSkip={() => setVibeCheckState({ show: false, partner: null, roomId: null })}
+        />
+      )}
+
 
       {callOverlayState.status !== 'idle' && (
         <CallOverlay

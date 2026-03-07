@@ -221,6 +221,15 @@ export const conversationQuerySchema = z
     })
   );
 
+// Vibe Check
+export const vibeCheckSchema = z.object({
+  targetId: z.string().uuid('Invalid target user ID format'),
+  roomId: z.string().min(1, 'Room ID is required'),
+  vibe: z.enum(['warm', 'cold'], {
+    errorMap: () => ({ message: 'Vibe must be warm or cold' }),
+  }),
+});
+
 /**
  * Validate request query parameters against schema
  */

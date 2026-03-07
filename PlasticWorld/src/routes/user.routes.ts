@@ -10,10 +10,10 @@ import {
   updateProfileSchema,
   updateStatusSchema,
   searchUsersQuerySchema,
+  vibeCheckSchema,
 } from '../utils/validation';
 import { deleteFirebaseUser } from '../config/firebase';
 import { upload } from '../middleware/multer';
-import friendshipService from '../services/friendship.service';
 import matchService from '../services/match.service';
 import logger from '../utils/logger';
 
@@ -377,6 +377,27 @@ router.delete(
     res.status(200).json({
       success: true,
       message: 'Account and all associated data deleted permanently',
+    });
+  })
+);
+
+/**
+ * POST /api/v1/users/aura/vote
+ * Submit a vibe check for a partner
+ */
+router.post(
+  '/aura/vote',
+  authenticate,
+  validateBody(vibeCheckSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { targetId, roomId, vibe } = req.body;
+
+    const result = await userService.submitVibeCheck(userId, targetId, roomId, vibe);
+
+    res.status(200).json({
+      success: true,
+      data: result,
     });
   })
 );

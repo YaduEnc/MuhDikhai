@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getSoundEnabled, toggleSound, initAudio } from '../utils/soundEngine'
+import { calculateAuraLevel } from '../utils/aura'
 import './Home.css'
 
 function DeleteConfirmationModal({ onConfirm, onCancel }) {
@@ -105,6 +106,12 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                                     {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
                                 </span>
                             )}
+                            {session?.user?.auraPoints !== undefined && (
+                                <div
+                                    className="aura-glow"
+                                    style={{ '--aura-color': calculateAuraLevel(session.user.auraPoints).color }}
+                                />
+                            )}
                         </div>
                         <div className="avatar-edit-overlay">✎</div>
                         <input
@@ -117,7 +124,14 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                     </div>
                     <div className="profile-info">
                         <span className="profile-name">{session?.user?.name || 'Anonymous'}</span>
-                        <span className="profile-email">{session?.user?.email || ''}</span>
+                        <div className="profile-aura-wrap">
+                            <span className="profile-email">{session?.user?.email || ''}</span>
+                            {session?.user?.auraPoints !== undefined && (
+                                <div className="aura-badge" style={{ backgroundColor: `${calculateAuraLevel(session.user.auraPoints).color}22`, color: calculateAuraLevel(session.user.auraPoints).color }}>
+                                    ✧ {calculateAuraLevel(session.user.auraPoints).name}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -326,7 +340,18 @@ function FriendRequests({ requests, onRespond }) {
                         )}
                     </div>
                     <div className="recent-info">
-                        <span className="recent-name">{req.user?.name || 'Stranger'}</span>
+                        <span className="recent-name">
+                            {req.user?.name || 'Stranger'}
+                            {req.user?.auraPoints !== undefined && (
+                                <span
+                                    className="partner-aura-badge"
+                                    title={`Aura: ${calculateAuraLevel(req.user.auraPoints).name}`}
+                                    style={{ color: calculateAuraLevel(req.user.auraPoints).color, fontSize: '0.8rem', marginLeft: '0.4rem' }}
+                                >
+                                    ✧
+                                </span>
+                            )}
+                        </span>
                         <span className="recent-topic">Wants to be your friend</span>
                     </div>
                     <div className="friend-actions">
@@ -359,7 +384,18 @@ function FriendsList({ friends, onOpenChat, unreadCounts = {} }) {
                             {unread > 0 && <span className="unread-dot" />}
                         </div>
                         <div className="recent-info">
-                            <span className="recent-name">{friend.user?.name || 'Stranger'}</span>
+                            <span className="recent-name">
+                                {friend.user?.name || 'Stranger'}
+                                {friend.user?.auraPoints !== undefined && (
+                                    <span
+                                        className="partner-aura-badge"
+                                        title={`Aura: ${calculateAuraLevel(friend.user.auraPoints).name}`}
+                                        style={{ color: calculateAuraLevel(friend.user.auraPoints).color, fontSize: '0.8rem', marginLeft: '0.4rem' }}
+                                    >
+                                        ✧
+                                    </span>
+                                )}
+                            </span>
                             <span className="recent-topic">{unread > 0 ? `${unread} new message${unread > 1 ? 's' : ''}` : 'Friend'}</span>
                         </div>
                         <button className="recent-add-btn" onClick={() => onOpenChat(friend)}>
@@ -641,7 +677,18 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                                                     )}
                                                 </div>
                                                 <div className="recent-info">
-                                                    <span className="recent-name">{match.partner?.name || 'Stranger'}</span>
+                                                    <span className="recent-name">
+                                                        {match.partner?.name || 'Stranger'}
+                                                        {match.partner?.auraPoints !== undefined && (
+                                                            <span
+                                                                className="partner-aura-badge"
+                                                                title={`Aura: ${calculateAuraLevel(match.partner.auraPoints).name}`}
+                                                                style={{ color: calculateAuraLevel(match.partner.auraPoints).color, fontSize: '0.8rem', marginLeft: '0.4rem' }}
+                                                            >
+                                                                ✧
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                     {match.sharedTopic && <span className="recent-topic">Talked about {match.sharedTopic}</span>}
                                                 </div>
                                                 <button

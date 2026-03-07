@@ -17,6 +17,7 @@ export interface Friendship {
     name: string;
     profilePictureUrl?: string;
     status: 'online' | 'offline' | 'away';
+    auraPoints?: number;
   };
   addressee?: {
     id: string;
@@ -24,6 +25,7 @@ export interface Friendship {
     name: string;
     profilePictureUrl?: string;
     status: 'online' | 'offline' | 'away';
+    auraPoints?: number;
   };
 }
 
@@ -373,9 +375,11 @@ class FriendshipService {
           -- Requester details
           r.id as "r_id", r.username as "r_username", r.name as "r_name",
           r.profile_picture_url as "r_profilePictureUrl", r.status as "r_status",
+          r.aura_points as "r_auraPoints",
           -- Addressee details
           a.id as "a_id", a.username as "a_username", a.name as "a_name",
-          a.profile_picture_url as "a_profilePictureUrl", a.status as "a_status"
+          a.profile_picture_url as "a_profilePictureUrl", a.status as "a_status",
+          a.aura_points as "a_auraPoints"
         FROM friendships f
         JOIN users r ON f.requester_id = r.id
         JOIN users a ON f.addressee_id = a.id
@@ -401,6 +405,7 @@ class FriendshipService {
           name: row.r_name,
           profilePictureUrl: row.r_profilePictureUrl,
           status: row.r_status,
+          auraPoints: row.r_auraPoints,
         },
         addressee: {
           id: row.a_id,
@@ -408,6 +413,7 @@ class FriendshipService {
           name: row.a_name,
           profilePictureUrl: row.a_profilePictureUrl,
           status: row.a_status,
+          auraPoints: row.a_auraPoints,
         },
       }));
 

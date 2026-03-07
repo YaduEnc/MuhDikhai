@@ -17,9 +17,19 @@ export interface User {
   roomsEntered: number;
   isAdmin: boolean;
   isActive: boolean;
+  auraPoints: number;
   createdAt: Date;
   updatedAt: Date;
 }
+
+
+export const AURA_LEVELS = [
+  { level: 1, name: 'Dissolved Mist', minPoints: 0, color: '#94a3b8' },      // Grey/Muted
+  { level: 2, name: 'Fading Whisper', minPoints: 50, color: '#f87171' },    // Soft Red
+  { level: 3, name: 'Soft Glow', minPoints: 100, color: '#fbbf24' },        // Amber
+  { level: 4, name: 'Steady Lantern', minPoints: 250, color: '#22c55e' },   // Green
+  { level: 5, name: 'Lighthouse', minPoints: 500, color: '#8b5cf6' },       // Purple/Premium
+];
 
 
 export interface CreateUserData {
@@ -129,7 +139,8 @@ class UserService {
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
           created_at as "createdAt", updated_at as "updatedAt",
-          rooms_entered as "roomsEntered", is_admin as "isAdmin"`,
+          rooms_entered as "roomsEntered", is_admin as "isAdmin",
+          aura_points as "auraPoints"`,
         [data.firebaseUid, username, data.email, data.name, defaultAge, data.profilePictureUrl || null, data.gender || 'prefer_not_to_say', 'offline', data.roomsEntered || 0, data.isAdmin || false]
       );
 
@@ -167,7 +178,8 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin"
+          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin",
+          aura_points as "auraPoints"
         FROM users
         WHERE ${whereClause}
         ORDER BY 
@@ -204,7 +216,8 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin"
+          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin",
+          aura_points as "auraPoints"
         FROM users
         WHERE ${whereClause}
         LIMIT 1`,
@@ -237,7 +250,8 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin"
+          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin",
+          aura_points as "auraPoints"
         FROM users
         WHERE ${whereClause}
         LIMIT 1`,
@@ -300,7 +314,8 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin"
+          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin",
+          aura_points as "auraPoints"
         FROM users
         WHERE id = $1 AND is_active = true
         LIMIT 1`,
@@ -430,7 +445,8 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin"`,
+          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin",
+          aura_points as "auraPoints"`,
         values
       );
 
@@ -607,7 +623,8 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt"`,
+          created_at as "createdAt", updated_at as "updatedAt",
+          aura_points as "auraPoints"`,
         [status, userId]
       );
 
@@ -666,6 +683,66 @@ class UserService {
     } catch (error) {
       logger.error('Failed to increment rooms_entered', { error, userId });
     }
+  }
+
+  /**
+   * Submit a vibe check for a partner
+   */
+  async submitVibeCheck(
+    voterId: string,
+    targetId: string,
+    roomId: string,
+    vibe: 'warm' | 'cold'
+  ): Promise<{ auraPoints: number; level: any }> {
+    try {
+      // 1. Log the vibe check in history
+      // Uses ON CONFLICT to prevent double voting
+      await database.query(
+        `INSERT INTO vibe_check_history (voter_id, target_id, room_id, vibe)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (voter_id, target_id, room_id) DO NOTHING`,
+        [voterId, targetId, roomId, vibe]
+      );
+
+      // 2. Update target's aura points
+      // Warm = +5 points, Cold = -10 points (penalize bad behavior more)
+      const pointChange = vibe === 'warm' ? 5 : -10;
+
+      const result = await database.query<{ auraPoints: number }>(
+        `UPDATE users 
+         SET aura_points = GREATEST(0, aura_points + $1) 
+         WHERE id = $2 
+         RETURNING aura_points as "auraPoints"`,
+        [pointChange, targetId]
+      );
+
+      const auraPoints = result.rows[0]?.auraPoints || 0;
+      const levelResult = this.calculateAuraLevel(auraPoints);
+
+      logger.info('Vibe check processed', { voterId, targetId, vibe, newPoints: auraPoints });
+
+      return { auraPoints, level: levelResult };
+    } catch (error) {
+      logger.error('Failed to submit vibe check', { error, voterId, targetId });
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate level and title from points
+   */
+  calculateAuraLevel(points: number) {
+    const reverseLevels = [...AURA_LEVELS].reverse();
+    const current = reverseLevels.find((l: any) => points >= l.minPoints) || AURA_LEVELS[0];
+
+    // Find next level for progress tracking
+    const next = AURA_LEVELS.find((l: any) => l.level === current.level + 1) || null;
+
+    return {
+      ...current,
+      nextLevel: next ? next.minPoints : null,
+      progress: next ? ((points - current.minPoints) / (next.minPoints - current.minPoints)) * 100 : 100
+    };
   }
 }
 
