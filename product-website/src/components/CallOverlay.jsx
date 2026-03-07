@@ -28,7 +28,7 @@ export default function CallOverlay({
         prepareLocalMedia,
         establishConnection,
         stopLocalMedia
-    } = useWebRTC(socket, roomId, session?.user?.id)
+    } = useWebRTC(socket, roomId, session?.user?.id, recipientId)
 
     // Sync WebRTC with call status
     useEffect(() => {

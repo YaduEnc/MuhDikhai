@@ -7,7 +7,7 @@ const ICE_SERVERS = {
     ]
 }
 
-export function useWebRTC(socket, roomId, userId) {
+export function useWebRTC(socket, roomId, userId, recipientId) {
     const [localStream, setLocalStream] = useState(null)
     const [remoteStream, setRemoteStream] = useState(null)
     const [isMuted, setIsMuted] = useState(false)
@@ -17,11 +17,13 @@ export function useWebRTC(socket, roomId, userId) {
     const pendingCandidates = useRef([])
     const socketRef = useRef(socket)
     const roomIdRef = useRef(roomId)
+    const recipientIdRef = useRef(recipientId)
     const localStreamRef = useRef(localStream)
 
     // Keep refs in sync
     useEffect(() => { socketRef.current = socket }, [socket])
     useEffect(() => { roomIdRef.current = roomId }, [roomId])
+    useEffect(() => { recipientIdRef.current = recipientId }, [recipientId])
     useEffect(() => { localStreamRef.current = localStream }, [localStream])
 
     // ─── Initialize PeerConnection ───────────────────────────────────────────
@@ -32,6 +34,7 @@ export function useWebRTC(socket, roomId, userId) {
             if (event.candidate && socketRef.current) {
                 socketRef.current.emit('webrtc:signal', {
                     roomId: roomIdRef.current,
+                    recipientId: recipientIdRef.current,
                     signal: { type: 'candidate', candidate: event.candidate }
                 })
             }
@@ -85,7 +88,11 @@ export function useWebRTC(socket, roomId, userId) {
         if (isInitiator && socketRef.current) {
             const offer = await pc.createOffer()
             await pc.setLocalDescription(offer)
-            socketRef.current.emit('webrtc:signal', { roomId: roomIdRef.current, signal: offer })
+            socketRef.current.emit('webrtc:signal', {
+                roomId: roomIdRef.current,
+                recipientId: recipientIdRef.current,
+                signal: offer
+            })
         }
     }, [createPC])
 
@@ -105,7 +112,7 @@ export function useWebRTC(socket, roomId, userId) {
 
     // ─── Handle Signaling ────────────────────────────────────────────────────
     useEffect(() => {
-        if (!socket || !roomId) return
+        if (!socket || (!roomId && !recipientId)) return
 
         const handleSignal = async (data) => {
             if (data.fromUserId === userId) return
@@ -123,7 +130,11 @@ export function useWebRTC(socket, roomId, userId) {
                     await pc.setRemoteDescription(new RTCSessionDescription(data.signal))
                     const answer = await pc.createAnswer()
                     await pc.setLocalDescription(answer)
-                    socket.emit('webrtc:signal', { roomId, signal: answer })
+                    socket.emit('webrtc:signal', {
+                        roomId,
+                        recipientId,
+                        signal: answer
+                    })
 
                     while (pendingCandidates.current.length) {
                         await pc.addIceCandidate(pendingCandidates.current.shift())
