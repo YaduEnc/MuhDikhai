@@ -1,15 +1,6 @@
-<p align="center">
-  <a href="#-features"><b>📖 README</b></a> &nbsp;&nbsp;
-  <a href="#-security--privacy"><b>🛡️ Security</b></a> &nbsp;&nbsp;
-  <a href="#-copyright--licensing"><b>⚖️ Proprietary</b></a>
-</p>
+# <p align="center"> <img src="./documentation/header.png" alt="Muhdikhai Header" width="800"> </p>
 
-<p align="center">
-  <img src="./documentation/header.png" alt="Muhdikhai Header" width="800">
-</p>
-
-<h1 align="center">🧿 MUHDIKHAI — Premium Ephemeral Chat Platform</h1>
-
+<h1 align="center">MUHDIKHAI</h1>
 <p align="center">
   <strong>Real People. Pure Chaos. Total Privacy.</strong><br>
   <i>A premium, Indian-Maximalist random chat experience built for the bold.</i>
