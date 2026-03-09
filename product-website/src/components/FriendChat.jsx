@@ -81,10 +81,42 @@ const GifPicker = memo(function GifPicker({ onSelect, onClose }) {
     )
 })
 
+// ─── Base64 UTF-8 Helpers ───────────────────────────────────────────────────
+function decodeBase64(str) {
+    if (!str || typeof str !== 'string') return str || '';
+    try {
+        let cleaned = str.trim();
+        if (cleaned.startsWith('"') && cleaned.endsWith('"')) cleaned = cleaned.slice(1, -1);
+        const binary = atob(cleaned);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return new TextDecoder().decode(bytes);
+    } catch (e) {
+        return str;
+    }
+}
+
+function encodeBase64(text) {
+    if (!text) return '';
+    try {
+        const bytes = new TextEncoder().encode(text);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+    } catch (e) {
+        return btoa(text);
+    }
+}
+
 // ─── Helper: detect if content is an image URL ───────────────────────────────
 function isImageUrl(text) {
     if (!text) return false
-    return /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)/i.test(text) || text.includes('giphy.com')
+    const content = decodeBase64(text);
+    return /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)/i.test(content) || content.includes('giphy.com')
 }
 
 const MessageMenu = memo(function MessageMenu({ m, isMine, onEdit, onDelete, onClose }) {
@@ -115,7 +147,7 @@ const MessageMenu = memo(function MessageMenu({ m, isMine, onEdit, onDelete, onC
     )
 })
 
-const FriendBubble = memo(function FriendBubble({ m, isMine, showAvatar, friend, decodeContent, handleDelete, handleEdit, formatTime, mainInputRef }) {
+const FriendBubble = memo(function FriendBubble({ m, isMine, showAvatar, friend, handleDelete, handleEdit, formatTime, mainInputRef }) {
     const [menuOpen, setMenuOpen] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
     const [editValue, setEditValue] = useState('')
@@ -139,7 +171,6 @@ const FriendBubble = memo(function FriendBubble({ m, isMine, showAvatar, friend,
                     <MessageContent
                         m={m}
                         isMine={isMine}
-                        decodeContent={decodeContent}
                         onTimeUp={handleDelete}
                         isEditing={isEditing}
                         editValue={editValue}
@@ -163,7 +194,7 @@ const FriendBubble = memo(function FriendBubble({ m, isMine, showAvatar, friend,
                     <MessageMenu
                         m={m}
                         isMine={isMine}
-                        onEdit={() => { setIsEditing(true); setEditValue(decodeContent(m.encryptedContent || m.content)); }}
+                        onEdit={() => { setIsEditing(true); setEditValue(decodeBase64(m.encryptedContent || m.content)); }}
                         onDelete={handleDelete}
                         onClose={() => setMenuOpen(false)}
                     />
@@ -174,8 +205,8 @@ const FriendBubble = memo(function FriendBubble({ m, isMine, showAvatar, friend,
 })
 
 // ─── Message Content Renderer ────────────────────────────────────────────────
-const MessageContent = memo(function MessageContent({ m, isMine, decodeContent, onTimeUp, isEditing, editValue, setEditValue, onEditSubmit }) {
-    const content = decodeContent(m.encryptedContent || m.content)
+const MessageContent = memo(function MessageContent({ m, isMine, onTimeUp, isEditing, editValue, setEditValue, onEditSubmit }) {
+    const content = decodeBase64(m.encryptedContent || m.content)
     const [revealed, setRevealed] = useState(isMine || !m.isVanish)
     const [timeLeft, setTimeLeft] = useState(m.isVanish ? 10 : null)
 
@@ -297,7 +328,7 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
         }
 
         const handleEdited = (data) => {
-            setMessages((prev) => prev.map((m) => m.id === data.messageId ? { ...m, encryptedContent: btoa(data.content), isEdited: true } : m))
+            setMessages((prev) => prev.map((m) => m.id === data.messageId ? { ...m, encryptedContent: encodeBase64(data.content), isEdited: true } : m))
         }
 
         const handleDeleted = (data) => {
@@ -325,15 +356,6 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
         scrollRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages, partnerTyping])
 
-    const decodeContent = (content) => {
-        if (!content) return ''
-        if (typeof content !== 'string') return ''
-        try {
-            return atob(content)
-        } catch {
-            return content
-        }
-    }
 
     const handleSend = (e) => {
         e.preventDefault()
@@ -342,8 +364,8 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
 
         socket.emit('message:send', {
             recipientId: friend.user.id,
-            encryptedContent: btoa(trimmed),
-            encryptedKey: btoa('placeholder-key'),
+            encryptedContent: encodeBase64(trimmed),
+            encryptedKey: encodeBase64('placeholder-key'),
             messageType: 'text',
             isVanish: vanishMode
         })
@@ -374,8 +396,8 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
         if (!socket) return
         socket.emit('message:send', {
             recipientId: friend.user.id,
-            encryptedContent: btoa(gifUrl),
-            encryptedKey: btoa('placeholder-key'),
+            encryptedContent: encodeBase64(gifUrl),
+            encryptedKey: encodeBase64('placeholder-key'),
             messageType: 'text'
         })
         setShowGifPicker(false)
@@ -412,8 +434,8 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
             if (json.success) {
                 socket.emit('message:send', {
                     recipientId: friend.user.id,
-                    encryptedContent: btoa(json.data.url),
-                    encryptedKey: btoa('media-key'),
+                    encryptedContent: encodeBase64(json.data.url),
+                    encryptedKey: encodeBase64('media-key'),
                     messageType: json.data.type || 'image'
                 })
             }
@@ -495,7 +517,6 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
                                 isMine={m.senderId === session?.user?.id}
                                 showAvatar={m.senderId !== session?.user?.id && (i === 0 || messages[i - 1]?.senderId !== m.senderId)}
                                 friend={friend}
-                                decodeContent={decodeContent}
                                 handleDelete={handleDelete}
                                 handleEdit={handleEdit}
                                 formatTime={formatTime}
