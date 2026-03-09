@@ -2,10 +2,31 @@ import { useEffect, useRef, useState } from 'react'
 import GhostProtocol from './GhostProtocol'
 import './Landing.css'
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+
 export default function Landing({ onStartMatch, authLoading, authError, onlineCount }) {
     const [scrolled, setScrolled] = useState(0)
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+    const [serverDown, setServerDown] = useState(false)
     const landingRef = useRef(null)
+
+    // Check server status on mount
+    useEffect(() => {
+        const checkServerStatus = async () => {
+            try {
+                const res = await fetch(`${BACKEND_URL}/health`)
+                if (!res.ok) {
+                    setServerDown(true)
+                } else {
+                    setServerDown(false)
+                }
+            } catch (err) {
+                // Network error, server is offline
+                setServerDown(true)
+            }
+        }
+        checkServerStatus()
+    }, [])
 
     // Parallax effect for orbs
     useEffect(() => {
@@ -51,6 +72,16 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
 
     return (
         <div className="landing-wrapper" ref={landingRef}>
+            {serverDown && (
+                <div className="server-down-banner">
+                    <div className="banner-icon">⚠️</div>
+                    <div className="banner-content">
+                        <strong>Backend Offline / Maintenance Mode</strong>
+                        <p>Our matchmaking servers are currently taking a quick nap or undergoing an upgrade. Bhasad will resume shortly, please try again in a few minutes!</p>
+                    </div>
+                </div>
+            )}
+
             {/* Ambient Background Orbs */}
             <div className="aura-container">
                 <div
