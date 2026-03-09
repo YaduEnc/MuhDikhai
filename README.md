@@ -1,5 +1,3 @@
-# <p align="center"> <img src="./documentation/header.png" alt="Muhdikhai Header" width="800"> </p>
-
 <h1 align="center">MUHDIKHAI</h1>
 <p align="center">
   <strong>Real People. Pure Chaos. Total Privacy.</strong><br>

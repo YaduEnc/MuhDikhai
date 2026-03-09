@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import GhostProtocol from './GhostProtocol'
 import './Landing.css'
 
 export default function Landing({ onStartMatch, authLoading, authError, onlineCount }) {
@@ -148,6 +149,8 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                     </article>
                 </div>
             </section>
+
+            <GhostProtocol />
 
             <section className="story-grid">
                 <article className="story-block reveal-on-scroll border-vibrant">

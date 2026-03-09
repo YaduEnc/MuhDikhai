@@ -331,7 +331,11 @@ function FriendRequests({ requests, onRespond }) {
     return (
         <div className="friends-list">
             {requests.map((req) => (
-                <div key={req.id} className="recent-match-card">
+                <div
+                    key={req.id}
+                    className="recent-match-card"
+                    style={{ '--aura-color': req.user?.auraPoints !== undefined ? calculateAuraLevel(req.user.auraPoints).color : 'var(--stroke)' }}
+                >
                     <div className="recent-avatar">
                         {req.user?.profilePictureUrl ? (
                             <img src={req.user.profilePictureUrl} alt="avatar" />
@@ -374,7 +378,11 @@ function FriendsList({ friends, onOpenChat, unreadCounts = {} }) {
             {friends.map((friend) => {
                 const unread = unreadCounts[friend.user?.id] || 0
                 return (
-                    <div key={friend.id} className={`recent-match-card ${unread > 0 ? 'has-unread' : ''}`}>
+                    <div
+                        key={friend.id}
+                        className={`recent-match-card ${unread > 0 ? 'has-unread' : ''}`}
+                        style={{ '--aura-color': friend.user?.auraPoints !== undefined ? calculateAuraLevel(friend.user.auraPoints).color : 'var(--stroke)' }}
+                    >
                         <div className="recent-avatar">
                             {friend.user?.profilePictureUrl ? (
                                 <img src={friend.user.profilePictureUrl} alt="avatar" />
@@ -622,17 +630,31 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
             </div>
 
             {/* Primary action — Start Matching */}
-            <button className={`home-match-btn ${isTransitioning ? 'expanding' : ''}`} type="button" onClick={handleStartMatch}>
+            <button className={`home-match-btn-v2 ${isTransitioning ? 'expanding' : ''}`} type="button" onClick={handleStartMatch}>
+                <div className="home-match-v2-bg">
+                    <div className="beam beam--1" />
+                    <div className="beam beam--2" />
+                </div>
 
-                <div className="home-match-btn-left">
-                    <div className="home-match-glow" />
-                    <div className="home-match-btn-icon">⚡</div>
-                    <div className="home-match-btn-copy">
-                        <span className="home-match-btn-title">Matching shuru karein?</span>
-                        <span className="home-match-btn-sub">Diving into the unfiltered mayhem</span>
+                <div className="home-match-v2-content">
+                    <div className="home-match-v2-visual">
+                        <div className="radar-circle radar-circle--1" />
+                        <div className="radar-circle radar-circle--2" />
+                        <div className="radar-circle radar-circle--3" />
+                        <div className="home-match-v2-icon">⚡</div>
+                    </div>
+
+                    <div className="home-match-v2-info">
+                        <div className="home-match-v2-tag">SYSTEM READY</div>
+                        <h2 className="home-match-v2-title">Matching shuru karein?</h2>
+                        <p className="home-match-v2-sub">Diving into the unfiltered mayhem of human randomness.</p>
                     </div>
                 </div>
-                <span className="home-match-btn-arrow">↗</span>
+
+                <div className="home-match-v2-arrow">
+                    <span className="arrow-glyph">→</span>
+                    <span className="arrow-text">LAUNCH</span>
+                </div>
             </button>
 
             {/* Home Tabs */}
@@ -668,7 +690,11 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                                 <div className="home-recents-section">
                                     <div className="recents-list">
                                         {recentMatches.map((match) => (
-                                            <div key={match.id} className="recent-match-card">
+                                            <div
+                                                key={match.id}
+                                                className="recent-match-card"
+                                                style={{ '--aura-color': match.partner?.auraPoints !== undefined ? calculateAuraLevel(match.partner.auraPoints).color : 'var(--stroke)' }}
+                                            >
                                                 <div className="recent-avatar">
                                                     {match.partner?.profilePictureUrl ? (
                                                         <img src={match.partner.profilePictureUrl} alt="avatar" />

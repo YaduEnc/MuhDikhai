@@ -1,20 +1,30 @@
-/* ── Shell ──────────────────────────────────────────────────────────── */
 .chat-shell-v2 {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 9rem);
-    min-height: 500px;
-    border-radius: var(--radius-lg);
+    height: 100vh;
+    flex: 1;
     background:
-        radial-gradient(circle at -10% -10%, rgba(255, 238, 213, 0.07) 0, transparent 55%),
-        radial-gradient(circle at 110% 110%, rgba(148, 163, 253, 0.12) 0, transparent 55%),
-        rgba(5, 8, 24, 0.98);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85);
+        radial-gradient(circle at -10% -10%, rgba(0, 255, 204, 0.05) 0, transparent 40%),
+        radial-gradient(circle at 110% 110%, rgba(255, 0, 85, 0.05) 0, transparent 40%),
+        rgba(3, 5, 20, 0.99);
+    border: none;
+    box-shadow: none;
     overflow: hidden;
     position: relative;
-    /* Updated for Seamless Match transition */
     animation: chat-enter 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.chat-shell-v2::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 30px 30px;
+    mask-image: radial-gradient(circle at center, black, transparent 80%);
+    pointer-events: none;
+    opacity: 0.5;
 }
 
 @keyframes chat-enter {
@@ -1014,21 +1024,21 @@
 
 .msg-bubble {
     display: inline-block;
-    padding: 0.7rem 1rem;
-    border-radius: 20px 20px 20px 6px;
-    background: rgba(15, 23, 42, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 0.85rem 1.1rem;
+    border-radius: 1.25rem 1.25rem 1.25rem 6px;
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 0.95rem;
-    color: var(--text-main);
-    line-height: 1.5;
+    color: var(--text-primary);
+    line-height: 1.55;
     word-break: break-word;
     max-width: 100%;
     position: relative;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
-    transition: all 0.2s ease;
-    animation: spring-up 500ms cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s var(--ease-out);
+    animation: spring-up 0.5s var(--ease-out) both;
 }
 
 @keyframes spring-up {
@@ -1050,10 +1060,11 @@
 }
 
 .msg-bubble--self {
-    border-radius: 20px 20px 6px 20px;
-    background: linear-gradient(135deg, rgba(29, 26, 56, 0.85), rgba(14, 17, 39, 0.85));
-    border-color: rgba(255, 255, 255, 0.18);
+    border-radius: 1.25rem 1.25rem 6px 1.25rem;
+    background: linear-gradient(135deg, rgba(0, 255, 204, 0.12), rgba(188, 19, 254, 0.08));
+    border: 1px solid rgba(0, 255, 204, 0.3);
     color: #fff;
+    box-shadow: 0 8px 32px rgba(0, 255, 204, 0.1);
 }
 
 

@@ -1,0 +1,312 @@
+.ghost-protocol {
+    padding: 10rem 2rem;
+    background: #020205;
+    position: relative;
+    overflow: hidden;
+    color: #fff;
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gp-background {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.gp-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(255, 0, 85, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 0, 85, 0.05) 1px, transparent 1px);
+    background-size: 50px 50px;
+    mask-image: radial-gradient(circle at center, black, transparent 80%);
+}
+
+.gp-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, transparent 20%, #020205 100%);
+}
+
+.gp-container {
+    max-width: 900px;
+    width: 100%;
+    position: relative;
+    z-index: 10;
+    text-align: center;
+}
+
+.gp-tag {
+    display: inline-block;
+    padding: 0.5rem 1.2rem;
+    background: rgba(255, 0, 85, 0.1);
+    border: 1px solid rgba(255, 0, 85, 0.3);
+    color: #ff0055;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    border-radius: 4px;
+    margin-bottom: 2rem;
+    text-transform: uppercase;
+}
+
+.gp-title {
+    font-family: 'Sora', sans-serif;
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 900;
+    line-height: 1;
+    margin-bottom: 4rem;
+    letter-spacing: -0.04em;
+    background: linear-gradient(135deg, #fff, #6d708d);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.gp-visualizer {
+    margin-bottom: 4rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.gp-card {
+    width: 100%;
+    max-width: 500px;
+    height: 180px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 24px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+}
+
+.gp-card-inner {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gp-message-content {
+    font-family: 'JetBrains Mono', 'Space Mono', monospace;
+    font-size: 1.5rem;
+    color: #00ffcc;
+    position: relative;
+}
+
+.gp-text-raw {
+    animation: flicker 0.2s infinite alternate;
+}
+
+.gp-text-scrambled {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    color: #ff0055;
+    font-weight: 900;
+}
+
+.scramble-char {
+    animation: drift 0.5s infinite;
+}
+
+.gp-shredding-mask {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gp-ash-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.gp-final-text {
+    opacity: 0.2;
+    font-size: 3rem;
+    font-weight: 900;
+    color: #fff;
+    filter: blur(4px);
+}
+
+.gp-scanner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #ff0055, transparent);
+    box-shadow: 0 0 15px #ff0055;
+    animation: scan 2s linear infinite;
+    opacity: 0;
+}
+
+.gp-card.encrypting .gp-scanner {
+    opacity: 1;
+}
+
+.gp-status-bar {
+    margin-top: 2rem;
+    width: 100%;
+    max-width: 300px;
+}
+
+.gp-status-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    margin-bottom: 0.8rem;
+    font-family: 'Space Mono', monospace;
+}
+
+.gp-status-item .label {
+    color: #6d708d;
+}
+
+.gp-status-item .value {
+    color: #fff;
+    font-weight: 700;
+}
+
+.gp-status-item .value.encrypting {
+    color: #ffae00;
+}
+
+.gp-status-item .value.shredding {
+    color: #ff0055;
+}
+
+.gp-status-item .value.final {
+    color: #6d708d;
+}
+
+.gp-loading-line {
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.gp-progress {
+    width: 0%;
+    height: 100%;
+    background: #00ffcc;
+    transition: width 0.5s ease-out;
+}
+
+.gp-progress.encrypting {
+    width: 40%;
+    background: #ffae00;
+}
+
+.gp-progress.shredding {
+    width: 85%;
+    background: #ff0055;
+    transition: width 2s linear;
+}
+
+.gp-progress.final {
+    width: 100%;
+    background: #020205;
+}
+
+.gp-content {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.gp-copy-lead {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 800;
+    line-height: 1.4;
+    margin-bottom: 1.5rem;
+    color: #fff;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gp-copy-lead.reveal {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.gp-copy-sub {
+    font-size: 1.1rem;
+    color: #6d708d;
+    line-height: 1.6;
+}
+
+/* Animations */
+@keyframes scan {
+    0% {
+        transform: translateY(0);
+    }
+
+    100% {
+        transform: translateY(180px);
+    }
+}
+
+@keyframes flicker {
+    0% {
+        opacity: 0.8;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes drift {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.7;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes anim-fade-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@media (max-width: 600px) {
+    .gp-card {
+        height: 140px;
+    }
+
+    .gp-final-text {
+        font-size: 2rem;
+    }
+}

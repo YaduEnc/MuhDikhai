@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import ExperienceBackground from './components/ExperienceBackground'
 import { io } from 'socket.io-client'
 import Home from './components/Home'
 import Chat from './components/Chat'
@@ -563,61 +564,40 @@ function App() {
   }
 
   const isSignedIn = Boolean(session?.user)
-  const isHome = Boolean(isSignedIn && !showChat && session.user.gender)
+  const isAnyChat = Boolean(showChat || socketState.phase === 'friend-chat')
+  const isHome = Boolean(isSignedIn && !isAnyChat && session.user.gender)
   const isInChat = Boolean(showChat && isSignedIn && session.user.gender)
   const needsOnboarding = Boolean(isSignedIn && !session.user.gender)
 
-  if (session && socketState.phase === 'friend-chat' && activeFriend) {
-    return (
-      <div className="app-shell">
-        <FriendChat
-          session={session}
-          friend={activeFriend}
-          socket={socketRef.current}
-          authedFetch={authedFetch}
-          onBack={handleBackFromFriendChat}
-          onInitiateCall={() => handleInitiateCall(activeFriend, 'friend')}
-        />
-        {callOverlayState.status !== 'idle' && (
-          <CallOverlay
-            socket={socketRef.current}
-            session={session}
-            callState={callOverlayState}
-            partner={callOverlayState.partner}
-            onAccept={handleAcceptCall}
-            onDecline={handleEndCall}
-            onEnd={handleEndCall}
-          />
-        )}
-      </div>
-    )
-  }
 
   return (
-    <div className="page">
-      <header className="nav">
-        <div className="nav-left">
-          <div className="nav-mark">
-            <img src="/logo.png" alt="Muhdikhai Mascot" className="nav-logo-img" />
-          </div>
-          <div className="nav-title">
-            <span className="brand-word">Muhdikhai</span>
-            <span className="brand-sub">
-              {isInChat ? 'Inside the madness' : isHome ? 'Vibe Check' : 'Real people. Pure chaos.'}
-            </span>
-          </div>
-        </div>
-        <div className="nav-right">
-          {isSignedIn && (
-            <div className="nav-user">
-              <div className="online-pill"><span className="online-dot" /><span>{onlineCount} present</span></div>
-              <button className="nav-signout" onClick={handleSignOut}>Leave</button>
+    <div className={`page ${isAnyChat ? 'is-chat-page' : ''}`}>
+      <ExperienceBackground />
+      {!isAnyChat && (
+        <header className="nav">
+          <div className="nav-left">
+            <div className="nav-mark">
+              <img src="/logo.png" alt="Muhdikhai Mascot" className="nav-logo-img" />
             </div>
-          )}
-        </div>
-      </header>
+            <div className="nav-title">
+              <span className="brand-word">Muhdikhai</span>
+              <span className="brand-sub">
+                {socketState.phase === 'friend-chat' ? 'Friend Room' : isInChat ? 'Inside the madness' : isHome ? 'Vibe Check' : 'Real people. Pure chaos.'}
+              </span>
+            </div>
+          </div>
+          <div className="nav-right">
+            {isSignedIn && (
+              <div className="nav-user">
+                <div className="online-pill"><span className="online-dot" /><span>{onlineCount} present</span></div>
+                <button className="nav-signout" onClick={handleSignOut}>Leave</button>
+              </div>
+            )}
+          </div>
+        </header>
+      )}
 
-      <main>
+      <main className={(isInChat || socketState.phase === 'friend-chat') ? 'main-full' : ''}>
         {isAdminView && isSignedIn && session.user.isAdmin && <AdminDashboard session={session} />}
         {!isAdminView && isHome && (
           <Home
@@ -691,6 +671,16 @@ function App() {
             onAddFriend={handleAddFriend}
           />
         )}
+        {socketState.phase === 'friend-chat' && activeFriend && (
+          <FriendChat
+            session={session}
+            friend={activeFriend}
+            socket={socketRef.current}
+            authedFetch={authedFetch}
+            onBack={handleBackFromFriendChat}
+            onInitiateCall={() => handleInitiateCall(activeFriend, 'friend')}
+          />
+        )}
       </main>
 
       {vibeCheckState.show && (
@@ -736,7 +726,7 @@ function App() {
         />
       )}
 
-      {!isAdminView && (
+      {!isAdminView && !isInChat && socketState.phase !== 'friend-chat' && (
         <footer className="footer">
           <div className="footer-main">
             <div className="footer-brand">
