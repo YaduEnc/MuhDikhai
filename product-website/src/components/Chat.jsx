@@ -344,10 +344,6 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
 const ProfileModal = memo(function ProfileModal({ partnerId, session, onClose }) {
     const [profile, setProfile] = useState(null)
     const [loading, setLoading] = useState(true)
-    const [reporting, setReporting] = useState(false)
-    const [reportReason, setReportReason] = useState('')
-    const [isSubmitting, setIsSubmitting] = useState(false)
-    const [reportDone, setReportDone] = useState(false)
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -367,114 +363,52 @@ const ProfileModal = memo(function ProfileModal({ partnerId, session, onClose })
         fetchProfile()
     }, [partnerId, session.accessToken])
 
-    const handleReportSubmit = async () => {
-        if (!reportReason) return
-        setIsSubmitting(true)
-        try {
-            const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
-            const res = await fetch(`${BACKEND_URL}/api/v1/reports`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${session.accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    reportedId: partnerId,
-                    reason: reportReason
-                })
-            })
-            if (res.ok) {
-                setReportDone(true)
-            } else {
-                alert('Failed to submit report. Please try again.')
-            }
-        } catch (err) {
-            console.error('Report failed', err)
-            alert('Something went wrong.')
-        } finally {
-            setIsSubmitting(false)
-        }
-    }
-
-    const reportReasons = [
-        "Inappropriate behavior",
-        "Harassment or bullying",
-        "Spam or fake profile",
-        "Explicit content",
-        "Underage user",
-        "Other"
-    ]
-
     return (
         <div className="profile-modal-overlay" onClick={onClose}>
             <div className="profile-modal-card" onClick={e => e.stopPropagation()}>
-                <button className="profile-close-btn" onClick={onClose}>✕</button>
-
+                <button className="profile-modal-close" onClick={onClose}>✕</button>
                 {loading ? (
-                    <div className="profile-loading">Reading the vibes...</div>
-                ) : reportDone ? (
-                    <div className="report-success">
-                        <span className="success-icon">🛡️</span>
-                        <h3>Report Submitted</h3>
-                        <p>Thank you for keeping PlasticWorld safe. Our team will review this shortly.</p>
-                        <button className="btn-ghost" onClick={onClose}>Close</button>
-                    </div>
-                ) : reporting ? (
-                    <div className="report-form">
-                        <h3>Report Stranger</h3>
-                        <p className="report-hint">Tell us why you're reporting this user. This is anonymous.</p>
-                        <div className="report-reasons-list">
-                            {reportReasons.map(r => (
-                                <label key={r} className="report-reason-item">
-                                    <input
-                                        type="radio"
-                                        name="reason"
-                                        value={r}
-                                        checked={reportReason === r}
-                                        onChange={() => setReportReason(r)}
-                                    />
-                                    <span>{r}</span>
-                                </label>
-                            ))}
-                        </div>
-                        <div className="report-actions">
-                            <button className="btn-ghost" onClick={() => setReporting(false)}>Back</button>
-                            <button
-                                className="btn-danger"
-                                disabled={!reportReason || isSubmitting}
-                                onClick={handleReportSubmit}
-                            >
-                                {isSubmitting ? 'Submitting...' : 'Submit Report'}
-                            </button>
-                        </div>
-                    </div>
+                    <div className="profile-loading">Loading...</div>
                 ) : profile ? (
-                    <>
-                        <div className="profile-large-avatar">
+                    <div className="profile-modal-content">
+                        <div className="profile-modal-avatar">
                             {profile.profilePictureUrl ? (
                                 <img src={profile.profilePictureUrl} alt={profile.name} />
                             ) : (
                                 (profile.name || '?')[0].toUpperCase()
                             )}
                         </div>
-                        <h3 className="profile-name-full">{profile.name}</h3>
+                        <h3 className="profile-modal-name">{profile.name}</h3>
+                        {profile.username && <p className="profile-modal-username">@{profile.username}</p>}
 
-                        <div className="profile-badge-row">
-                            {profile.gender && <span className="profile-badge">{profile.gender}</span>}
-                            {profile.age && <span className="profile-badge">{profile.age} years old</span>}
+                        <div className="profile-modal-details">
+                            <div className="pm-detail">
+                                <span className="pm-label">Gender</span>
+                                <span className="pm-value" style={{ textTransform: 'capitalize' }}>
+                                    {profile.gender?.replace(/_/g, ' ') || 'Unknown'}
+                                </span>
+                            </div>
+                            <div className="pm-detail">
+                                <span className="pm-label">Aura</span>
+                                <div className="pm-aura-badge" style={{ borderColor: calculateAuraLevel(profile.auraPoints || 0).color }}>
+                                    <span className="pm-aura-pts">{profile.auraPoints || 0}</span>
+                                    <span className="pm-aura-txt" style={{ color: calculateAuraLevel(profile.auraPoints || 0).color }}>
+                                        {calculateAuraLevel(profile.auraPoints || 0).name}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
 
-                        <span className="profile-label">About</span>
-                        <div className="profile-bio-box">
-                            {profile.bio || "This stranger hasn't written a bio yet."}
-                        </div>
+                        {profile.bio && (
+                            <div className="profile-modal-bio">
+                                <h4>About</h4>
+                                <p>{profile.bio}</p>
+                            </div>
+                        )}
 
-                        <button className="profile-report-btn" onClick={() => setReporting(true)}>
-                            Report User
-                        </button>
-                    </>
+                    </div>
                 ) : (
-                    <div className="profile-error">Couldn't find this stranger.</div>
+                    <div className="profile-error">Failed to load profile</div>
                 )}
             </div>
         </div>

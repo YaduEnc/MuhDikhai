@@ -119,7 +119,7 @@ router.put(
       username?: string;
       phoneNumber?: string | null;
       name?: string;
-      bio?: string;
+      bio?: string | null;
       profilePictureUrl?: string | null;
       gender?: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
     } = {};

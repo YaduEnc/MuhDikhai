@@ -50,8 +50,12 @@ function DeleteConfirmationModal({ onConfirm, onCancel }) {
 }
 
 function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
-    const [bio, setBio] = useState(session?.user?.bio || '')
-    const [gender, setGender] = useState(session?.user?.gender || 'prefer_not_to_say')
+    const [isEditing, setIsEditing] = useState(false)
+    const [editData, setEditData] = useState({
+        name: session?.user?.name || '',
+        bio: session?.user?.bio || '',
+        gender: session?.user?.gender || 'prefer_not_to_say'
+    })
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState('')
     const fileInputRef = useRef(null)
@@ -59,12 +63,10 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
     const handleFileChange = async (e) => {
         const file = e.target.files?.[0]
         if (!file) return
-
         if (file.size > 10 * 1024 * 1024) {
             setError('Photo must be less than 10MB')
             return
         }
-
         setIsSaving(true)
         setError('')
         try {
@@ -81,7 +83,8 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
         setIsSaving(true)
         setError('')
         try {
-            await onUpdateProfile({ bio, gender })
+            await onUpdateProfile(editData)
+            setIsEditing(false)
         } catch (err) {
             setError(err.message || 'Failed to update profile')
         } finally {
@@ -89,121 +92,125 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
         }
     }
 
-    return (
-        <div className="inner-view">
-            <button className="back-btn" type="button" onClick={onBack}>
-                <span>←</span>
-                <span>Back to home</span>
-            </button>
-            <div className="profile-card">
-                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                    <div className="avatar-upload-wrap" onClick={() => fileInputRef.current?.click()} title="Change photo">
-                        <div className="profile-avatar">
-                            {session?.user?.photoURL ? (
-                                <img src={session.user.photoURL} alt="avatar" className="profile-avatar-img" />
-                            ) : (
-                                <span className="profile-avatar-initials">
-                                    {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
-                                </span>
-                            )}
-                            {session?.user?.auraPoints !== undefined && (
-                                <div
-                                    className="aura-glow"
-                                    style={{ '--aura-color': calculateAuraLevel(session.user.auraPoints).color }}
-                                />
-                            )}
+    if (!isEditing) {
+        return (
+            <div className="inner-view">
+                <button className="back-btn" onClick={onBack}>
+                    <span>←</span>
+                    <span>Back</span>
+                </button>
+                <div className="profile-card">
+                    <div className="profile-header">
+                        <div className="profile-avatar-wrapper">
+                            <div className="profile-avatar lg">
+                                {session?.user?.photoURL ? (
+                                    <img src={session.user.photoURL} alt="avatar" className="profile-avatar-img" />
+                                ) : (
+                                    <span className="profile-avatar-initials">
+                                        {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
+                                    </span>
+                                )}
+                            </div>
+                            <button
+                                className="avatar-edit-btn"
+                                onClick={() => fileInputRef.current?.click()}
+                                title="Change avatar"
+                            >
+                                ✎
+                            </button>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                                accept="image/*"
+                                onChange={handleFileChange}
+                            />
                         </div>
-                        <div className="avatar-edit-overlay">✎</div>
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            style={{ display: 'none' }}
-                            accept="image/*"
-                            onChange={handleFileChange}
-                        />
-                    </div>
-                    <div className="profile-info">
-                        <span className="profile-name">{session?.user?.name || 'Anonymous'}</span>
-                        <div className="profile-aura-wrap">
-                            <span className="profile-email">{session?.user?.email || ''}</span>
-                            {session?.user?.auraPoints !== undefined && (
-                                <div className="aura-badge" style={{ backgroundColor: `${calculateAuraLevel(session.user.auraPoints).color}22`, color: calculateAuraLevel(session.user.auraPoints).color }}>
-                                    ✧ {calculateAuraLevel(session.user.auraPoints).name}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="profile-edit-section">
-                    <div className="profile-field-group">
-                        <label className="profile-field-label">Apne baare mein batao</label>
-                        <textarea
-                            className="profile-textarea"
-                            placeholder="Tell the world something unfiltered..."
-                            value={bio}
-                            onChange={(e) => setBio(e.target.value)}
-                            maxLength={500}
-                        />
-                    </div>
-
-                    <div className="profile-field-group">
-                        <label className="profile-field-label">Gender</label>
-                        <div className="gender-selector">
-                            {['male', 'female', 'other', 'prefer_not_to_say'].map((g) => (
-                                <button
-                                    key={g}
-                                    type="button"
-                                    className={`gender-pill ${gender === g ? 'active' : ''}`}
-                                    onClick={() => setGender(g)}
-                                >
-                                    {g.charAt(0).toUpperCase() + g.slice(1).replace(/_/g, ' ')}
-                                </button>
-                            ))}
+                        <div className="profile-info">
+                            <h2 className="profile-name">{session?.user?.name}</h2>
+                            <p className="profile-email">{session?.user?.email}</p>
                         </div>
                     </div>
 
-                    {error && <div className="modal-error" style={{ marginBottom: 0 }}>{error}</div>}
-
-                    <div className="profile-save-row">
-                        <button
-                            className="profile-save-btn"
-                            onClick={handleSave}
-                            disabled={isSaving}
-                        >
-                            {isSaving ? 'Updating...' : 'Save Changes'}
+                    <div className="profile-actions">
+                        <button className="btn-primary" onClick={() => setIsEditing(true)}>
+                            Edit Profile
                         </button>
                     </div>
+
+                    <div className="profile-details-grid">
+                        <div className="detail-item">
+                            <span className="detail-label">Bio</span>
+                            <p className="detail-value">{session?.user?.bio || 'No bio yet'}</p>
+                        </div>
+                        <div className="detail-item">
+                            <span className="detail-label">Gender</span>
+                            <p className="detail-value" style={{ textTransform: 'capitalize' }}>
+                                {session?.user?.gender?.replace(/_/g, ' ') || 'Not specified'}
+                            </p>
+                        </div>
+                        <div className="detail-item">
+                            <span className="detail-label">Account Aura</span>
+                            <div className="aura-badge large" style={{ borderColor: calculateAuraLevel(session?.user?.auraPoints || 0).color }}>
+                                <span className="aura-point-value">{session?.user?.auraPoints || 0}</span>
+                                <span className="aura-name" style={{ color: calculateAuraLevel(session?.user?.auraPoints || 0).color }}>
+                                    {calculateAuraLevel(session?.user?.auraPoints || 0).name}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="inner-view">
+            <button className="back-btn" onClick={() => setIsEditing(false)}>
+                <span>←</span>
+                <span>Cancel</span>
+            </button>
+            <div className="profile-card">
+                <div className="profile-field-group">
+                    <label className="profile-field-label">Name</label>
+                    <input
+                        className="profile-input"
+                        value={editData.name}
+                        onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                        placeholder="Your name"
+                    />
+                </div>
+                <div className="profile-field-group">
+                    <label className="profile-field-label">Bio</label>
+                    <textarea
+                        className="profile-textarea"
+                        value={editData.bio}
+                        onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
+                        placeholder="Tell others about yourself..."
+                        maxLength={500}
+                    />
+                </div>
+                <div className="profile-field-group">
+                    <label className="profile-field-label">Gender</label>
+                    <select
+                        className="profile-select"
+                        value={editData.gender}
+                        onChange={(e) => setEditData({ ...editData, gender: e.target.value })}
+                    >
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="non-binary">Non-binary</option>
+                        <option value="other">Other</option>
+                        <option value="prefer_not_to_say">Prefer not to say</option>
+                    </select>
                 </div>
 
-                <div className="profile-stats">
-                    <div className="profile-stat">
-                        <span className="profile-stat-value">{session?.user?.roomsEntered || 0}</span>
-                        <span className="profile-stat-label">Entry count</span>
-                    </div>
-                    <div className="profile-stat">
-                        <span className="profile-stat-value">0</span>
-                        <span className="profile-stat-label">Hours chatted</span>
-                    </div>
-                    <div className="profile-stat">
-                        <span className="profile-stat-value">∞</span>
-                        <span className="profile-stat-label">Moments forgotten</span>
-                    </div>
-                </div>
-                <div className="profile-section-title">Your preferences</div>
-                <div className="profile-prefs">
-                    <label className="pref-toggle">
-                        <span className="pref-label">Camera optional by default</span>
-                        <span className="toggle-pill active" />
-                    </label>
-                    <label className="pref-toggle">
-                        <span className="pref-label">Soft‑spoken mode</span>
-                        <span className="toggle-pill" />
-                    </label>
-                    <label className="pref-toggle">
-                        <span className="pref-label">Blurred preview on match</span>
-                        <span className="toggle-pill active" />
-                    </label>
+                {error && <div className="modal-error">{error}</div>}
+
+                <div className="profile-actions">
+                    <button className="btn-primary" onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? 'Saving...' : 'Save Profile'}
+                    </button>
                 </div>
             </div>
         </div>
