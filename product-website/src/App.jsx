@@ -107,6 +107,9 @@ function App() {
   }, [room])
 
   useEffect(() => {
+    const handlePopState = () => {
+      setIsAdminView(window.location.pathname === '/admin')
+    }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
