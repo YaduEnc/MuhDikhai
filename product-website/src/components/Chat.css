@@ -1730,8 +1730,29 @@
         border-radius: 12px;
     }
 
+    .chat-partner-info {
+        flex-shrink: 0;
+        max-width: 40%;
+    }
+
     .chat-partner-name {
-        font-size: 0.85rem;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .chat-partner-status {
+        font-size: 0.65vmax;
+        white-space: nowrap;
+    }
+
+    .chat-header-right {
+        gap: 0.4rem;
+        justify-content: flex-end;
+        flex: 1;
+        overflow-x: auto;
+        padding-bottom: 2px;
     }
 
     .chat-next-btn,
@@ -1739,12 +1760,26 @@
     .fc-vanish-toggle,
     .chat-add-friend-btn,
     .chat-leave-btn {
-        padding: 0.35rem 0.7rem;
-        font-size: 0.68rem;
+        padding: 0.3rem 0.6rem;
+        font-size: 0.62rem;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    /* Hide text labels for some buttons on very small screens if needed, 
+       but for now let's just make them fit */
+    .fc-vanish-label {
+        font-size: 0.6rem;
     }
 
     .fc-vanish-icon {
         font-size: 0.8rem;
+    }
+
+    .chat-starter-btn {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.75rem;
+        border-radius: 10px;
     }
 }
 
