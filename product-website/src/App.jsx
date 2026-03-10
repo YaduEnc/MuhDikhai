@@ -670,11 +670,14 @@ function App() {
                 });
               }
 
-              // Then join new with same prefs
+              // Reset local state immediately
               setSocketState((prev) => ({ ...prev, phase: 'matching' }));
               setRoom(null);
               setChatMessages([]);
-              socketRef.current?.emit('random:join', matchPrefs);
+              // Delay re-join to let the backend finish cleaning up the leave
+              // Without this, random:join can arrive before random:leave completes,
+              // causing the user to get stuck (heartbeat exists but not in any queue)
+              setTimeout(() => socketRef.current?.emit('random:join', matchPrefs), 300);
             }}
             matchingStats={matchingStats}
             onAddFriend={handleAddFriend}

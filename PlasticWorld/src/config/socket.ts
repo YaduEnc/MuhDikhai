@@ -115,9 +115,8 @@ function inverseQueueKeys(gender: string, preference: string, topic?: string): s
     keys.push(queueKey(preference, 'everyone'));
   }
 
-  // Remove my own queue from inverse keys so I don't match myself
-  const myKey = topic ? queueKey(gender, preference, topic) : queueKey(gender, preference);
-  return [...new Set(keys.filter(k => k !== myKey))];
+  // Return unique keys (we DO NOT filter out myKey because users can match with others in the same bucket)
+  return [...new Set(keys)];
 }
 
 /**
@@ -250,52 +249,72 @@ async function tryInstantMatch(
 ): Promise<{ partner: QueuedUser; topic: string } | null> {
   const { gender, preference, topics } = user;
 
-  // Phase 1: Try topic-specific queues first (best match quality)
-  for (const topic of topics) {
-    const keys = inverseQueueKeys(gender, preference, topic);
+  const tryMatchOnKeys = async (keys: string[], getSharedTopic: (p: QueuedUser) => string) => {
     for (const key of keys) {
-      const popped = await pub.rpop(key);
-      if (popped) {
+      const poppedToPutBack: string[] = [];
+      let matchedPartner: QueuedUser | null = null;
+
+      while (true) {
+        const popped = await pub.rpop(key);
+        if (!popped) break; // Queue is empty
+
         const partner: QueuedUser = JSON.parse(popped);
-        // Validate partner is not the same user and not already matched
+
+        // Don't match with ourselves! Save to put back and keep looking.
         if (partner.userId === user.userId) {
-          // Put them back and continue
-          await pub.lpush(key, popped);
+          poppedToPutBack.push(popped);
           continue;
         }
+
         const alreadyMatched = await pub.hget('random:user_rooms', partner.userId);
-        if (alreadyMatched) continue; // Skip ghost; don't put back
-        // Validate TTL heartbeat still exists
+        if (alreadyMatched) {
+          continue; // Ghost user, skip entirely (already matched)
+        }
+
         const heartbeat = await pub.get(`matchq:heartbeat:${partner.userId}`);
-        if (!heartbeat) continue; // Ghost user, skip
-        await pub.decr('matchq:counter:queue'); // partner left queue
-        return { partner, topic };
+        if (!heartbeat) {
+          continue; // Ghost user, skip entirely (disconnected)
+        }
+
+        // Match found!
+        matchedPartner = partner;
+        await pub.decr('matchq:counter:queue'); // Partner left queue
+        break;
       }
+
+      // Restore users we popped but shouldn't have (in reverse order to maintain queue LIFO/FIFO)
+      // Since rpop takes from the right, to put them back at the right end maintaining their order, 
+      // we must rpush them in the reverse order they were popped.
+      if (poppedToPutBack.length > 0) {
+        for (let i = poppedToPutBack.length - 1; i >= 0; i--) {
+          await pub.rpush(key, poppedToPutBack[i]);
+        }
+      }
+
+      if (matchedPartner) {
+        return { partner: matchedPartner, topic: getSharedTopic(matchedPartner) };
+      }
+    }
+    return null;
+  };
+
+  // Phase 1: Try topic-specific queues first (best match quality)
+  if (topics && topics.length > 0) {
+    for (const topic of topics) {
+      const keys = inverseQueueKeys(gender, preference, topic);
+      const result = await tryMatchOnKeys(keys, () => topic);
+      if (result) return result;
     }
   }
 
   // Phase 2: Try generic (no topic) queues
   const genericKeys = inverseQueueKeys(gender, preference);
-  for (const key of genericKeys) {
-    const popped = await pub.rpop(key);
-    if (popped) {
-      const partner: QueuedUser = JSON.parse(popped);
-      if (partner.userId === user.userId) {
-        await pub.lpush(key, popped);
-        continue;
-      }
-      const alreadyMatched = await pub.hget('random:user_rooms', partner.userId);
-      if (alreadyMatched) continue;
-      const heartbeat = await pub.get(`matchq:heartbeat:${partner.userId}`);
-      if (!heartbeat) continue;
-      await pub.decr('matchq:counter:queue');
-      // Find shared topic if any
-      const shared = partner.topics.filter((t: string) => topics.includes(t));
-      return { partner, topic: shared[0] || '' };
-    }
-  }
+  const result = await tryMatchOnKeys(genericKeys, (partner) => {
+    const shared = partner.topics?.filter((t: string) => topics?.includes(t)) || [];
+    return shared[0] || '';
+  });
 
-  return null;
+  return result;
 }
 
 /**
@@ -350,12 +369,90 @@ async function finalizeMatch(
 }
 
 /**
- * Background worker: emits stats + cleans up ghost entries.
- * This is now very lightweight since matching happens on-join (O(1)).
+ * Background sweep: try to match any two compatible users already sitting in queues.
+ * This catches the case where two users joined at nearly the same time and both
+ * ended up in separate queue buckets without finding each other.
+ */
+async function sweepAndMatch(io: SocketIOServer, pub: any): Promise<void> {
+  try {
+    // We need to SCAN raw Redis keys because ioredis `keyPrefix` is applied automatically.
+    // Since `pub` already has the prefix, we scan for 'matchq:*' which becomes 'plasticworld:matchq:*'.
+    // But SCAN with pub.keys() returns keys WITH the prefix stripped.
+    const allKeys = await pub.keys('matchq:*');
+    // Filter to only queue-bucket keys (not heartbeat / counter keys)
+    const bucketKeys = allKeys.filter((k: string) =>
+      k.startsWith('matchq:') &&
+      !k.startsWith('matchq:heartbeat:') &&
+      !k.startsWith('matchq:counter:')
+    );
+
+    if (bucketKeys.length === 0) return;
+
+    // For each bucket that has entries, try to find a match
+    for (const key of bucketKeys) {
+      // Peek at the right-most entry (oldest) without popping
+      const entries = await pub.lrange(key, -1, -1);
+      if (!entries || entries.length === 0) continue;
+
+      let candidate: QueuedUser;
+      try {
+        candidate = JSON.parse(entries[0]);
+      } catch { continue; }
+
+      // Validate heartbeat — if dead, pop and discard
+      const heartbeat = await pub.get(`matchq:heartbeat:${candidate.userId}`);
+      if (!heartbeat) {
+        await pub.rpop(key); // Remove stale entry
+        continue;
+      }
+
+      // Check not already matched
+      const alreadyMatched = await pub.hget('random:user_rooms', candidate.userId);
+      if (alreadyMatched) {
+        await pub.rpop(key); // Remove ghost entry
+        continue;
+      }
+
+      // Try to find a partner for this candidate using the same logic as on-join
+      const matchResult = await tryInstantMatch(pub, candidate);
+      if (matchResult) {
+        // Pop the candidate out of this queue
+        await pub.rpop(key);
+        // Also try to remove candidate from OTHER queues they might be in
+        // (they could be in topic-specific + generic queues)
+        const candidateJson = JSON.stringify(candidate);
+        for (const otherKey of bucketKeys) {
+          if (otherKey !== key) {
+            await pub.lrem(otherKey, 1, candidateJson);
+          }
+        }
+        // Decrement queue counter for the candidate leaving queue
+        await pub.decr('matchq:counter:queue');
+        // Finalize!
+        await finalizeMatch(io, pub, candidate, matchResult.partner, matchResult.topic);
+        logger.info('Background sweep matched users', {
+          userA: candidate.userId,
+          userB: matchResult.partner.userId,
+          topic: matchResult.topic
+        });
+      }
+    }
+  } catch (error) {
+    logger.error('Matchmaker sweep error', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+/**
+ * Background worker: emits stats, runs periodic match sweep, cleans up ghost entries.
  */
 export function startMatchmakerWorker(io: SocketIOServer, pubClient: any) {
   // Emit stats every 5s
   setInterval(() => emitMatchingStats(io), 5000);
+
+  // Run match sweep every 3s to catch users who missed instant matching
+  setInterval(() => sweepAndMatch(io, pubClient), 3000);
 
   // Initialize counters if not present
   pubClient.setnx('matchq:counter:queue', '0');
@@ -468,10 +565,22 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         }
 
         // 2. Check if already queued (heartbeat exists) — prevent double-queue
+        //    BUT if the heartbeat exists from a stale leave/join race, clear it and re-queue.
         const alreadyQueued = await pub.get(`matchq:heartbeat:${userId}`);
         if (alreadyQueued) {
-          socket.emit('random:waiting');
-          return;
+          // Check if the user is ACTUALLY still in a live state.
+          // If they have no active room, this is likely a stale heartbeat from a
+          // rapid leave→join race condition. Clear it and proceed to re-queue.
+          const hasRoom = await pub.hget('random:user_rooms', userId);
+          if (hasRoom) {
+            // User has an active room — they shouldn't be joining queue. Let them know.
+            socket.emit('random:waiting');
+            return;
+          }
+          // Stale heartbeat — clear it and re-queue
+          logger.info('Clearing stale heartbeat for user, re-queuing', { userId });
+          await pub.del(`matchq:heartbeat:${userId}`);
+          await pub.decr('matchq:counter:queue'); // Undo the stale queue count
         }
 
         const me: QueuedUser = { userId, topics: userTopics, gender: userGender, preference };
