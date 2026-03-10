@@ -60,6 +60,16 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
     const [error, setError] = useState('')
     const fileInputRef = useRef(null)
 
+    const auraPoints = session?.user?.auraPoints || 0
+    const auraLevel = calculateAuraLevel(auraPoints)
+    const auraProgress = Math.max(0, Math.min(auraPoints, 100))
+
+    const hasBio = !!(session?.user?.bio && session.user.bio.trim().length > 0)
+    const bioText = hasBio
+        ? session.user.bio
+        : 'Add a short line about yourself so others know who is on the other side.'
+    const hasGender = !!(session?.user?.gender && session.user.gender !== 'prefer_not_to_say')
+
     const handleFileChange = async (e) => {
         const file = e.target.files?.[0]
         if (!file) return
@@ -99,63 +109,137 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                     <span>←</span>
                     <span>Back</span>
                 </button>
-                <div className="profile-card">
-                    <div className="profile-header">
-                        <div className="profile-avatar-wrapper">
-                            <div className="profile-avatar lg">
-                                {session?.user?.photoURL ? (
-                                    <img src={session.user.photoURL} alt="avatar" className="profile-avatar-img" />
-                                ) : (
-                                    <span className="profile-avatar-initials">
-                                        {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
-                                    </span>
-                                )}
+                <div className="profile-layout">
+                    {/* Left column – identity card */}
+                    <div className="profile-card profile-identity-card">
+                        <div className="profile-card-header">
+                            <div className="profile-header-main">
+                                <div className="profile-avatar-wrapper">
+                                    <div className="profile-avatar lg">
+                                        {session?.user?.photoURL ? (
+                                            <img src={session.user.photoURL} alt="avatar" className="profile-avatar-img" />
+                                        ) : (
+                                            <span className="profile-avatar-initials">
+                                                {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <button
+                                        className="avatar-edit-btn"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        title="Change avatar"
+                                    >
+                                        ✎
+                                    </button>
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        style={{ display: 'none' }}
+                                        accept="image/*"
+                                        onChange={handleFileChange}
+                                    />
+                                </div>
+                                <div className="profile-info">
+                                    <h2 className="profile-name">{session?.user?.name}</h2>
+                                    <p className="profile-email">{session?.user?.email}</p>
+                                </div>
                             </div>
-                            <button
-                                className="avatar-edit-btn"
-                                onClick={() => fileInputRef.current?.click()}
-                                title="Change avatar"
-                            >
-                                ✎
+                            <button className="btn-primary profile-edit-btn" onClick={() => setIsEditing(true)}>
+                                Edit profile
                             </button>
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                style={{ display: 'none' }}
-                                accept="image/*"
-                                onChange={handleFileChange}
-                            />
-                        </div>
-                        <div className="profile-info">
-                            <h2 className="profile-name">{session?.user?.name}</h2>
-                            <p className="profile-email">{session?.user?.email}</p>
                         </div>
                     </div>
 
-                    <div className="profile-actions">
-                        <button className="btn-primary" onClick={() => setIsEditing(true)}>
-                            Edit Profile
-                        </button>
-                    </div>
+                    {/* Right column – details & stats */}
+                    <div className="profile-details-column">
+                        <div className="profile-card profile-info-card">
+                            <div className="card-section-header card-section-header--with-action">
+                                <div className="card-section-heading">
+                                    <span className="card-eyebrow">Personal info</span>
+                                    <h3 className="card-title">About you</h3>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="card-inline-edit"
+                                    onClick={() => setIsEditing(true)}
+                                >
+                                    Edit
+                                </button>
+                            </div>
+                            <div className="info-rows">
+                                <div className="info-row info-row--with-action">
+                                    <div className="info-row-main">
+                                        <span className="info-label">Bio</span>
+                                        <p className="info-value info-value--muted">
+                                            {bioText}
+                                        </p>
+                                    </div>
+                                    {!hasBio && (
+                                        <button
+                                            type="button"
+                                            className="info-inline-action"
+                                            onClick={() => setIsEditing(true)}
+                                        >
+                                            Add bio
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="info-row info-row--with-action">
+                                    <div className="info-row-main">
+                                        <span className="info-label">Gender</span>
+                                        <p className="info-value" style={{ textTransform: 'capitalize' }}>
+                                            {hasGender
+                                                ? session?.user?.gender?.replace(/_/g, ' ')
+                                                : 'Not specified'}
+                                        </p>
+                                    </div>
+                                    {!hasGender && (
+                                        <button
+                                            type="button"
+                                            className="info-inline-action"
+                                            onClick={() => setIsEditing(true)}
+                                        >
+                                            Set gender
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
 
-                    <div className="profile-details-grid">
-                        <div className="detail-item">
-                            <span className="detail-label">Bio</span>
-                            <p className="detail-value">{session?.user?.bio || 'No bio yet'}</p>
-                        </div>
-                        <div className="detail-item">
-                            <span className="detail-label">Gender</span>
-                            <p className="detail-value" style={{ textTransform: 'capitalize' }}>
-                                {session?.user?.gender?.replace(/_/g, ' ') || 'Not specified'}
-                            </p>
-                        </div>
-                        <div className="detail-item">
-                            <span className="detail-label">Account Aura</span>
-                            <div className="aura-badge large" style={{ borderColor: calculateAuraLevel(session?.user?.auraPoints || 0).color }}>
-                                <span className="aura-point-value">{session?.user?.auraPoints || 0}</span>
-                                <span className="aura-name" style={{ color: calculateAuraLevel(session?.user?.auraPoints || 0).color }}>
-                                    {calculateAuraLevel(session?.user?.auraPoints || 0).name}
-                                </span>
+                        <div className="profile-card profile-aura-card">
+                            <div className="aura-card-header">
+                                <div>
+                                    <span className="card-eyebrow">Account Aura</span>
+                                    <h3 className="card-title">{auraLevel.name}</h3>
+                                </div>
+                                <div className="aura-card-value">
+                                    <span className="aura-point-value">{auraPoints}</span>
+                                    <span className="aura-point-label">Dissolved Mist</span>
+                                </div>
+                            </div>
+
+                            <div className="aura-progress">
+                                <div className="aura-progress-track">
+                                    <div
+                                        className="aura-progress-fill"
+                                        style={{ '--aura-progress': `${auraProgress}` }}
+                                    />
+                                </div>
+                                <div className="aura-progress-meta">
+                                    <span className="aura-progress-label">0 = Dissolved Mist</span>
+                                    <span className="aura-progress-range">Climb as you match, talk, and stay kind.</span>
+                                </div>
+                            </div>
+
+                            <div className="aura-substats">
+                                <div className="aura-substat">
+                                    <span className="aura-substat-label">Conversations completed</span>
+                                    <span className="aura-substat-value">—</span>
+                                </div>
+                                <div className="aura-substat">
+                                    <span className="aura-substat-label">Friends made</span>
+                                    <span className="aura-substat-value">—</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -170,47 +254,106 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                 <span>←</span>
                 <span>Cancel</span>
             </button>
-            <div className="profile-card">
-                <div className="profile-field-group">
-                    <label className="profile-field-label">Name</label>
-                    <input
-                        className="profile-input"
-                        value={editData.name}
-                        onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                        placeholder="Your name"
-                    />
-                </div>
-                <div className="profile-field-group">
-                    <label className="profile-field-label">Bio</label>
-                    <textarea
-                        className="profile-textarea"
-                        value={editData.bio}
-                        onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
-                        placeholder="Tell others about yourself..."
-                        maxLength={500}
-                    />
-                </div>
-                <div className="profile-field-group">
-                    <label className="profile-field-label">Gender</label>
-                    <select
-                        className="profile-select"
-                        value={editData.gender}
-                        onChange={(e) => setEditData({ ...editData, gender: e.target.value })}
-                    >
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                        <option value="non-binary">Non-binary</option>
-                        <option value="other">Other</option>
-                        <option value="prefer_not_to_say">Prefer not to say</option>
-                    </select>
+            <div className="profile-layout profile-layout--editing">
+                {/* Left column – static identity preview */}
+                <div className="profile-card profile-identity-card profile-identity-card--editing">
+                    <div className="profile-card-header">
+                        <div className="profile-header-main">
+                            <div
+                                className="avatar-upload-wrap avatar-upload-wrap--editing"
+                                onClick={() => fileInputRef.current?.click()}
+                                title="Change profile photo"
+                            >
+                                <div className="profile-avatar lg">
+                                    {session?.user?.photoURL ? (
+                                        <img src={session.user.photoURL} alt="avatar" className="profile-avatar-img" />
+                                    ) : (
+                                        <span className="profile-avatar-initials">
+                                            {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="avatar-edit-overlay">
+                                    <span>Change photo</span>
+                                </div>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    style={{ display: 'none' }}
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                />
+                            </div>
+                            <div className="profile-info">
+                                <span className="card-eyebrow">Editing profile</span>
+                                <h2 className="profile-name">{session?.user?.name}</h2>
+                                <p className="profile-email">{session?.user?.email}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="profile-edit-hint">
+                        Changes here update what others see on your profile card.
+                    </div>
                 </div>
 
-                {error && <div className="modal-error">{error}</div>}
+                {/* Right column – form card */}
+                <div className="profile-card profile-edit-card">
+                    <div className="profile-edit-header">
+                        <div className="card-section-heading">
+                            <span className="card-eyebrow">Profile details</span>
+                            <h3 className="card-title">Update your basics</h3>
+                        </div>
+                    </div>
 
-                <div className="profile-actions">
-                    <button className="btn-primary" onClick={handleSave} disabled={isSaving}>
-                        {isSaving ? 'Saving...' : 'Save Profile'}
-                    </button>
+                    <div className="profile-edit-grid">
+                        <div className="profile-field-group">
+                            <label className="profile-field-label">Name</label>
+                            <input
+                                className="profile-input"
+                                value={editData.name}
+                                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                                placeholder="Your name"
+                            />
+                        </div>
+                        <div className="profile-field-group profile-field-group--full">
+                            <label className="profile-field-label">Bio</label>
+                            <textarea
+                                className="profile-textarea"
+                                value={editData.bio}
+                                onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
+                                placeholder="Tell others about yourself..."
+                                maxLength={500}
+                            />
+                            <div className="profile-field-meta">
+                                <span className="profile-field-hint">Keep it short, honest, and kind.</span>
+                                <span className="profile-field-count">
+                                    {editData.bio.length}/500
+                                </span>
+                            </div>
+                        </div>
+                        <div className="profile-field-group">
+                            <label className="profile-field-label">Gender</label>
+                            <select
+                                className="profile-select"
+                                value={editData.gender}
+                                onChange={(e) => setEditData({ ...editData, gender: e.target.value })}
+                            >
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="non-binary">Non-binary</option>
+                                <option value="other">Other</option>
+                                <option value="prefer_not_to_say">Prefer not to say</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {error && <div className="modal-error modal-error--inline">{error}</div>}
+
+                    <div className="profile-edit-footer">
+                        <button className="btn-primary" onClick={handleSave} disabled={isSaving}>
+                            {isSaving ? 'Saving...' : 'Save profile'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
