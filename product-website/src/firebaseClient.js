@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 
 // Firebase web configuration for the suttafund project
 const firebaseConfig = {
@@ -13,6 +13,11 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
+const auth = getAuth(app)
 
-export const auth = getAuth(app)
+// Set persistence to LOCAL so the browser remembers the user even after tab is closed
+setPersistence(auth, browserLocalPersistence)
+  .catch((err) => console.error("Firebase persistence error:", err));
+
+export { auth }
 

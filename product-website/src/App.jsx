@@ -10,6 +10,8 @@ import FriendChat from './components/FriendChat'
 import CallOverlay from './components/CallOverlay'
 import VibeCheckModal from './components/VibeCheckModal'
 import LegalPages from './components/LegalPages'
+import { auth } from './firebaseClient'
+import { onAuthStateChanged } from 'firebase/auth'
 
 import {
   signInWithGoogle,
@@ -17,6 +19,7 @@ import {
   saveSession,
   getStoredSession as getSession,
   clearSession,
+  signInSilently,
 } from './authClient'
 import { initAudio, playMatchThump, playIncomingDrop, playOutgoingTick } from './utils/soundEngine'
 import './App.css'
@@ -68,6 +71,7 @@ function App() {
   const [unreadCounts, setUnreadCounts] = useState({})
   const [matchingStats, setMatchingStats] = useState({ online: 0, inQueue: 0, matched: 0 })
   const [matchPrefs, setMatchPrefs] = useState({ topics: [], preference: 'everyone' })
+  const [isInitializing, setIsInitializing] = useState(true)
 
   const [callOverlayState, setCallOverlayState] = useState({
     status: 'idle', // 'idle', 'requesting', 'incoming', 'active'
@@ -103,11 +107,23 @@ function App() {
   }, [room])
 
   useEffect(() => {
-    const handlePopState = () => {
-      setIsAdminView(window.location.pathname === '/admin')
-    }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  // Silent Auto-Login Observer
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // If we have a Firebase user but NO backend session, sync them silently
+      if (user && !sessionRef.current?.accessToken) {
+        setAuthLoading(true)
+        const next = await signInSilently(user)
+        if (next) setSession(next)
+        setAuthLoading(false)
+      }
+      setIsInitializing(false)
+    })
+    return () => unsubscribe()
   }, [])
 
   // Heartbeat: keep queue position alive while waiting for a match
@@ -641,7 +657,20 @@ function App() {
             }}
           />
         )}
-        {!isSignedIn && <Landing onStartMatch={handleAuth} authLoading={authLoading} authError={authError} onlineCount={onlineCount} />}
+        {!isSignedIn && !isInitializing && (
+          <Landing
+            onStartMatch={handleAuth}
+            authLoading={authLoading}
+            authError={authError}
+            onlineCount={onlineCount}
+          />
+        )}
+        {isInitializing && (
+          <div className="auth-initializer">
+            <div className="auth-spinner" />
+            <p>Restoring session...</p>
+          </div>
+        )}
         {isInChat && (
           <Chat
             session={session}

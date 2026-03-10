@@ -27,12 +27,10 @@ export function saveSession(session) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
 }
 
-export async function signInWithGoogle() {
-  const provider = new GoogleAuthProvider()
-  const result = await signInWithPopup(auth, provider)
-  const user = result.user
-  const idToken = await user.getIdToken()
-
+/**
+ * Exchanges a Firebase ID Token for a backend session
+ */
+export async function exchangeIdToken(idToken) {
   const deviceInfo = {
     deviceName: navigator.userAgent.substring(0, 100),
     deviceType: 'web',
@@ -69,11 +67,30 @@ export async function signInWithGoogle() {
     device: payload.data.device,
   }
 
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
-  }
-
+  saveSession(session)
   return session
+}
+
+export async function signInWithGoogle() {
+  const provider = new GoogleAuthProvider()
+  const result = await signInWithPopup(auth, provider)
+  const user = result.user
+  const idToken = await user.getIdToken()
+  return exchangeIdToken(idToken)
+}
+
+/**
+ * Attempts to restore a backend session silently if a Firebase user exists
+ */
+export async function signInSilently(firebaseUser) {
+  if (!firebaseUser) return null
+  try {
+    const idToken = await firebaseUser.getIdToken()
+    return await exchangeIdToken(idToken)
+  } catch (error) {
+    console.warn('Silent sign-in failed:', error)
+    return null
+  }
 }
 
 export async function refreshSession(refreshToken) {
