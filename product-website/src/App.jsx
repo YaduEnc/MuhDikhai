@@ -110,6 +110,15 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
+  // Heartbeat: keep queue position alive while waiting for a match
+  useEffect(() => {
+    if (socketState.phase !== 'matching' || !socketRef.current) return
+    const interval = setInterval(() => {
+      socketRef.current?.emit('random:ping')
+    }, 10_000)
+    return () => clearInterval(interval)
+  }, [socketState.phase])
+
   useEffect(() => {
     if (!session?.accessToken) return
 

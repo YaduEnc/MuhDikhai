@@ -35,12 +35,7 @@ const typingUsers = new Map<string, Set<string>>();
 // Store disconnect timeouts for connection state recovery
 const disconnectTimeouts = new Map<string, NodeJS.Timeout>();
 
-// Random chat state (ephemeral, in-memory)
-interface RandomRoom {
-  id: string;
-  users: [string, string]; // userIds
-  topic?: string;
-}
+// Random chat queue entry
 
 interface QueuedUser {
   userId: string;
@@ -61,19 +56,83 @@ interface QueuedUser {
 // Ephemeral media tracking (roomId -> Set of filenames)
 const roomMedia = new Map<string, Set<string>>();
 
+// ─── Partitioned Queue Helpers ───────────────────────────────────────
+
+/**
+ * Build the Redis list key for a partitioned queue bucket.
+ * Format: `matchq:<gender>:<preference>[:<topic>]`
+ * e.g. `matchq:male:female:anime`  or  `matchq:female:everyone`
+ */
+function queueKey(gender: string, preference: string, topic?: string): string {
+  const base = `matchq:${gender}:${preference}`;
+  return topic ? `${base}:${topic}` : base;
+}
+
+/**
+ * Given a user's gender + preference, return the inverse queue key(s)
+ * we should try to pop from.
+ *
+ * For example: A *male* seeking *female* should pop from a queue where
+ * a *female* is seeking *male* (or *everyone*).
+ */
+function inverseQueueKeys(gender: string, preference: string, topic?: string): string[] {
+  const keys: string[] = [];
+
+  if (preference === 'everyone') {
+    // Accept anyone whose preference is 'everyone' or who specifically seeks my gender
+    if (topic) {
+      keys.push(queueKey('male', 'everyone', topic));
+      keys.push(queueKey('female', 'everyone', topic));
+      keys.push(queueKey('non-binary', 'everyone', topic));
+      keys.push(queueKey('other', 'everyone', topic));
+      keys.push(queueKey('prefer_not_to_say', 'everyone', topic));
+      // Also those specifically seeking my gender with this topic
+      keys.push(queueKey('male', gender, topic));
+      keys.push(queueKey('female', gender, topic));
+      keys.push(queueKey('non-binary', gender, topic));
+      keys.push(queueKey('other', gender, topic));
+      keys.push(queueKey('prefer_not_to_say', gender, topic));
+    }
+    // Without topic (broader)
+    keys.push(queueKey('male', 'everyone'));
+    keys.push(queueKey('female', 'everyone'));
+    keys.push(queueKey('non-binary', 'everyone'));
+    keys.push(queueKey('other', 'everyone'));
+    keys.push(queueKey('prefer_not_to_say', 'everyone'));
+    keys.push(queueKey('male', gender));
+    keys.push(queueKey('female', gender));
+    keys.push(queueKey('non-binary', gender));
+    keys.push(queueKey('other', gender));
+    keys.push(queueKey('prefer_not_to_say', gender));
+  } else {
+    // Specific preference (e.g. male seeking female)
+    // Pop from queues where the desired gender is waiting and they want me or everyone
+    if (topic) {
+      keys.push(queueKey(preference, gender, topic));
+      keys.push(queueKey(preference, 'everyone', topic));
+    }
+    keys.push(queueKey(preference, gender));
+    keys.push(queueKey(preference, 'everyone'));
+  }
+
+  // Remove my own queue from inverse keys so I don't match myself
+  const myKey = topic ? queueKey(gender, preference, topic) : queueKey(gender, preference);
+  return [...new Set(keys.filter(k => k !== myKey))];
+}
+
 /**
  * Emit stats about the matching system to all connected users
  */
-
 async function emitMatchingStats(io: any) {
   try {
-    const pubClient = redisClient.getClient();
-    const queueLen = await pubClient.hlen('random:queue');
-    const matchedLen = await pubClient.hlen('random:user_rooms');
+    const pub = redisClient.getClient();
+    // Use a simple counter key instead of scanning all queues
+    const queueLen = parseInt(await pub.get('matchq:counter:queue') || '0');
+    const matchedLen = parseInt(await pub.get('matchq:counter:matched') || '0');
     const stats = {
       online: activeUsers.size,
-      inQueue: queueLen,
-      matched: Math.floor(matchedLen / 2),
+      inQueue: Math.max(0, queueLen),
+      matched: Math.max(0, matchedLen),
     };
     io.emit('random:stats', stats);
   } catch (e) { /* ignore */ }
@@ -181,62 +240,126 @@ export const socketAuth = async (socket: AuthenticatedSocket, next: (err?: Exten
  * Initialize Socket.io server
  */
 
-export function startMatchmakerWorker(io: SocketIOServer, pubClient: any) {
-  setInterval(async () => {
-    try {
-      const lock = await pubClient.set('matchmaker:lock', '1', 'EX', 2, 'NX');
-      if (!lock) return;
-      const queueMap = await pubClient.hgetall('random:queue');
-      const queueIds = Object.keys(queueMap);
-      if (queueIds.length < 2) return;
-      const queue: QueuedUser[] = queueIds.map((id: string) => JSON.parse(queueMap[id]));
-      const activeRooms = await pubClient.hgetall('random:user_rooms');
-      const validQueue = queue.filter((q: QueuedUser) => !activeRooms[q.userId]);
-      const matchedPairs = [];
-      const toRemove = new Set<string>();
-      for (let i = 0; i < validQueue.length; i++) {
-        const userA = validQueue[i];
-        if (toRemove.has(userA.userId)) continue;
-        for (let j = i + 1; j < validQueue.length; j++) {
-          const userB = validQueue[j];
-          if (toRemove.has(userB.userId)) continue;
-          const aPrefSatisfied = userA.preference === 'everyone' || userA.preference === userB.gender;
-          const bPrefSatisfied = userB.preference === 'everyone' || userB.preference === userA.gender;
-          if (aPrefSatisfied && bPrefSatisfied) {
-            const shared = userB.topics.filter((t: string) => userA.topics.includes(t));
-            matchedPairs.push({ u1: userA, u2: userB, topic: shared[0] || '' });
-            toRemove.add(userA.userId);
-            toRemove.add(userB.userId);
-            break;
-          }
+/**
+ * Try to instantly match a user by popping from inverse queues. O(1).
+ * Returns the matched partner's QueuedUser data if found, null otherwise.
+ */
+async function tryInstantMatch(
+  pub: any,
+  user: QueuedUser
+): Promise<{ partner: QueuedUser; topic: string } | null> {
+  const { gender, preference, topics } = user;
+
+  // Phase 1: Try topic-specific queues first (best match quality)
+  for (const topic of topics) {
+    const keys = inverseQueueKeys(gender, preference, topic);
+    for (const key of keys) {
+      const popped = await pub.rpop(key);
+      if (popped) {
+        const partner: QueuedUser = JSON.parse(popped);
+        // Validate partner is not the same user and not already matched
+        if (partner.userId === user.userId) {
+          // Put them back and continue
+          await pub.lpush(key, popped);
+          continue;
         }
+        const alreadyMatched = await pub.hget('random:user_rooms', partner.userId);
+        if (alreadyMatched) continue; // Skip ghost; don't put back
+        // Validate TTL heartbeat still exists
+        const heartbeat = await pub.get(`matchq:heartbeat:${partner.userId}`);
+        if (!heartbeat) continue; // Ghost user, skip
+        await pub.decr('matchq:counter:queue'); // partner left queue
+        return { partner, topic };
       }
-      for (const match of matchedPairs) {
-        const roomId = `random:${[match.u1.userId, match.u2.userId].sort().join(':')}:${Date.now()}`;
-        await pubClient.hset('random:user_rooms', match.u1.userId, roomId);
-        await pubClient.hset('random:user_rooms', match.u2.userId, roomId);
-        await pubClient.hdel('random:queue', match.u1.userId, match.u2.userId);
-        const room: RandomRoom = { id: roomId, users: [match.u1.userId, match.u2.userId], topic: match.topic || undefined };
-        await pubClient.hset('random:rooms', roomId, JSON.stringify(room));
-        const [profileA, profileB] = await Promise.all([
-          userService.getPublicUserProfile(match.u1.userId),
-          userService.getPublicUserProfile(match.u2.userId)
-        ]);
-        io.in(`user:${match.u1.userId}`).socketsJoin(roomId);
-        io.in(`user:${match.u2.userId}`).socketsJoin(roomId);
-        io.to(`user:${match.u1.userId}`).emit('random:matched', { roomId, partner: profileB, topic: match.topic });
-        io.to(`user:${match.u2.userId}`).emit('random:matched', { roomId, partner: profileA, topic: match.topic });
-        await Promise.all([
-          userService.incrementRoomsEntered(match.u1.userId),
-          userService.incrementRoomsEntered(match.u2.userId),
-          matchService.recordMatch(match.u1.userId, match.u2.userId, roomId, match.topic || undefined)
-        ]);
-      }
-      if (matchedPairs.length > 0) emitMatchingStats(io);
-    } catch (err) {
-      logger.error('Matchmaker error', err);
     }
-  }, 2000);
+  }
+
+  // Phase 2: Try generic (no topic) queues
+  const genericKeys = inverseQueueKeys(gender, preference);
+  for (const key of genericKeys) {
+    const popped = await pub.rpop(key);
+    if (popped) {
+      const partner: QueuedUser = JSON.parse(popped);
+      if (partner.userId === user.userId) {
+        await pub.lpush(key, popped);
+        continue;
+      }
+      const alreadyMatched = await pub.hget('random:user_rooms', partner.userId);
+      if (alreadyMatched) continue;
+      const heartbeat = await pub.get(`matchq:heartbeat:${partner.userId}`);
+      if (!heartbeat) continue;
+      await pub.decr('matchq:counter:queue');
+      // Find shared topic if any
+      const shared = partner.topics.filter((t: string) => topics.includes(t));
+      return { partner, topic: shared[0] || '' };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Finalize a match: create room, notify both users, record in DB.
+ */
+async function finalizeMatch(
+  io: SocketIOServer,
+  pub: any,
+  userA: QueuedUser,
+  userB: QueuedUser,
+  topic: string
+): Promise<void> {
+  const roomId = `random:${[userA.userId, userB.userId].sort().join(':')}:${Date.now()}`;
+
+  // Atomic Redis writes
+  const pipeline = pub.pipeline();
+  pipeline.hset('random:user_rooms', userA.userId, roomId);
+  pipeline.hset('random:user_rooms', userB.userId, roomId);
+  pipeline.hset('random:rooms', roomId, JSON.stringify({
+    id: roomId,
+    users: [userA.userId, userB.userId],
+    topic: topic || undefined,
+  }));
+  // Remove heartbeats (they're matched now)
+  pipeline.del(`matchq:heartbeat:${userA.userId}`);
+  pipeline.del(`matchq:heartbeat:${userB.userId}`);
+  pipeline.incr('matchq:counter:matched');
+  await pipeline.exec();
+
+  // Batch profile lookup (single Promise.all instead of sequential)
+  const [profileA, profileB] = await Promise.all([
+    userService.getPublicUserProfile(userA.userId),
+    userService.getPublicUserProfile(userB.userId),
+  ]);
+
+  // Join socket rooms
+  io.in(`user:${userA.userId}`).socketsJoin(roomId);
+  io.in(`user:${userB.userId}`).socketsJoin(roomId);
+
+  // Notify both users
+  io.to(`user:${userA.userId}`).emit('random:matched', { roomId, partner: profileB, topic });
+  io.to(`user:${userB.userId}`).emit('random:matched', { roomId, partner: profileA, topic });
+
+  // Fire-and-forget DB recording (non-blocking)
+  Promise.all([
+    userService.incrementRoomsEntered(userA.userId),
+    userService.incrementRoomsEntered(userB.userId),
+    matchService.recordMatch(userA.userId, userB.userId, roomId, topic || undefined),
+  ]).catch(err => logger.error('Failed to record match in DB', err));
+
+  emitMatchingStats(io);
+}
+
+/**
+ * Background worker: emits stats + cleans up ghost entries.
+ * This is now very lightweight since matching happens on-join (O(1)).
+ */
+export function startMatchmakerWorker(io: SocketIOServer, pubClient: any) {
+  // Emit stats every 5s
+  setInterval(() => emitMatchingStats(io), 5000);
+
+  // Initialize counters if not present
+  pubClient.setnx('matchq:counter:queue', '0');
+  pubClient.setnx('matchq:counter:matched', '0');
 }
 
 export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
@@ -323,15 +446,15 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
      */
     socket.on('random:join', async (payload?: { topics?: string[]; preference?: 'male' | 'female' | 'everyone' }) => {
       try {
-        const pubClient = redisClient.getClient();
-        emitMatchingStats(io);
+        const pub = redisClient.getClient();
         const userTopics = payload?.topics || [];
         const preference = payload?.preference || 'everyone';
         const userGender = socket.user?.gender || 'prefer_not_to_say';
 
-        const existingRoomId = await pubClient.hget('random:user_rooms', userId);
+        // 1. If user already has an active room, rejoin it
+        const existingRoomId = await pub.hget('random:user_rooms', userId);
         if (existingRoomId) {
-          const roomStr = await pubClient.hget('random:rooms', existingRoomId);
+          const roomStr = await pub.hget('random:rooms', existingRoomId);
           if (roomStr) {
             const room = JSON.parse(roomStr);
             const partnerId = room.users.find((id: string) => id !== userId);
@@ -340,20 +463,45 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             socket.emit('random:matched', { roomId: existingRoomId, partner, topic: room.topic });
             return;
           }
+          // Stale room pointer, clean it
+          await pub.hdel('random:user_rooms', userId);
         }
 
-        const isQueued = await pubClient.hexists('random:queue', userId);
-        if (isQueued) {
+        // 2. Check if already queued (heartbeat exists) — prevent double-queue
+        const alreadyQueued = await pub.get(`matchq:heartbeat:${userId}`);
+        if (alreadyQueued) {
           socket.emit('random:waiting');
           return;
         }
 
-        await pubClient.hset('random:queue', userId, JSON.stringify({
-          userId, topics: userTopics, gender: userGender, preference
-        }));
+        const me: QueuedUser = { userId, topics: userTopics, gender: userGender, preference };
 
-        socket.emit('random:waiting');
-        emitMatchingStats(io);
+        // 3. Try O(1) instant match by popping from inverse queues
+        const matchResult = await tryInstantMatch(pub, me);
+
+        if (matchResult) {
+          // INSTANT MATCH FOUND! Finalize it.
+          await finalizeMatch(io, pub, me, matchResult.partner, matchResult.topic);
+        } else {
+          // 4. No match found — push me into my queue bucket
+          //    Set heartbeat TTL (30s) for ghost detection
+          await pub.set(`matchq:heartbeat:${userId}`, JSON.stringify(me), 'EX', 30);
+
+          // Push into topic-specific queues first, then generic
+          if (userTopics.length > 0) {
+            for (const topic of userTopics) {
+              const key = queueKey(userGender, preference, topic);
+              await pub.lpush(key, JSON.stringify(me));
+            }
+          }
+          // Always push into the generic (no-topic) queue too
+          const genericKey = queueKey(userGender, preference);
+          await pub.lpush(genericKey, JSON.stringify(me));
+
+          await pub.incr('matchq:counter:queue');
+          socket.emit('random:waiting');
+          emitMatchingStats(io);
+        }
       } catch (error) {
         logger.error('Failed to join random chat queue', {
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -363,6 +511,20 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           error: 'Could not join random chat. Please try again.',
         });
       }
+    });
+
+    /**
+     * Heartbeat ping: iOS/web client should send this every 10s while in queue.
+     * This refreshes the 30s TTL so the user isn't treated as a ghost.
+     */
+    socket.on('random:ping', async () => {
+      try {
+        const pub = redisClient.getClient();
+        const heartbeat = await pub.get(`matchq:heartbeat:${userId}`);
+        if (heartbeat) {
+          await pub.expire(`matchq:heartbeat:${userId}`, 30);
+        }
+      } catch (e) { /* ignore */ }
     });
 
     /**
@@ -497,29 +659,39 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
      */
     socket.on('random:leave', async () => {
       try {
-        const pubClient = redisClient.getClient();
-        await pubClient.hdel('random:queue', userId);
+        const pub = redisClient.getClient();
 
-        const roomId = await pubClient.hget('random:user_rooms', userId);
+        // Remove heartbeat & decrement queue counter if they were queued
+        const wasQueued = await pub.del(`matchq:heartbeat:${userId}`);
+        if (wasQueued) {
+          await pub.decr('matchq:counter:queue');
+        }
+        // Note: We do NOT try to remove from list queues (O(N)). 
+        // Instead, the pop logic validates heartbeat, so ghost entries are harmlessly skipped.
+
+        const roomId = await pub.hget('random:user_rooms', userId);
         if (!roomId) {
           socket.emit('random:ended');
           emitMatchingStats(io);
           return;
         }
 
-        const roomStr = await pubClient.hget('random:rooms', roomId);
+        const roomStr = await pub.hget('random:rooms', roomId);
         if (roomStr) {
           const room = JSON.parse(roomStr);
           const otherUserId = room.users.find((id: string) => id !== userId);
 
           io.to(roomId).emit('random:left', { roomId, userId });
 
-          await pubClient.hdel('random:user_rooms', userId);
-          await pubClient.hdel('random:rooms', roomId);
-
+          const pipeline = pub.pipeline();
+          pipeline.hdel('random:user_rooms', userId);
+          pipeline.hdel('random:rooms', roomId);
+          pipeline.decr('matchq:counter:matched');
           if (otherUserId) {
-            await pubClient.hdel('random:user_rooms', otherUserId);
+            pipeline.hdel('random:user_rooms', otherUserId);
           }
+          await pipeline.exec();
+
           cleanupRoomMedia(roomId);
         }
 
@@ -527,7 +699,6 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         socket.emit('random:ended', { roomId });
         emitMatchingStats(io);
       } catch (error) {
-
         logger.error('Failed to leave random chat', {
           error: error instanceof Error ? error.message : 'Unknown error',
           userId,
@@ -918,15 +1089,18 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
               logger.info('Grace period expired, cleaning up session permanently', { userId });
 
               try {
-                const pubClient = redisClient.getClient();
+                const pub = redisClient.getClient();
 
-                // Clean up random queue
-                await pubClient.hdel('random:queue', userId);
+                // Clean up queue heartbeat
+                const wasQueued = await pub.del(`matchq:heartbeat:${userId}`);
+                if (wasQueued) {
+                  await pub.decr('matchq:counter:queue');
+                }
 
                 // Clean up random room
-                const roomId = await pubClient.hget('random:user_rooms', userId);
+                const roomId = await pub.hget('random:user_rooms', userId);
                 if (roomId) {
-                  const roomStr = await pubClient.hget('random:rooms', roomId);
+                  const roomStr = await pub.hget('random:rooms', roomId);
                   if (roomStr) {
                     const room = JSON.parse(roomStr);
                     const otherUserId = room.users.find((id: string) => id !== userId);
@@ -937,11 +1111,16 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
                       userId,
                     });
 
-                    await pubClient.hdel('random:user_rooms', userId);
-                    await pubClient.hdel('random:rooms', roomId);
+                    const pipeline = pub.pipeline();
+                    pipeline.hdel('random:user_rooms', userId);
+                    pipeline.hdel('random:rooms', roomId);
+                    pipeline.decr('matchq:counter:matched');
+                    if (otherUserId) {
+                      pipeline.hdel('random:user_rooms', otherUserId);
+                    }
+                    await pipeline.exec();
 
                     if (otherUserId) {
-                      await pubClient.hdel('random:user_rooms', otherUserId);
                       const otherSockets = activeUsers.get(otherUserId) ?? new Set<string>();
                       for (const id of otherSockets) {
                         const s = io.sockets.sockets.get(id);
@@ -952,7 +1131,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
                     // Trigger ephemeral media cleanup
                     cleanupRoomMedia(roomId);
                   } else {
-                    await pubClient.hdel('random:user_rooms', userId);
+                    await pub.hdel('random:user_rooms', userId);
                   }
                 }
 
