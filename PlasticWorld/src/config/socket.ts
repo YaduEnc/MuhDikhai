@@ -120,6 +120,18 @@ function inverseQueueKeys(gender: string, preference: string, topic?: string): s
 }
 
 /**
+ * Helper to acquire a match lock with retries
+ */
+async function acquireMatchLock(pub: any, userId: string, retries = 10, delayMs = 150): Promise<boolean> {
+  for (let i = 0; i < retries; i++) {
+    const lock = await pub.set(`matchq:lock:${userId}`, '1', 'EX', 5, 'NX');
+    if (lock) return true;
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+  return false;
+}
+
+/**
  * Emit stats about the matching system to all connected users
  */
 async function emitMatchingStats(io: any) {
@@ -266,13 +278,21 @@ async function tryInstantMatch(
           continue;
         }
 
+        const lockPartner = await pub.set(`matchq:lock:${partner.userId}`, '1', 'EX', 5, 'NX');
+        if (!lockPartner) {
+          poppedToPutBack.push(popped);
+          continue;
+        }
+
         const alreadyMatched = await pub.hget('random:user_rooms', partner.userId);
         if (alreadyMatched) {
+          await pub.del(`matchq:lock:${partner.userId}`);
           continue; // Ghost user, skip entirely (already matched)
         }
 
         const heartbeat = await pub.get(`matchq:heartbeat:${partner.userId}`);
         if (!heartbeat) {
+          await pub.del(`matchq:lock:${partner.userId}`);
           continue; // Ghost user, skip entirely (disconnected)
         }
 
@@ -338,9 +358,11 @@ async function finalizeMatch(
     users: [userA.userId, userB.userId],
     topic: topic || undefined,
   }));
-  // Remove heartbeats (they're matched now)
+  // Remove heartbeats and explicit locks (they're matched now)
   pipeline.del(`matchq:heartbeat:${userA.userId}`);
   pipeline.del(`matchq:heartbeat:${userB.userId}`);
+  pipeline.del(`matchq:lock:${userA.userId}`);
+  pipeline.del(`matchq:lock:${userB.userId}`);
   pipeline.incr('matchq:counter:matched');
   await pipeline.exec();
 
@@ -375,66 +397,57 @@ async function finalizeMatch(
  */
 async function sweepAndMatch(io: SocketIOServer, pub: any): Promise<void> {
   try {
-    // We need to SCAN raw Redis keys because ioredis `keyPrefix` is applied automatically.
-    // Since `pub` already has the prefix, we scan for 'matchq:*' which becomes 'plasticworld:matchq:*'.
-    // But SCAN with pub.keys() returns keys WITH the prefix stripped.
     const allKeys = await pub.keys('matchq:*');
-    // Filter to only queue-bucket keys (not heartbeat / counter keys)
     const bucketKeys = allKeys.filter((k: string) =>
       k.startsWith('matchq:') &&
       !k.startsWith('matchq:heartbeat:') &&
-      !k.startsWith('matchq:counter:')
+      !k.startsWith('matchq:counter:') &&
+      !k.startsWith('matchq:lock:')
     );
 
     if (bucketKeys.length === 0) return;
 
-    // For each bucket that has entries, try to find a match
     for (const key of bucketKeys) {
-      // Peek at the right-most entry (oldest) without popping
-      const entries = await pub.lrange(key, -1, -1);
-      if (!entries || entries.length === 0) continue;
+      const poppedStr = await pub.rpop(key);
+      if (!poppedStr) continue;
 
       let candidate: QueuedUser;
       try {
-        candidate = JSON.parse(entries[0]);
+        candidate = JSON.parse(poppedStr);
       } catch { continue; }
 
-      // Validate heartbeat — if dead, pop and discard
-      const heartbeat = await pub.get(`matchq:heartbeat:${candidate.userId}`);
-      if (!heartbeat) {
-        await pub.rpop(key); // Remove stale entry
+      const lockMe = await pub.set(`matchq:lock:${candidate.userId}`, '1', 'EX', 5, 'NX');
+      if (!lockMe) {
+        await pub.rpush(key, poppedStr);
         continue;
       }
 
-      // Check not already matched
-      const alreadyMatched = await pub.hget('random:user_rooms', candidate.userId);
-      if (alreadyMatched) {
-        await pub.rpop(key); // Remove ghost entry
-        continue;
-      }
+      try {
+        const heartbeat = await pub.get(`matchq:heartbeat:${candidate.userId}`);
+        if (!heartbeat) continue;
 
-      // Try to find a partner for this candidate using the same logic as on-join
-      const matchResult = await tryInstantMatch(pub, candidate);
-      if (matchResult) {
-        // Pop the candidate out of this queue
-        await pub.rpop(key);
-        // Also try to remove candidate from OTHER queues they might be in
-        // (they could be in topic-specific + generic queues)
-        const candidateJson = JSON.stringify(candidate);
-        for (const otherKey of bucketKeys) {
-          if (otherKey !== key) {
-            await pub.lrem(otherKey, 1, candidateJson);
+        const alreadyMatched = await pub.hget('random:user_rooms', candidate.userId);
+        if (alreadyMatched) continue;
+
+        const matchResult = await tryInstantMatch(pub, candidate);
+        if (matchResult) {
+          for (const otherKey of bucketKeys) {
+            if (otherKey !== key) {
+              await pub.lrem(otherKey, 0, poppedStr);
+            }
           }
+          await pub.decr('matchq:counter:queue');
+          logger.info('Background sweep matched users', {
+            userA: candidate.userId,
+            userB: matchResult.partner.userId,
+            topic: matchResult.topic
+          });
+          await finalizeMatch(io, pub, candidate, matchResult.partner, matchResult.topic);
+        } else {
+          await pub.rpush(key, poppedStr);
         }
-        // Decrement queue counter for the candidate leaving queue
-        await pub.decr('matchq:counter:queue');
-        // Finalize!
-        await finalizeMatch(io, pub, candidate, matchResult.partner, matchResult.topic);
-        logger.info('Background sweep matched users', {
-          userA: candidate.userId,
-          userB: matchResult.partner.userId,
-          topic: matchResult.topic
-        });
+      } finally {
+        await pub.del(`matchq:lock:${candidate.userId}`);
       }
     }
   } catch (error) {
@@ -542,8 +555,9 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
      * Random chat: join the gentle queue
      */
     socket.on('random:join', async (payload?: { topics?: string[]; preference?: 'male' | 'female' | 'everyone' }) => {
+      let lockMeAcquired = false;
+      const pub = redisClient.getClient();
       try {
-        const pub = redisClient.getClient();
         const userTopics = payload?.topics || [];
         const preference = payload?.preference || 'everyone';
         const userGender = socket.user?.gender || 'prefer_not_to_say';
@@ -564,23 +578,24 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           await pub.hdel('random:user_rooms', userId);
         }
 
+        const lockMe = await pub.set(`matchq:lock:${userId}`, '1', 'EX', 5, 'NX');
+        if (!lockMe) {
+          socket.emit('random:waiting');
+          return;
+        }
+        lockMeAcquired = true;
+
         // 2. Check if already queued (heartbeat exists) — prevent double-queue
-        //    BUT if the heartbeat exists from a stale leave/join race, clear it and re-queue.
         const alreadyQueued = await pub.get(`matchq:heartbeat:${userId}`);
         if (alreadyQueued) {
-          // Check if the user is ACTUALLY still in a live state.
-          // If they have no active room, this is likely a stale heartbeat from a
-          // rapid leave→join race condition. Clear it and proceed to re-queue.
           const hasRoom = await pub.hget('random:user_rooms', userId);
           if (hasRoom) {
-            // User has an active room — they shouldn't be joining queue. Let them know.
             socket.emit('random:waiting');
             return;
           }
-          // Stale heartbeat — clear it and re-queue
           logger.info('Clearing stale heartbeat for user, re-queuing', { userId });
           await pub.del(`matchq:heartbeat:${userId}`);
-          await pub.decr('matchq:counter:queue'); // Undo the stale queue count
+          await pub.decr('matchq:counter:queue');
         }
 
         const me: QueuedUser = { userId, topics: userTopics, gender: userGender, preference };
@@ -593,17 +608,14 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           await finalizeMatch(io, pub, me, matchResult.partner, matchResult.topic);
         } else {
           // 4. No match found — push me into my queue bucket
-          //    Set heartbeat TTL (30s) for ghost detection
           await pub.set(`matchq:heartbeat:${userId}`, JSON.stringify(me), 'EX', 30);
 
-          // Push into topic-specific queues first, then generic
           if (userTopics.length > 0) {
             for (const topic of userTopics) {
               const key = queueKey(userGender, preference, topic);
               await pub.lpush(key, JSON.stringify(me));
             }
           }
-          // Always push into the generic (no-topic) queue too
           const genericKey = queueKey(userGender, preference);
           await pub.lpush(genericKey, JSON.stringify(me));
 
@@ -619,6 +631,10 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         socket.emit('random:error', {
           error: 'Could not join random chat. Please try again.',
         });
+      } finally {
+        if (lockMeAcquired) {
+          await pub.del(`matchq:lock:${userId}`);
+        }
       }
     });
 
@@ -767,8 +783,12 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
      * Random chat: leave current room / queue
      */
     socket.on('random:leave', async () => {
+      let lockMeAcquired = false;
+      const pub = redisClient.getClient();
       try {
-        const pub = redisClient.getClient();
+        const lockMe = await acquireMatchLock(pub, userId);
+        if (lockMe) lockMeAcquired = true;
+        else logger.warn('random:leave lock timeout, proceeding anyway', { userId });
 
         // Remove heartbeat & decrement queue counter if they were queued
         const wasQueued = await pub.del(`matchq:heartbeat:${userId}`);
@@ -812,6 +832,8 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           error: error instanceof Error ? error.message : 'Unknown error',
           userId,
         });
+      } finally {
+        if (lockMeAcquired) await pub.del(`matchq:lock:${userId}`);
       }
     });
 
@@ -1197,8 +1219,12 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
               disconnectTimeouts.delete(userId);
               logger.info('Grace period expired, cleaning up session permanently', { userId });
 
+              let lockMeAcquired = false;
+              const pub = redisClient.getClient();
               try {
-                const pub = redisClient.getClient();
+                const lockMe = await acquireMatchLock(pub, userId);
+                if (lockMe) lockMeAcquired = true;
+                else logger.warn('disconnect cleanup lock timeout, proceeding anyway', { userId });
 
                 // Clean up queue heartbeat
                 const wasQueued = await pub.del(`matchq:heartbeat:${userId}`);
@@ -1252,6 +1278,8 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
                 emitMatchingStats(io);
               } catch (e) {
                 logger.error('Failed to cleanup user session', { error: e });
+              } finally {
+                if (lockMeAcquired) await pub.del(`matchq:lock:${userId}`);
               }
             }, 5000);
 
