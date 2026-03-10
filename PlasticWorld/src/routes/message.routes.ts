@@ -102,8 +102,10 @@ router.post(
       throw new AppError('No file uploaded', 400, 'NO_FILE');
     }
 
-    // Return the URL to the uploaded file
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    // Return the URL to the uploaded file (respecting proxies/tunnels)
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('x-forwarded-host') || req.get('host');
+    const baseUrl = `${protocol}://${host}`;
     const mediaUrl = `${baseUrl}/uploads/${req.file.filename}`;
 
     // Track media for ephemeral room cleanup if roomId is provided
