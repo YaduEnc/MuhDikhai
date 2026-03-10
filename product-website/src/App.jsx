@@ -24,7 +24,23 @@ import {
 import { initAudio, playMatchThump, playIncomingDrop, playOutgoingTick } from './utils/soundEngine'
 import './App.css'
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
+// Backend URL Selection: Priority is URL param (?backend=...) > LocalStorage > Environment Var > Localhost
+const getBackendUrl = () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const paramOverride = urlParams.get('backend');
+  
+  if (paramOverride) {
+    localStorage.setItem('muhdikhai_backend_override', paramOverride);
+    return paramOverride;
+  }
+  
+  const savedOverride = localStorage.getItem('muhdikhai_backend_override');
+  if (savedOverride) return savedOverride;
+
+  return import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+};
+
+const BACKEND_URL = getBackendUrl();
 
 async function getValidSession(session) {
   if (!session?.accessToken) throw new Error('No session')
