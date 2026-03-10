@@ -63,7 +63,7 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
       callback(null, true);
     } else {
       logger.warn('CORS blocked origin', { origin, allowedOrigins });

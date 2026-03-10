@@ -242,17 +242,35 @@ export function startMatchmakerWorker(io: SocketIOServer, pubClient: any) {
 export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: process.env.CORS_ORIGIN?.split(',') || [
-        'http://localhost:3000',
-        'http://localhost:8080',
-        'http://localhost:8081',
-        'http://localhost:8082',
-        'http://localhost:8083', // For messaging test page
-        'http://localhost:5173',
-        'https://yaduraj.me',
-        'https://muhdikhai.yaduraj.me',
-        'https://batchit.yaduraj.me',
-      ],
+      origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        const defaultOrigins = [
+          'http://localhost:3000',
+          'http://localhost:8080',
+          'http://localhost:8081',
+          'http://localhost:8082',
+          'http://localhost:8083', // For messaging test page
+          'http://localhost:5173',
+          'https://yaduraj.me',
+          'https://muhdikhai.yaduraj.me',
+          'https://batchit.yaduraj.me',
+        ];
+
+        let allowedOrigins: string[] = defaultOrigins;
+        if (process.env.CORS_ORIGIN) {
+          const productionOrigins = process.env.CORS_ORIGIN.split(',').map((o: string) => o.trim());
+          allowedOrigins = [...new Set([...defaultOrigins, ...productionOrigins])];
+        }
+
+        if (!origin) {
+          return callback(null, true);
+        }
+
+        if (allowedOrigins.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       credentials: true,
       methods: ['GET', 'POST'],
     },
