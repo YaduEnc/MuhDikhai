@@ -1687,7 +1687,64 @@
     }
 
     .msg-content {
-        max-width: 80%;
+        max-width: 85%;
+    }
+
+    .chat-input-actions {
+        gap: 0.2rem;
+    }
+
+    .input-action-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 0.7rem;
+    }
+
+    .input-action-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .chat-send-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .send-icon {
+        font-size: 0.95rem;
+        /* Shrunk the ↑ icon for mobile */
+    }
+
+    .chat-textarea {
+        padding: 0.45rem 0.8rem;
+        font-size: 0.85rem;
+    }
+
+    .chat-header-v2 {
+        padding: 0.7rem 0.8rem;
+    }
+
+    .chat-partner-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+    }
+
+    .chat-partner-name {
+        font-size: 0.85rem;
+    }
+
+    .chat-next-btn,
+    .video-request-btn,
+    .fc-vanish-toggle,
+    .chat-add-friend-btn,
+    .chat-leave-btn {
+        padding: 0.35rem 0.7rem;
+        font-size: 0.68rem;
+    }
+
+    .fc-vanish-icon {
+        font-size: 0.8rem;
     }
 }
 
