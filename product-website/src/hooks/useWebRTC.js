@@ -13,6 +13,12 @@ export function useWebRTC(socket, roomId, userId, recipientId) {
     const [isMuted, setIsMuted] = useState(false)
     const [isVideoOff, setIsVideoOff] = useState(false)
 
+    // Device Management
+    const [availableVideoDevices, setAvailableVideoDevices] = useState([])
+    const [availableAudioDevices, setAvailableAudioDevices] = useState([])
+    const [selectedVideoDevice, setSelectedVideoDevice] = useState(null)
+    const [selectedAudioDevice, setSelectedAudioDevice] = useState(null)
+
     const pcRef = useRef(null)
     const pendingCandidates = useRef([])
     const socketRef = useRef(socket)
@@ -25,6 +31,39 @@ export function useWebRTC(socket, roomId, userId, recipientId) {
     useEffect(() => { roomIdRef.current = roomId }, [roomId])
     useEffect(() => { recipientIdRef.current = recipientId }, [recipientId])
     useEffect(() => { localStreamRef.current = localStream }, [localStream])
+
+    // ─── Device Enumeration ─────────────────────────────────────────────────
+    const enumerateDevices = useCallback(async () => {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices()
+            const videoInputs = devices.filter(device => device.kind === 'videoinput')
+            const audioInputs = devices.filter(device => device.kind === 'audioinput')
+
+            setAvailableVideoDevices(videoInputs)
+            setAvailableAudioDevices(audioInputs)
+
+            // Auto-select first devices if none currently selected
+            if (!selectedVideoDevice && videoInputs.length > 0) {
+                // Try to find physical hardware over virtual if possible, but default to first.
+                setSelectedVideoDevice(videoInputs[0].deviceId)
+            }
+            if (!selectedAudioDevice && audioInputs.length > 0) {
+                setSelectedAudioDevice(audioInputs[0].deviceId)
+            }
+        } catch (err) {
+            console.error('Error enumerating devices:', err)
+        }
+    }, [selectedVideoDevice, selectedAudioDevice])
+
+    // Listen for device changes (e.g. plugging in a mic)
+    useEffect(() => {
+        if (navigator.mediaDevices) {
+            navigator.mediaDevices.addEventListener('devicechange', enumerateDevices)
+            return () => {
+                navigator.mediaDevices.removeEventListener('devicechange', enumerateDevices)
+            }
+        }
+    }, [enumerateDevices])
 
     // ─── Initialize PeerConnection ───────────────────────────────────────────
     const createPC = useCallback(() => {
@@ -58,19 +97,82 @@ export function useWebRTC(socket, roomId, userId, recipientId) {
         }
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 640, height: 480, facingMode: 'user' },
-                audio: true
-            })
+            const constraints = {
+                video: selectedVideoDevice
+                    ? { deviceId: { exact: selectedVideoDevice }, width: 640, height: 480 }
+                    : { width: 640, height: 480, facingMode: 'user' },
+                audio: selectedAudioDevice
+                    ? { deviceId: { exact: selectedAudioDevice } }
+                    : true
+            }
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints)
+
+            // Maintain current mute/video toggled states when re-requesting stream
+            if (isVideoOff) stream.getVideoTracks().forEach(t => t.enabled = false)
+            if (isMuted) stream.getAudioTracks().forEach(t => t.enabled = false)
+
             setLocalStream(stream)
             localStreamRef.current = stream
+
+            // Crucial: Enumerate *after* getting first stream so labels are exposed
+            await enumerateDevices()
+
             return true
         } catch (err) {
             console.error('Failed to get media devices:', err)
             alert('Could not access camera/microphone. Please check browser permissions.')
             return false
         }
-    }, [])
+    }, [selectedVideoDevice, selectedAudioDevice, isVideoOff, isMuted, enumerateDevices])
+
+    // ─── Hot Swap Devices ────────────────────────────────────────────────────
+    const switchDevice = useCallback(async (kind, deviceId) => {
+        if (!deviceId || !localStreamRef.current) return false
+
+        try {
+            const constraints = {
+                video: kind === 'video' ? { deviceId: { exact: deviceId }, width: 640, height: 480 } : false,
+                audio: kind === 'audio' ? { deviceId: { exact: deviceId } } : false
+            }
+
+            // Grab the specific isolated stream for the new hardware
+            const newStream = await navigator.mediaDevices.getUserMedia(constraints)
+            const newTrack = kind === 'video' ? newStream.getVideoTracks()[0] : newStream.getAudioTracks()[0]
+
+            // Apply current muted/video disabled state to new track
+            if (kind === 'video' && isVideoOff) newTrack.enabled = false
+            if (kind === 'audio' && isMuted) newTrack.enabled = false
+
+            // Replace track on the live RTCPeerConnection sender without tearing down connection
+            const sender = pcRef.current?.getSenders().find(s => s.track && s.track.kind === (kind === 'video' ? 'video' : 'audio'))
+            if (sender) {
+                await sender.replaceTrack(newTrack)
+            }
+
+            // 1. Remove old track from our local stream
+            const oldTrack = localStreamRef.current.getTracks().find(t => t.kind === (kind === 'video' ? 'video' : 'audio'))
+            if (oldTrack) {
+                localStreamRef.current.removeTrack(oldTrack)
+                oldTrack.stop() // Turn off hardware light for old camera
+            }
+
+            // 2. Add new track to our local stream for local preview
+            localStreamRef.current.addTrack(newTrack)
+
+            // Update React state explicitly to trigger a re-render of `<video>` preview if necessary
+            setLocalStream(new MediaStream(localStreamRef.current.getTracks()))
+
+            // Update selected states
+            if (kind === 'video') setSelectedVideoDevice(deviceId)
+            if (kind === 'audio') setSelectedAudioDevice(deviceId)
+
+            return true
+        } catch (err) {
+            console.error(`Failed to switch ${kind} to ${deviceId}:`, err)
+            return false
+        }
+    }, [isVideoOff, isMuted])
 
     const establishConnection = useCallback(async (isInitiator) => {
         const stream = localStreamRef.current
@@ -192,6 +294,12 @@ export function useWebRTC(socket, roomId, userId, recipientId) {
         toggleVideo,
         prepareLocalMedia,
         establishConnection,
-        stopLocalMedia
+        stopLocalMedia,
+        // New Device exports
+        availableVideoDevices,
+        availableAudioDevices,
+        selectedVideoDevice,
+        selectedAudioDevice,
+        switchDevice
     }
 }

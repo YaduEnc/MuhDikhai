@@ -13,12 +13,25 @@
     animation: fadeIn 0.3s ease;
 }
 
+.call-overlay-fixed.active-mode {
+    background: #000;
+    backdrop-filter: none;
+}
+
 .call-overlay-content {
     width: 100%;
     max-width: 800px;
     padding: 2rem;
     text-align: center;
     color: white;
+}
+
+.call-overlay-fixed.active-mode .call-overlay-content {
+    max-width: 100%;
+    height: 100%;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .call-partner-avatar.large {
@@ -95,25 +108,31 @@
 .call-active-view {
     display: flex;
     flex-direction: column;
-    height: 80vh;
+    width: 100%;
+    height: 100%;
+    position: relative;
 }
 
 .video-grid {
     flex: 1;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 2rem;
+    display: flex;
+    flex-direction: row;
+    /* Desktop: side by side horizontal split */
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    gap: 0;
 }
 
 .video-tile {
-    background: #1a1a2a;
-    border-radius: 20px;
+    flex: 1;
+    background: #111;
     position: relative;
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 0;
 }
 
 .video-tile video {
@@ -122,38 +141,67 @@
     object-fit: cover;
 }
 
+/* Subtle separator between videos */
+.video-tile.local {
+    border-left: 2px solid #000;
+}
+
 .tile-label {
     position: absolute;
-    bottom: 1rem;
-    left: 1rem;
-    background: rgba(0, 0, 0, 0.5);
-    padding: 0.3rem 0.8rem;
-    border-radius: 8px;
-    font-size: 0.9rem;
+    bottom: 2rem;
+    left: 2rem;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    backdrop-filter: blur(5px);
 }
 
 .call-controls {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
-    gap: 1rem;
+    gap: 1.5rem;
     justify-content: center;
+    background: rgba(20, 20, 30, 0.8);
+    padding: 1rem 2rem;
+    border-radius: 40px;
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    z-index: 100;
 }
 
 .ctrl-btn {
-    width: 50px;
-    height: 50px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
     border: none;
-    background: #2a2a3a;
+    background: rgba(255, 255, 255, 0.15);
     color: white;
-    font-size: 1.2rem;
+    font-size: 1.4rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ctrl-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: scale(1.05);
 }
 
 .ctrl-btn.off {
     background: #ef4444;
+    color: white;
+}
+
+.ctrl-btn.off:hover {
+    background: #dc2626;
 }
 
 .ctrl-btn.end {
@@ -161,9 +209,126 @@
     transform: rotate(135deg);
 }
 
-@media (max-width: 600px) {
+.ctrl-btn.end:hover {
+    background: #dc2626;
+    transform: rotate(135deg) scale(1.05);
+}
+
+.ctrl-btn.active {
+    background: #6366f1;
+    color: white;
+}
+
+.device-settings-popover {
+    position: absolute;
+    bottom: 120px;
+    /* Float above controls */
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 30, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 1.5rem;
+    width: 320px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    text-align: left;
+    animation: fadeIn 0.2s ease;
+}
+
+.device-settings-popover h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1.2rem;
+    color: #fff;
+    border-bottom: 1px solid #3a3a4a;
+    padding-bottom: 0.5rem;
+}
+
+.device-group {
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.device-group label {
+    font-size: 0.85rem;
+    color: #a0a0b0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.device-group select {
+    background: #2a2a3a;
+    border: 1px solid #4a4a5a;
+    color: white;
+    padding: 0.6rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+    cursor: pointer;
+}
+
+.device-group select:focus {
+    border-color: #6366f1;
+}
+
+.device-group select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.close-settings {
+    width: 100%;
+    padding: 0.8rem;
+    background: #3a3a4a;
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    transition: background 0.2s;
+}
+
+.close-settings:hover {
+    background: #4a4a5a;
+}
+
+@media (max-width: 768px) {
     .video-grid {
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr 0.3fr;
+        flex-direction: column;
+        /* Mobile gets top-bottom split */
+    }
+
+    .video-tile.local {
+        border-left: none;
+        border-top: 2px solid #000;
+    }
+
+    .call-controls {
+        bottom: 20px;
+        padding: 0.8rem 1.5rem;
+        gap: 1rem;
+        width: 90%;
+        max-width: 400px;
+    }
+
+    .ctrl-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 1.2rem;
+    }
+
+    .tile-label {
+        bottom: 1rem;
+        left: 1rem;
+        font-size: 0.9rem;
+    }
+
+    .device-settings-popover {
+        width: 90%;
+        bottom: 100px;
     }
 }
