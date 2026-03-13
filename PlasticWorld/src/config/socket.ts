@@ -42,6 +42,7 @@ interface QueuedUser {
   topics: string[];
   gender: string;
   preference: 'male' | 'female' | 'everyone';
+  enqueuedAt?: number;
 }
 
 // Queue of users waiting for a random partner
@@ -349,8 +350,18 @@ async function finalizeMatch(
 ): Promise<void> {
   const roomId = `random:${[userA.userId, userB.userId].sort().join(':')}:${Date.now()}`;
 
-  // Atomic Redis writes
+  // Calculate and record latencies for telemetry
+  const now = Date.now();
   const pipeline = pub.pipeline();
+  
+  if (userA.enqueuedAt) {
+    pipeline.lpush('matchq:metrics:latencies', (now - userA.enqueuedAt).toString());
+  }
+  if (userB.enqueuedAt) {
+    pipeline.lpush('matchq:metrics:latencies', (now - userB.enqueuedAt).toString());
+  }
+  pipeline.ltrim('matchq:metrics:latencies', 0, 99); // Keep last 100
+
   pipeline.hset('random:user_rooms', userA.userId, roomId);
   pipeline.hset('random:user_rooms', userB.userId, roomId);
   pipeline.hset('random:rooms', roomId, JSON.stringify({
@@ -397,13 +408,20 @@ async function finalizeMatch(
  */
 async function sweepAndMatch(io: SocketIOServer, pub: any): Promise<void> {
   try {
-    const allKeys = await pub.keys('matchq:*');
-    const bucketKeys = allKeys.filter((k: string) =>
-      k.startsWith('matchq:') &&
-      !k.startsWith('matchq:heartbeat:') &&
-      !k.startsWith('matchq:counter:') &&
-      !k.startsWith('matchq:lock:')
-    );
+    const bucketKeys: string[] = [];
+    let cursor = '0';
+    do {
+      const [nextCursor, keys] = await pub.scan(cursor, 'MATCH', 'matchq:*', 'COUNT', 100);
+      cursor = nextCursor;
+      
+      const filtered = keys.filter((k: string) =>
+        !k.startsWith('matchq:heartbeat:') &&
+        !k.startsWith('matchq:counter:') &&
+        !k.startsWith('matchq:lock:') &&
+        !k.startsWith('matchq:metrics:')
+      );
+      bucketKeys.push(...filtered);
+    } while (cursor !== '0');
 
     if (bucketKeys.length === 0) return;
 
@@ -541,6 +559,8 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     // Add user to active users
     if (!activeUsers.has(userId)) {
       activeUsers.set(userId, new Set());
+      // Mark globally online in Redis for API visibility
+      pubClient.sadd('presence:online_users', userId).catch(err => logger.error('Presence SADD failed', err));
     }
     activeUsers.get(userId)!.add(socket.id);
 
@@ -598,7 +618,13 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           await pub.decr('matchq:counter:queue');
         }
 
-        const me: QueuedUser = { userId, topics: userTopics, gender: userGender, preference };
+        const me: QueuedUser = { 
+          userId, 
+          topics: userTopics, 
+          gender: userGender, 
+          preference,
+          enqueuedAt: Date.now()
+        };
 
         // 3. Try O(1) instant match by popping from inverse queues
         const matchResult = await tryInstantMatch(pub, me);
@@ -1211,6 +1237,11 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         if (userSockets) {
           userSockets.delete(socket.id);
           if (userSockets.size === 0) {
+            activeUsers.delete(userId);
+            // Last socket closed - mark globally offline
+            const pub = redisClient.getClient();
+            pub.srem('presence:online_users', userId).catch(err => logger.error('Presence SREM failed', err));
+
             // ONLY clean up state if this was the last active socket for this user
             // Implementing gracefully delay of 5 seconds to support connection recovery/drops
             logger.info('Last user socket disconnected, starting 5s grace period', { userId });

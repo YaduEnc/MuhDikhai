@@ -176,7 +176,7 @@ const MessageMenu = memo(function MessageMenu({ msg, isSelf, onReact, onEdit, on
 
 // ─── Message Content Renderer (Random Chat) ───────────────────────────────────
 const RandomMessageContent = memo(function RandomMessageContent({ msg, isSelf, isEditing, editValue, setEditValue, onEditSubmit, onTimeUp }) {
-    const [revealed, setRevealed] = useState(isSelf || !msg.isVanish)
+    const [revealed, setRevealed] = useState(isSelf)
     const [timeLeft, setTimeLeft] = useState(msg.isVanish ? 10 : null)
 
     useEffect(() => {
@@ -433,6 +433,7 @@ export default function Chat({
     callOverlayStatus,
     matchingStats,
     onAddFriend,
+    authedFetch,
 }) {
     const [input, setInput] = useState('')
     const [showEmoji, setShowEmoji] = useState(false)
@@ -554,9 +555,8 @@ export default function Chat({
 
         try {
             const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
-            const res = await fetch(`${BACKEND_URL}/api/v1/messages/upload`, {
+            const res = await authedFetch(`${BACKEND_URL}/api/v1/messages/upload`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${session.accessToken}` },
                 body: formData
             })
             const json = await res.json()

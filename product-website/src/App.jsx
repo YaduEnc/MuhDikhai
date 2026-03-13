@@ -387,6 +387,7 @@ function App() {
     setShowChat(false)
     setIsTransitioning(false)
     setRoom(null)
+    setChatMessages([])
     setSocketState({ status: 'disconnected', phase: 'idle', socket: null })
   }
 
@@ -406,6 +407,7 @@ function App() {
     setShowChat(false)
     setIsTransitioning(false)
     setRoom(null)
+    setChatMessages([])
     setSocketState((prev) => ({ ...prev, phase: 'idle' }))
   }
 
@@ -626,7 +628,12 @@ function App() {
       )}
 
       <main className={(isInChat || socketState.phase === 'friend-chat') ? 'main-full' : ''}>
-        {isAdminView && isSignedIn && session.user.isAdmin && <AdminDashboard session={session} />}
+        {isAdminView && isSignedIn && session.user.isAdmin && (
+          <AdminDashboard 
+            session={session} 
+            authedFetch={authedFetch}
+          />
+        )}
         {!isAdminView && isHome && (
           <Home
             session={session}
@@ -636,6 +643,7 @@ function App() {
               initAudio()
               setIsTransitioning(true)
               setMatchPrefs({ topics, preference })
+              setChatMessages([])
               setSocketState((prev) => ({ ...prev, phase: 'matching' }))
               setTimeout(() => { setShowChat(true); setIsTransitioning(false); }, 600)
               setTimeout(() => socketRef.current?.emit('random:join', { topics, preference }), 50)
@@ -686,6 +694,7 @@ function App() {
             onDeleteMessage={handleDeleteRandomMessage}
             onTyping={handleTyping}
             onLeave={handleLeaveChat}
+            authedFetch={authedFetch}
             onInitiateCall={() => handleInitiateCall(room, 'random')}
             callOverlayStatus={callOverlayState.status}
             onSearchAgain={() => {

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import reportService from '../services/report.service';
+import matchmakingTelemetryService from '../services/matchmakingTelemetry.service';
 import { authenticate, isAdmin } from '../middleware/auth.middleware';
 import database from '../config/database';
 import redis from '../config/redis';
@@ -18,17 +19,16 @@ router.use(isAdmin);
  */
 router.get('/stats/live', async (_req: any, res: any) => {
     try {
-        // Get online count from Redis
-        const onlineCount = await redis.keys('user:status:*');
+        // Get online count from Redis set
+        const onlineCount = await redis.getClient().scard('presence:online_users');
 
         // In a real scenario, we might have more complex socket room tracking
-        // For now, let's get some basic session stats
         const activeSessionsResult = await database.query(
             "SELECT COUNT(*) as count FROM sessions WHERE is_active = true AND access_expires_at > CURRENT_TIMESTAMP"
         );
 
         res.json({
-            onlineUsers: onlineCount.length,
+            onlineUsers: onlineCount,
             activeSessions: parseInt(activeSessionsResult.rows[0].count, 10),
             timestamp: new Date().toISOString()
         });
@@ -61,6 +61,21 @@ router.get('/stats/growth', async (_req: any, res: any) => {
     } catch (error) {
         logger.error('Error fetching growth stats:', error);
         res.status(500).json({ error: 'Failed to fetch growth stats' });
+    }
+});
+
+/**
+ * @route   GET /api/v1/admin/matchmaking-stats
+ * @desc    Get real-time matchmaking telemetry
+ * @access  Admin
+ */
+router.get('/matchmaking-stats', async (_req: any, res: any) => {
+    try {
+        const stats = await matchmakingTelemetryService.getMatchmakingStats();
+        res.json(stats);
+    } catch (error) {
+        logger.error('Error fetching matchmaking stats:', error);
+        res.status(500).json({ error: 'Failed to fetch matchmaking telemetry' });
     }
 });
 

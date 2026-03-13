@@ -2325,3 +2325,74 @@
     font-size: 0.95rem;
     line-height: 1.5;
 }
+/* ── Media Privacy & Blur System ────────────────────────────────── */
+.media-privacy-wrap {
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    cursor: pointer;
+    background: #000;
+    line-height: 0;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.media-privacy-wrap:hover {
+    transform: scale(1.02);
+}
+
+.blur-media {
+    filter: blur(60px) brightness(0.7) saturate(1.2);
+    transform: scale(1.15); /* Overscale to hide blur edges */
+    transition: filter 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+}
+
+.revealed .blur-media {
+    filter: blur(0) brightness(1) saturate(1);
+    transform: scale(1);
+}
+
+.blur-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%);
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    transition: opacity 0.4s ease;
+}
+
+.revealed .blur-overlay {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.blur-icon {
+    font-size: 2.2rem;
+    margin-bottom: 0.8rem;
+    filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
+    animation: bounce-subtle 2s infinite ease-in-out;
+}
+
+@keyframes bounce-subtle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+.blur-text {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 0.5rem 1rem;
+    border-radius: 99px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
