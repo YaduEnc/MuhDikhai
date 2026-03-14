@@ -807,8 +807,8 @@ function App() {
         />
       )}
 
-      {/* Premium Server Down Overlay (Only show if we've lost an existing connection) */}
-      {(socketState.status === 'disconnected' || socketState.status === 'error') && hasConnectedOnce && (
+      {/* Premium Server Down Overlay (Only show if we've lost an existing connection and are logged in) */}
+      {(socketState.status === 'disconnected' || socketState.status === 'error') && hasConnectedOnce && session && (
         <div className="server-down-overlay">
           <div className="radar-container">
             <div className="radar-circle" />
