@@ -10,23 +10,7 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
     const [serverDown, setServerDown] = useState(false)
     const landingRef = useRef(null)
 
-    // Check server status on mount
-    useEffect(() => {
-        const checkServerStatus = async () => {
-            try {
-                const res = await fetch(`${BACKEND_URL}/health`)
-                if (!res.ok) {
-                    setServerDown(true)
-                } else {
-                    setServerDown(false)
-                }
-            } catch (err) {
-                // Network error, server is offline
-                setServerDown(true)
-            }
-        }
-        checkServerStatus()
-    }, [])
+    // Simplified Landing - Rely on App.jsx for connectivity status
 
     // Parallax effect for orbs
     useEffect(() => {
@@ -72,15 +56,6 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
 
     return (
         <div className="landing-wrapper" ref={landingRef}>
-            {serverDown && (
-                <div className="server-down-banner">
-                    <div className="banner-icon">⚠️</div>
-                    <div className="banner-content">
-                        <strong>Backend Offline / Maintenance Mode</strong>
-                        <p>Our matchmaking servers are currently taking a quick nap or undergoing an upgrade. Bhasad will resume shortly, please try again in a few minutes!</p>
-                    </div>
-                </div>
-            )}
 
             {/* Ambient Background Orbs */}
             <div className="aura-container">
@@ -112,9 +87,9 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                     </div>
                     <h1 className="hero-heading">
                         <span className="heading-bold">Muhdikhai.</span>
-                        <span className="heading-tender">No filters, pure chaos. 🌶️</span>
+                        <span className="heading-tender">Join the Chaos.</span>
                     </h1>
-                    <p className="hero-subtext">The loudest, most unfiltered random chat on the internet. Skip the small talk, seedha mudde pe aao.</p>
+                    <p className="hero-subtext">A beautifully curated random chat experience. No noise, just strangers.</p>
                     {authError && <p className="auth-error">{authError}</p>}
                     <button
                         className="btn-primary landing-btn"
@@ -122,7 +97,7 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                         disabled={authLoading}
                     >
                         <span className="btn-primary-dot" />
-                        {authLoading ? 'Darwaaza khul raha hai…' : 'Bhasad shuru karein 🔥'}
+                        {authLoading ? 'Getting you in…' : 'Start the Magic 🔥'}
                     </button>
                     <div className="hero-scroll-hint">
                         <span className="hint-arrow" />
@@ -194,12 +169,12 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                         No AI matching, no premium subscriptions to see who liked you. You get a room, you get a stranger, and you make it whatever you want.
                     </p>
                     <p className="story-note font-bold">
-                        Darr lag raha hai? Toh mat aao.
+                        Welcome to the new era of chat.
                     </p>
                 </article>
 
                 <article className="story-block story-block--secondary reveal-on-scroll">
-                    <h3 className="story-heading-sm">Built to Handle the Bhasad</h3>
+                    <h3 className="story-heading-sm">Built for the Connection</h3>
                     <p className="story-text">
                         Don't let the chaos fool you. Underneath, this is a highly optimized, encrypted real-time beast.
                     </p>

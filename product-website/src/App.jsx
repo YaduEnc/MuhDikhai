@@ -57,7 +57,7 @@ function App() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [room, setRoom] = useState(null)
   const [socketState, setSocketState] = useState({
-    status: 'disconnected',
+    status: 'connecting',
     phase: 'idle', // 'idle' | 'matching' | 'matched' | 'partner-left' | 'friend-chat'
     partnerStatus: 'offline'
   })
@@ -69,9 +69,9 @@ function App() {
   const [socketVersion, setSocketVersion] = useState(0)
   const [isAdminView, setIsAdminView] = useState(window.location.pathname === '/admin')
   const [unreadCounts, setUnreadCounts] = useState({})
-  const [matchingStats, setMatchingStats] = useState({ online: 0, inQueue: 0, matched: 0 })
   const [matchPrefs, setMatchPrefs] = useState({ topics: [], preference: 'everyone' })
   const [isInitializing, setIsInitializing] = useState(true)
+  const [hasConnectedOnce, setHasConnectedOnce] = useState(false)
 
   const [callOverlayState, setCallOverlayState] = useState({
     status: 'idle', // 'idle', 'requesting', 'incoming', 'active'
@@ -168,6 +168,7 @@ function App() {
         socket.on('connect', () => {
           refreshingRef.current = false
           setSocketState((prev) => ({ ...prev, socket, status: 'connected' }))
+          setHasConnectedOnce(true)
           // Fetch unread counts on connect
           authedFetch(`${BACKEND_URL}/api/v1/messages/unread-counts`)
             .then(r => r.json())
@@ -806,8 +807,8 @@ function App() {
         />
       )}
 
-      {/* Premium Server Down Overlay */}
-      {socketState.status === 'disconnected' && !isInitializing && (
+      {/* Premium Server Down Overlay (Only show if we've lost an existing connection) */}
+      {(socketState.status === 'disconnected' || socketState.status === 'error') && hasConnectedOnce && (
         <div className="server-down-overlay">
           <div className="radar-container">
             <div className="radar-circle" />
