@@ -14,6 +14,16 @@
     animation: chat-enter 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Match Found Shockwave */
+.chat-shell-v2.phase-matched {
+    animation: match-shockwave 1s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+@keyframes match-shockwave {
+    0% { filter: brightness(3) contrast(1.5); transform: scale(1.02); }
+    100% { filter: brightness(1) contrast(1); transform: scale(1); }
+}
+
 .chat-shell-v2::before {
     content: '';
     position: absolute;
@@ -125,7 +135,19 @@
 }
 
 .chat-partner-status.live {
-    color: #4ade80;
+    color: #00ffcc;
+    text-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+}
+
+.phase-matching .chat-partner-name {
+    animation: identity-sync-pulse 2s ease-in-out infinite;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.1em;
+}
+
+@keyframes identity-sync-pulse {
+    0%, 100% { opacity: 0.4; filter: blur(1px); }
+    50% { opacity: 0.8; filter: blur(0px); }
 }
 
 .chat-header-right {
@@ -261,21 +283,18 @@
 
 /* ── Matching Waiting State (Radar) ────────────────────────────────── */
 .chat-waiting {
-    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 3rem;
+    height: 100%;
     position: relative;
-    text-align: center;
     padding: 2rem;
-    background: radial-gradient(circle at center, rgba(251, 191, 119, 0.03) 0, transparent 70%);
 }
 
 .radar-container {
     position: relative;
-    width: 140px;
     height: 140px;
     display: flex;
     align-items: center;
@@ -377,34 +396,49 @@
 }
 
 .stat-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 0.75rem 0.5rem;
-    border-radius: 12px;
+    background: rgba(15, 20, 45, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 1.2rem 0.8rem;
+    border-radius: 16px;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    transition: all 0.3s ease;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    backdrop-filter: blur(8px);
+}
+
+.stat-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
 }
 
 .stat-card.highlight {
-    background: rgba(251, 191, 119, 0.05);
-    border-color: rgba(251, 191, 119, 0.15);
+    background: rgba(0, 255, 204, 0.03);
+    border-color: rgba(0, 255, 204, 0.2);
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.1);
 }
 
 .stat-value {
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: #fbbf77;
-    font-variant-numeric: tabular-nums;
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: #fff;
+    font-family: 'Outfit', sans-serif;
+    letter-spacing: -0.02em;
+}
+
+.stat-card.highlight .stat-value {
+    color: #00ffcc;
+    text-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
 }
 
 .stat-label {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: var(--text-muted);
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.3);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.15em;
 }
 
 .chat-waiting-text {

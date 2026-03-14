@@ -580,7 +580,7 @@ export default function Chat({
     ]
 
     return (
-        <div className="chat-shell-v2">
+        <div className={`chat-shell-v2 phase-${socketState.phase} ${vanishMode ? 'vanish-active' : ''}`}>
             {/* Header */}
             <div className="chat-header-v2">
                 <div className={`chat-header-left${isMatched ? ' clickable' : ''}`} onClick={() => isMatched && setShowProfile(room?.partner?.id)}>
@@ -593,7 +593,7 @@ export default function Chat({
                     </div>
                     <div className="chat-partner-info">
                         <span className="chat-partner-name">
-                            {room?.partner?.name || 'Finding someone…'}
+                            {isMatching ? 'SYNCING IDENTITY...' : (room?.partner?.name || 'Stranger')}
                             {isMatched && room?.partner?.auraPoints !== undefined && (
                                 <span
                                     className="partner-aura-badge"
@@ -606,10 +606,10 @@ export default function Chat({
                         </span>
                         <span className={`chat-partner-status${isMatched ? ' live' : ''}`}>
                             {isMatching
-                                ? 'Looking for a quiet match…'
+                                ? 'Protocols established...'
                                 : isMatched
-                                    ? 'Connected · end-to-end encrypted'
-                                    : 'Ready when you are'}
+                                    ? 'Quantum Link Active'
+                                    : 'Circuit broken'}
                         </span>
                         {isMatched && room?.topic && (
                             <span className="chat-shared-topic">

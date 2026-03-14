@@ -602,7 +602,7 @@ function App() {
 
   return (
     <div className={`page ${isAnyChat ? 'is-chat-page' : ''}`}>
-      <ExperienceBackground />
+      <ExperienceBackground phase={socketState.phase} isTyping={partnerTyping} />
       {!isAnyChat && (
         <header className="nav">
           <div className="nav-left">
