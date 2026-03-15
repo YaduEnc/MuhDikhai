@@ -41,6 +41,7 @@ const getCorsOrigins = () => {
     'https://yaduraj.me',
     'https://muhdikhai.yaduraj.me',
     'https://batchit.yaduraj.me',
+    'https://muh-dikhai-atchktjte-yaduluxes-projects.vercel.app',
   ];
 
   // In production, merge CORS_ORIGIN with default localhost origins
