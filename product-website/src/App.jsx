@@ -75,6 +75,7 @@ function App() {
   const [hasConnectedOnce, setHasConnectedOnce] = useState(false)
   const [isServerDown, setIsServerDown] = useState(false)
   const [suppressOverlay, setSuppressOverlay] = useState(false)
+  const [matchingStats, setMatchingStats] = useState(null)
 
   const [callOverlayState, setCallOverlayState] = useState({
     status: 'idle', // 'idle', 'requesting', 'incoming', 'active'
