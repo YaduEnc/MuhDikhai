@@ -30,12 +30,49 @@ const consoleFormat = winston.format.combine(
   })
 );
 
+// Custom transport to send alerts to external services (Discord/WhatsApp)
+class AlertTransport extends winston.transports.Console {
+  constructor(opts?: any) {
+    super(opts);
+  }
+
+  log(info: any, callback: () => void) {
+    setImmediate(async () => {
+      // Only notify for error level and avoid recursion
+      // info.level might be a string like 'error' or a colorized string
+      const isError = typeof info.level === 'string' && info.level.includes('error');
+      
+      if (isError && !info.isAlert) {
+        try {
+          // Lazy import to avoid circular dependency
+          const notificationService = (await import('../services/notification.service')).default;
+          await notificationService.sendAlert(
+            info.message || 'System Error',
+            info.error || info.message || 'No error message provided',
+            { ...info, isAlert: true } // Mark as already an alert
+          );
+        } catch (err) {
+          console.error('Critical: Failed to send alert notification', err);
+        }
+      }
+    });
+
+    if (callback) {
+      callback();
+    }
+  }
+}
+
 // Create transports
 const transports: winston.transport[] = [
   // Console transport
   new winston.transports.Console({
     format: process.env.NODE_ENV === 'production' ? logFormat : consoleFormat,
     level: process.env.LOG_LEVEL || 'info',
+  }),
+  // Alert transport for errors
+  new AlertTransport({
+    level: 'error',
   }),
 ];
 

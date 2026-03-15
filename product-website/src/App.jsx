@@ -72,6 +72,7 @@ function App() {
   const [matchPrefs, setMatchPrefs] = useState({ topics: [], preference: 'everyone' })
   const [isInitializing, setIsInitializing] = useState(true)
   const [hasConnectedOnce, setHasConnectedOnce] = useState(false)
+  const [isServerDown, setIsServerDown] = useState(false)
 
   const [callOverlayState, setCallOverlayState] = useState({
     status: 'idle', // 'idle', 'requesting', 'incoming', 'active'
@@ -807,8 +808,8 @@ function App() {
         />
       )}
 
-      {/* Premium Server Down Overlay (Only show if we've lost an existing connection and are logged in) */}
-      {(socketState.status === 'disconnected' || socketState.status === 'error') && hasConnectedOnce && session && (
+      {/* Premium Server Down Overlay (Proactive & Reactive) */}
+      {(isServerDown || ((socketState.status === 'disconnected' || socketState.status === 'error') && hasConnectedOnce && session)) && (
         <div className="server-down-overlay">
           <div className="radar-container">
             <div className="radar-circle" />
