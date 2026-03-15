@@ -72,29 +72,23 @@ function queueKey(gender: string, preference: string, topic?: string): string {
 /**
  * Given a user's gender + preference, return the inverse queue key(s)
  * we should try to pop from.
- *
- * For example: A *male* seeking *female* should pop from a queue where
- * a *female* is seeking *male* (or *everyone*).
  */
 function inverseQueueKeys(gender: string, preference: string, topic?: string): string[] {
   const keys: string[] = [];
 
   if (preference === 'everyone') {
-    // Accept anyone whose preference is 'everyone' or who specifically seeks my gender
     if (topic) {
       keys.push(queueKey('male', 'everyone', topic));
       keys.push(queueKey('female', 'everyone', topic));
       keys.push(queueKey('non-binary', 'everyone', topic));
       keys.push(queueKey('other', 'everyone', topic));
       keys.push(queueKey('prefer_not_to_say', 'everyone', topic));
-      // Also those specifically seeking my gender with this topic
       keys.push(queueKey('male', gender, topic));
       keys.push(queueKey('female', gender, topic));
       keys.push(queueKey('non-binary', gender, topic));
       keys.push(queueKey('other', gender, topic));
       keys.push(queueKey('prefer_not_to_say', gender, topic));
     }
-    // Without topic (broader)
     keys.push(queueKey('male', 'everyone'));
     keys.push(queueKey('female', 'everyone'));
     keys.push(queueKey('non-binary', 'everyone'));
@@ -106,8 +100,6 @@ function inverseQueueKeys(gender: string, preference: string, topic?: string): s
     keys.push(queueKey('other', gender));
     keys.push(queueKey('prefer_not_to_say', gender));
   } else {
-    // Specific preference (e.g. male seeking female)
-    // Pop from queues where the desired gender is waiting and they want me or everyone
     if (topic) {
       keys.push(queueKey(preference, gender, topic));
       keys.push(queueKey(preference, 'everyone', topic));
@@ -116,7 +108,6 @@ function inverseQueueKeys(gender: string, preference: string, topic?: string): s
     keys.push(queueKey(preference, 'everyone'));
   }
 
-  // Return unique keys (we DO NOT filter out myKey because users can match with others in the same bucket)
   return [...new Set(keys)];
 }
 
@@ -132,15 +123,110 @@ async function acquireMatchLock(pub: any, userId: string, retries = 10, delayMs 
   return false;
 }
 
+// ─── Atomic Lua Script for Match-or-Enqueue ─────────────────────────
+// This script atomically: checks inverse queues for a valid partner,
+// validates heartbeat, acquires lock, and either matches or enqueues.
+// Eliminates ALL race conditions from the previous multi-roundtrip approach.
+const MATCH_OR_ENQUEUE_LUA = `
+-- KEYS: [1..N] = inverse queue keys to check, [N+1..M] = my enqueue keys
+-- ARGV: [1] = my userId, [2] = my JSON data, [3] = number of inverse keys,
+--       [4] = heartbeat key, [5] = heartbeat TTL, [6] = user_rooms hash key,
+--       [7] = queue counter key
+
+local myUserId = ARGV[1]
+local myData = ARGV[2]
+local numInverseKeys = tonumber(ARGV[3])
+local heartbeatKey = ARGV[4]
+local heartbeatTTL = tonumber(ARGV[5])
+local userRoomsKey = ARGV[6]
+local queueCounterKey = ARGV[7]
+
+-- Phase 1: Try to find a valid partner from inverse queues
+for i = 1, numInverseKeys do
+  local key = KEYS[i]
+  local qLen = redis.call('LLEN', key)
+  local skipList = {}
+  local matched = false
+
+  for j = 1, qLen do
+    local popped = redis.call('RPOP', key)
+    if not popped then break end
+
+    local partnerData = cjson.decode(popped)
+    local partnerUserId = partnerData['userId']
+
+    -- Skip self
+    if partnerUserId == myUserId then
+      skipList[#skipList + 1] = popped
+    else
+      -- Validate: check heartbeat exists (not a ghost)
+      local partnerHB = redis.call('GET', 'matchq:heartbeat:' .. partnerUserId)
+      if not partnerHB then
+        -- Ghost entry, discard silently (don't put back)
+      else
+        -- Validate: check not already matched
+        local existingRoom = redis.call('HGET', userRoomsKey, partnerUserId)
+        if existingRoom then
+          -- Already matched, discard
+        else
+          -- Try to lock the partner atomically
+          local lockOk = redis.call('SET', 'matchq:lock:' .. partnerUserId, '1', 'EX', 5, 'NX')
+          if lockOk then
+            -- MATCH FOUND! Put back any skipped users first
+            for _, skipped in ipairs(skipList) do
+              redis.call('RPUSH', key, skipped)
+            end
+            -- Decrement queue counter for partner leaving
+            redis.call('DECR', queueCounterKey)
+            -- Delete partner heartbeat (they're matched now)
+            redis.call('DEL', 'matchq:heartbeat:' .. partnerUserId)
+            -- Return partner data
+            return {'MATCHED', popped}
+          else
+            -- Could not lock, put back
+            skipList[#skipList + 1] = popped
+          end
+        end
+      end
+    end
+  end
+
+  -- Put back all skipped valid users (in reverse to maintain order)
+  for k = #skipList, 1, -1 do
+    redis.call('RPUSH', key, skipList[k])
+  end
+
+  if matched then break end
+end
+
+-- Phase 2: No match found — enqueue myself
+-- Set heartbeat
+redis.call('SET', heartbeatKey, myData, 'EX', heartbeatTTL)
+
+-- Push to all my queue keys (keys after the inverse keys)
+for i = numInverseKeys + 1, #KEYS do
+  redis.call('LPUSH', KEYS[i], myData)
+  redis.call('EXPIRE', KEYS[i], 120) -- Auto-cleanup stale buckets after 2 min
+end
+
+-- Increment queue counter
+redis.call('INCR', queueCounterKey)
+
+return {'QUEUED', ''}
+`;
+
 /**
  * Emit stats about the matching system to all connected users
  */
 async function emitMatchingStats(io: any) {
   try {
     const pub = redisClient.getClient();
-    // Use a simple counter key instead of scanning all queues
-    const queueLen = parseInt(await pub.get('matchq:counter:queue') || '0');
-    const matchedLen = parseInt(await pub.get('matchq:counter:matched') || '0');
+    const pipeline = pub.pipeline();
+    pipeline.get('matchq:counter:queue');
+    pipeline.get('matchq:counter:matched');
+    const results = await pipeline.exec();
+    const queueLen = parseInt((results?.[0]?.[1] as string) || '0');
+    const matchedLen = parseInt((results?.[1]?.[1] as string) || '0');
     const stats = {
       online: activeUsers.size,
       inQueue: Math.max(0, queueLen),
@@ -149,7 +235,6 @@ async function emitMatchingStats(io: any) {
     io.emit('random:stats', stats);
   } catch (e) { /* ignore */ }
 }
-
 
 /**
  * Track a file uploaded to a specific room
@@ -253,89 +338,57 @@ export const socketAuth = async (socket: AuthenticatedSocket, next: (err?: Exten
  */
 
 /**
- * Try to instantly match a user by popping from inverse queues. O(1).
- * Returns the matched partner's QueuedUser data if found, null otherwise.
+ * Execute the atomic Lua match-or-enqueue script.
+ * Returns { matched: true, partnerData: string } or { matched: false }.
  */
-async function tryInstantMatch(
+async function atomicMatchOrEnqueue(
   pub: any,
   user: QueuedUser
-): Promise<{ partner: QueuedUser; topic: string } | null> {
-  const { gender, preference, topics } = user;
+): Promise<{ matched: true; partnerData: string } | { matched: false }> {
+  const { userId, gender, preference, topics } = user;
+  const myData = JSON.stringify(user);
 
-  const tryMatchOnKeys = async (keys: string[], getSharedTopic: (p: QueuedUser) => string) => {
-    for (const key of keys) {
-      const poppedToPutBack: string[] = [];
-      let matchedPartner: QueuedUser | null = null;
-
-      while (true) {
-        const popped = await pub.rpop(key);
-        if (!popped) break; // Queue is empty
-
-        const partner: QueuedUser = JSON.parse(popped);
-
-        // Don't match with ourselves! Save to put back and keep looking.
-        if (partner.userId === user.userId) {
-          poppedToPutBack.push(popped);
-          continue;
-        }
-
-        const lockPartner = await pub.set(`matchq:lock:${partner.userId}`, '1', 'EX', 5, 'NX');
-        if (!lockPartner) {
-          poppedToPutBack.push(popped);
-          continue;
-        }
-
-        const alreadyMatched = await pub.hget('random:user_rooms', partner.userId);
-        if (alreadyMatched) {
-          await pub.del(`matchq:lock:${partner.userId}`);
-          continue; // Ghost user, skip entirely (already matched)
-        }
-
-        const heartbeat = await pub.get(`matchq:heartbeat:${partner.userId}`);
-        if (!heartbeat) {
-          await pub.del(`matchq:lock:${partner.userId}`);
-          continue; // Ghost user, skip entirely (disconnected)
-        }
-
-        // Match found!
-        matchedPartner = partner;
-        await pub.decr('matchq:counter:queue'); // Partner left queue
-        break;
-      }
-
-      // Restore users we popped but shouldn't have (in reverse order to maintain queue LIFO/FIFO)
-      // Since rpop takes from the right, to put them back at the right end maintaining their order, 
-      // we must rpush them in the reverse order they were popped.
-      if (poppedToPutBack.length > 0) {
-        for (let i = poppedToPutBack.length - 1; i >= 0; i--) {
-          await pub.rpush(key, poppedToPutBack[i]);
-        }
-      }
-
-      if (matchedPartner) {
-        return { partner: matchedPartner, topic: getSharedTopic(matchedPartner) };
-      }
-    }
-    return null;
-  };
-
-  // Phase 1: Try topic-specific queues first (best match quality)
+  // Build inverse keys (where we look for a partner)
+  const inverseKeys: string[] = [];
   if (topics && topics.length > 0) {
     for (const topic of topics) {
-      const keys = inverseQueueKeys(gender, preference, topic);
-      const result = await tryMatchOnKeys(keys, () => topic);
-      if (result) return result;
+      inverseKeys.push(...inverseQueueKeys(gender, preference, topic));
     }
   }
+  inverseKeys.push(...inverseQueueKeys(gender, preference));
+  // Deduplicate
+  const uniqueInverseKeys = [...new Set(inverseKeys)];
 
-  // Phase 2: Try generic (no topic) queues
-  const genericKeys = inverseQueueKeys(gender, preference);
-  const result = await tryMatchOnKeys(genericKeys, (partner) => {
-    const shared = partner.topics?.filter((t: string) => topics?.includes(t)) || [];
-    return shared[0] || '';
-  });
+  // Build my enqueue keys (where I'll sit if no match)
+  const myKeys: string[] = [];
+  if (topics && topics.length > 0) {
+    for (const topic of topics) {
+      myKeys.push(queueKey(gender, preference, topic));
+    }
+  }
+  myKeys.push(queueKey(gender, preference));
+  const uniqueMyKeys = [...new Set(myKeys)];
 
-  return result;
+  // All KEYS = inverse keys + my enqueue keys
+  const allKeys = [...uniqueInverseKeys, ...uniqueMyKeys];
+
+  const result = await pub.eval(
+    MATCH_OR_ENQUEUE_LUA,
+    allKeys.length,
+    ...allKeys,
+    userId,                          // ARGV[1]
+    myData,                          // ARGV[2]
+    uniqueInverseKeys.length.toString(), // ARGV[3]
+    `matchq:heartbeat:${userId}`,    // ARGV[4]
+    '30',                            // ARGV[5] heartbeat TTL
+    'random:user_rooms',             // ARGV[6]
+    'matchq:counter:queue'           // ARGV[7]
+  );
+
+  if (result && result[0] === 'MATCHED') {
+    return { matched: true, partnerData: result[1] };
+  }
+  return { matched: false };
 }
 
 /**
@@ -402,88 +455,134 @@ async function finalizeMatch(
 }
 
 /**
- * Background sweep: try to match any two compatible users already sitting in queues.
- * This catches the case where two users joined at nearly the same time and both
- * ended up in separate queue buckets without finding each other.
+ * Redis Streams-based background sweep via consumer groups.
+ * Replaces the old SCAN-based sweep that blocked Redis at scale.
+ *
+ * When a user fails instant matching, they are added to a Redis Stream.
+ * This consumer reads from the stream and retries matching them.
+ * Multiple server instances can each run a consumer — Redis handles load balancing.
  */
-async function sweepAndMatch(io: SocketIOServer, pub: any): Promise<void> {
+async function streamSweepConsumer(io: SocketIOServer, pub: any): Promise<void> {
+  const streamKey = 'matchq:stream';
+  const groupName = 'matchmaker';
+  const consumerName = `worker-${process.pid}`;
+
   try {
-    const bucketKeys: string[] = [];
-    let cursor = '0';
-    do {
-      const [nextCursor, keys] = await pub.scan(cursor, 'MATCH', 'matchq:*', 'COUNT', 100);
-      cursor = nextCursor;
-      
-      const filtered = keys.filter((k: string) =>
-        !k.startsWith('matchq:heartbeat:') &&
-        !k.startsWith('matchq:counter:') &&
-        !k.startsWith('matchq:lock:') &&
-        !k.startsWith('matchq:metrics:')
-      );
-      bucketKeys.push(...filtered);
-    } while (cursor !== '0');
+    // Read up to 10 pending match requests, block for 1s if none available
+    const results = await pub.xreadgroup(
+      'GROUP', groupName, consumerName,
+      'COUNT', 10, 'BLOCK', 1000,
+      'STREAMS', streamKey, '>'
+    );
 
-    if (bucketKeys.length === 0) return;
+    if (!results || results.length === 0) return;
 
-    for (const key of bucketKeys) {
-      const poppedStr = await pub.rpop(key);
-      if (!poppedStr) continue;
+    const entries = results[0][1]; // [[id, [field, value, ...]], ...]
 
-      let candidate: QueuedUser;
+    for (const [entryId, fields] of entries) {
       try {
-        candidate = JSON.parse(poppedStr);
-      } catch { continue; }
-
-      const lockMe = await pub.set(`matchq:lock:${candidate.userId}`, '1', 'EX', 5, 'NX');
-      if (!lockMe) {
-        await pub.rpush(key, poppedStr);
-        continue;
-      }
-
-      try {
-        const heartbeat = await pub.get(`matchq:heartbeat:${candidate.userId}`);
-        if (!heartbeat) continue;
-
-        const alreadyMatched = await pub.hget('random:user_rooms', candidate.userId);
-        if (alreadyMatched) continue;
-
-        const matchResult = await tryInstantMatch(pub, candidate);
-        if (matchResult) {
-          for (const otherKey of bucketKeys) {
-            if (otherKey !== key) {
-              await pub.lrem(otherKey, 0, poppedStr);
-            }
-          }
-          await pub.decr('matchq:counter:queue');
-          logger.info('Background sweep matched users', {
-            userA: candidate.userId,
-            userB: matchResult.partner.userId,
-            topic: matchResult.topic
-          });
-          await finalizeMatch(io, pub, candidate, matchResult.partner, matchResult.topic);
-        } else {
-          await pub.rpush(key, poppedStr);
+        // Parse fields array into object
+        const data: Record<string, string> = {};
+        for (let i = 0; i < fields.length; i += 2) {
+          data[fields[i]] = fields[i + 1];
         }
-      } finally {
-        await pub.del(`matchq:lock:${candidate.userId}`);
+
+        const candidate: QueuedUser = JSON.parse(data.userData);
+
+        // Validate: heartbeat still alive? Not already matched?
+        const pipeline = pub.pipeline();
+        pipeline.get(`matchq:heartbeat:${candidate.userId}`);
+        pipeline.hget('random:user_rooms', candidate.userId);
+        const checks = await pipeline.exec();
+
+        const heartbeat = checks?.[0]?.[1];
+        const existingRoom = checks?.[1]?.[1];
+
+        if (!heartbeat || existingRoom) {
+          // Ghost or already matched, ACK and skip
+          await pub.xack(streamKey, groupName, entryId);
+          continue;
+        }
+
+        // Try atomic match
+        const matchResult = await atomicMatchOrEnqueue(pub, candidate);
+
+        if (matchResult.matched) {
+          const partner: QueuedUser = JSON.parse(matchResult.partnerData);
+          const sharedTopics = candidate.topics?.filter((t: string) => partner.topics?.includes(t)) || [];
+          const topic = sharedTopics[0] || '';
+
+          // The Lua script already decremented the queue counter for the partner.
+          // Now decrement for the candidate who also left the queue.
+          await pub.decr('matchq:counter:queue');
+          // Remove candidate's heartbeat (they're matched now)
+          await pub.del(`matchq:heartbeat:${candidate.userId}`);
+
+          logger.info('Stream consumer matched users', {
+            userA: candidate.userId,
+            userB: partner.userId,
+            topic
+          });
+
+          await finalizeMatch(io, pub, candidate, partner, topic);
+        }
+        // If not matched, the Lua script already re-enqueued them,
+        // so we don't need to do anything.
+
+        // ACK the entry regardless
+        await pub.xack(streamKey, groupName, entryId);
+
+      } catch (entryErr) {
+        logger.error('Stream consumer entry error', { entryId, error: entryErr });
+        // ACK even on error to prevent infinite retries on bad data
+        await pub.xack(streamKey, groupName, entryId).catch(() => {});
       }
     }
-  } catch (error) {
-    logger.error('Matchmaker sweep error', {
+  } catch (error: any) {
+    // Ignore NOGROUP error on first run (group not yet created)
+    if (error?.message?.includes('NOGROUP')) return;
+    logger.error('Stream sweep consumer error', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 }
 
 /**
- * Background worker: emits stats, runs periodic match sweep, cleans up ghost entries.
+ * Initialize the Redis Stream and consumer group for matchmaking.
+ */
+async function initMatchmakerStream(pub: any): Promise<void> {
+  const streamKey = 'matchq:stream';
+  try {
+    // Create the consumer group. MKSTREAM creates the stream if it doesn't exist.
+    await pub.xgroup('CREATE', streamKey, 'matchmaker', '0', 'MKSTREAM');
+    logger.info('Matchmaker stream consumer group created');
+  } catch (error: any) {
+    // BUSYGROUP = group already exists, which is fine
+    if (!error.message?.includes('BUSYGROUP')) {
+      logger.error('Failed to create matchmaker stream group', { error });
+    }
+  }
+}
+
+/**
+ * Background worker: emits stats, runs stream consumer, trims stream.
  */
 export function startMatchmakerWorker(io: SocketIOServer, pubClient: any) {
+  // Initialize stream & consumer group
+  initMatchmakerStream(pubClient);
+
   // Emit stats every 5s
   setInterval(() => emitMatchingStats(io), 5000);
 
-  // Run match sweep every 3s to catch users who missed instant matching
-  setInterval(() => sweepAndMatch(io, pubClient), 3000);
+  // Run stream consumer every 2s (replaces the old SCAN-based sweep)
+  setInterval(() => streamSweepConsumer(io, pubClient), 2000);
+
+  // Trim the stream periodically to prevent memory leaks (~every 30s)
+  setInterval(async () => {
+    try {
+      await pubClient.xtrim('matchq:stream', 'MAXLEN', '~', 1000);
+    } catch (e) { /* ignore */ }
+  }, 30000);
 
   // Initialize counters if not present
   pubClient.setnx('matchq:counter:queue', '0');
@@ -626,26 +725,22 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           enqueuedAt: Date.now()
         };
 
-        // 3. Try O(1) instant match by popping from inverse queues
-        const matchResult = await tryInstantMatch(pub, me);
+        // 3. Atomic match-or-enqueue via Lua script (zero race conditions)
+        const matchResult = await atomicMatchOrEnqueue(pub, me);
 
-        if (matchResult) {
+        if (matchResult.matched) {
           // INSTANT MATCH FOUND! Finalize it.
-          await finalizeMatch(io, pub, me, matchResult.partner, matchResult.topic);
+          const partner: QueuedUser = JSON.parse(matchResult.partnerData);
+          const sharedTopics = me.topics?.filter((t: string) => partner.topics?.includes(t)) || [];
+          const topic = sharedTopics[0] || '';
+          await finalizeMatch(io, pub, me, partner, topic);
         } else {
-          // 4. No match found — push me into my queue bucket
-          await pub.set(`matchq:heartbeat:${userId}`, JSON.stringify(me), 'EX', 30);
-
-          if (userTopics.length > 0) {
-            for (const topic of userTopics) {
-              const key = queueKey(userGender, preference, topic);
-              await pub.lpush(key, JSON.stringify(me));
-            }
-          }
-          const genericKey = queueKey(userGender, preference);
-          await pub.lpush(genericKey, JSON.stringify(me));
-
-          await pub.incr('matchq:counter:queue');
+          // No match found — Lua already enqueued us + set heartbeat.
+          // Also add to Redis Stream for the background consumer group to retry.
+          await pub.xadd(
+            'matchq:stream', 'MAXLEN', '~', '2000', '*',
+            'userData', JSON.stringify(me)
+          );
           socket.emit('random:waiting');
           emitMatchingStats(io);
         }
