@@ -10,6 +10,7 @@ import FriendChat from './components/FriendChat'
 import CallOverlay from './components/CallOverlay'
 import VibeCheckModal from './components/VibeCheckModal'
 import LegalPages from './components/LegalPages'
+import PWAInstallPrompt from './components/PWAInstallPrompt'
 import { auth } from './firebaseClient'
 import { onAuthStateChanged } from 'firebase/auth'
 
@@ -910,6 +911,7 @@ function App() {
           </div>
         </div>
       )}
+      <PWAInstallPrompt />
     </div>
   )
 }
