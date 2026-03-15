@@ -50,6 +50,24 @@ class MatchmakingTelemetryService {
       // 5. Get Active Rooms Count
       const activeRooms = await pub.hlen('random:rooms');
 
+      // 6. Get User Locations for Globe (formatted for Cobe)
+      const userLocations: { location: [number, number], size: number }[] = [];
+      
+      // Redis GEO stores as zset scores (52-bit integers). 
+      // It's easier to just use GEOPOS for all members found.
+      const userIds = await pub.zrange('presence:geo', 0, -1);
+      if (userIds.length > 0) {
+        const positions = await pub.geopos('presence:geo', ...userIds);
+        positions.forEach(pos => {
+          if (pos) {
+            userLocations.push({
+              location: [parseFloat(pos[1]), parseFloat(pos[0])], // [lat, long] for globe
+              size: 0.05
+            });
+          }
+        });
+      }
+
       return {
         timestamp: new Date().toISOString(),
         queues: {
@@ -60,7 +78,8 @@ class MatchmakingTelemetryService {
           avgLatencyMs: Math.round(avgLatency),
           recentSampleCount: latencies.length,
           totalMatchedSinceStart: parseInt(totalMatched),
-          activeRooms
+          activeRooms,
+          userLocations
         },
         health: {
           redisMemoryUsed: usedMemory,

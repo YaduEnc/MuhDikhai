@@ -11,6 +11,7 @@ import matchService from '../services/match.service';
 import logger from '../utils/logger';
 import { createAdapter } from '@socket.io/redis-adapter';
 import redisClient from './redis';
+import geoip from 'geoip-lite';
 import { ExtendedError } from 'socket.io/dist/namespace';
 
 interface SocketUser {
@@ -127,11 +128,15 @@ async function acquireMatchLock(pub: any, userId: string, retries = 10, delayMs 
 // This script atomically: checks inverse queues for a valid partner,
 // validates heartbeat, acquires lock, and either matches or enqueues.
 // Eliminates ALL race conditions from the previous multi-roundtrip approach.
+//
+// IMPORTANT: ioredis adds keyPrefix to KEYS[] automatically, but NOT to
+// hardcoded key strings inside Lua. We pass the prefix as ARGV[8] and
+// prepend it to all dynamic key references.
 const MATCH_OR_ENQUEUE_LUA = `
 -- KEYS: [1..N] = inverse queue keys to check, [N+1..M] = my enqueue keys
 -- ARGV: [1] = my userId, [2] = my JSON data, [3] = number of inverse keys,
 --       [4] = heartbeat key, [5] = heartbeat TTL, [6] = user_rooms hash key,
---       [7] = queue counter key
+--       [7] = queue counter key, [8] = key prefix (e.g. 'plasticworld:')
 
 local myUserId = ARGV[1]
 local myData = ARGV[2]
@@ -140,13 +145,13 @@ local heartbeatKey = ARGV[4]
 local heartbeatTTL = tonumber(ARGV[5])
 local userRoomsKey = ARGV[6]
 local queueCounterKey = ARGV[7]
+local prefix = ARGV[8]
 
 -- Phase 1: Try to find a valid partner from inverse queues
 for i = 1, numInverseKeys do
   local key = KEYS[i]
   local qLen = redis.call('LLEN', key)
   local skipList = {}
-  local matched = false
 
   for j = 1, qLen do
     local popped = redis.call('RPOP', key)
@@ -160,26 +165,26 @@ for i = 1, numInverseKeys do
       skipList[#skipList + 1] = popped
     else
       -- Validate: check heartbeat exists (not a ghost)
-      local partnerHB = redis.call('GET', 'matchq:heartbeat:' .. partnerUserId)
+      local partnerHB = redis.call('GET', prefix .. 'matchq:heartbeat:' .. partnerUserId)
       if not partnerHB then
         -- Ghost entry, discard silently (don't put back)
       else
         -- Validate: check not already matched
-        local existingRoom = redis.call('HGET', userRoomsKey, partnerUserId)
+        local existingRoom = redis.call('HGET', prefix .. 'random:user_rooms', partnerUserId)
         if existingRoom then
           -- Already matched, discard
         else
           -- Try to lock the partner atomically
-          local lockOk = redis.call('SET', 'matchq:lock:' .. partnerUserId, '1', 'EX', 5, 'NX')
+          local lockOk = redis.call('SET', prefix .. 'matchq:lock:' .. partnerUserId, '1', 'EX', 5, 'NX')
           if lockOk then
             -- MATCH FOUND! Put back any skipped users first
             for _, skipped in ipairs(skipList) do
               redis.call('RPUSH', key, skipped)
             end
             -- Decrement queue counter for partner leaving
-            redis.call('DECR', queueCounterKey)
+            redis.call('DECR', prefix .. 'matchq:counter:queue')
             -- Delete partner heartbeat (they're matched now)
-            redis.call('DEL', 'matchq:heartbeat:' .. partnerUserId)
+            redis.call('DEL', prefix .. 'matchq:heartbeat:' .. partnerUserId)
             -- Return partner data
             return {'MATCHED', popped}
           else
@@ -195,13 +200,11 @@ for i = 1, numInverseKeys do
   for k = #skipList, 1, -1 do
     redis.call('RPUSH', key, skipList[k])
   end
-
-  if matched then break end
 end
 
 -- Phase 2: No match found — enqueue myself
 -- Set heartbeat
-redis.call('SET', heartbeatKey, myData, 'EX', heartbeatTTL)
+redis.call('SET', prefix .. heartbeatKey, myData, 'EX', heartbeatTTL)
 
 -- Push to all my queue keys (keys after the inverse keys)
 for i = numInverseKeys + 1, #KEYS do
@@ -210,10 +213,11 @@ for i = numInverseKeys + 1, #KEYS do
 end
 
 -- Increment queue counter
-redis.call('INCR', queueCounterKey)
+redis.call('INCR', prefix .. 'matchq:counter:queue')
 
 return {'QUEUED', ''}
 `;
+
 
 /**
  * Emit stats about the matching system to all connected users
@@ -372,6 +376,9 @@ async function atomicMatchOrEnqueue(
   // All KEYS = inverse keys + my enqueue keys
   const allKeys = [...uniqueInverseKeys, ...uniqueMyKeys];
 
+  // Get the key prefix from the Redis client options
+  const keyPrefix = (pub.options?.keyPrefix) || '';
+
   const result = await pub.eval(
     MATCH_OR_ENQUEUE_LUA,
     allKeys.length,
@@ -382,7 +389,8 @@ async function atomicMatchOrEnqueue(
     `matchq:heartbeat:${userId}`,    // ARGV[4]
     '30',                            // ARGV[5] heartbeat TTL
     'random:user_rooms',             // ARGV[6]
-    'matchq:counter:queue'           // ARGV[7]
+    'matchq:counter:queue',          // ARGV[7]
+    keyPrefix                        // ARGV[8] key prefix
   );
 
   if (result && result[0] === 'MATCHED') {
@@ -662,6 +670,16 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
       pubClient.sadd('presence:online_users', userId).catch(err => logger.error('Presence SADD failed', err));
     }
     activeUsers.get(userId)!.add(socket.id);
+    
+    // GeoIP Telemetry
+    const ip = socket.handshake.address === '::1' ? '122.161.48.1' : socket.handshake.address.replace('::ffff:', '');
+    const geo = geoip.lookup(ip);
+    if (geo) {
+      const [lat, long] = geo.ll;
+      pubClient.geoadd('presence:geo', long, lat, userId).catch(() => {});
+      // Store user's last known location for API visibility
+      pubClient.hset(`user:${userId}:meta`, 'location', JSON.stringify({ lat, long, city: geo.city, country: geo.country })).catch(() => {});
+    }
 
     // Join user's personal room
     socket.join(`user:${userId}`);
@@ -1398,6 +1416,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
 
                 // User is no longer online
                 activeUsers.delete(userId);
+                await pub.zrem('presence:geo', userId).catch(() => {});
                 await userService.updateStatus(userId, 'offline');
                 io.emit('user:offline', { userId, name });
                 io.emit('presence:count', { count: activeUsers.size });

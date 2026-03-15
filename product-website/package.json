@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "cobe": "^0.6.5",
     "firebase": "^12.10.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-spring": "^10.0.3",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
