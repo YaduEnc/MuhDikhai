@@ -73,6 +73,7 @@ function App() {
   const [isInitializing, setIsInitializing] = useState(true)
   const [hasConnectedOnce, setHasConnectedOnce] = useState(false)
   const [isServerDown, setIsServerDown] = useState(false)
+  const [suppressOverlay, setSuppressOverlay] = useState(false)
 
   const [callOverlayState, setCallOverlayState] = useState({
     status: 'idle', // 'idle', 'requesting', 'incoming', 'active'
@@ -836,37 +837,76 @@ function App() {
         />
       )}
 
-      {/* Premium Server Down Overlay (Proactive & Reactive) */}
-      {!isInitializing && (isServerDown || ((socketState.status === 'disconnected' || socketState.status === 'error') && hasConnectedOnce && session)) && (
+      {/* Premium Server Down Overlay (Proactive & Reactive Cyberpunk Theme) */}
+      {!isInitializing && !suppressOverlay && (isServerDown || ((socketState.status === 'disconnected' || socketState.status === 'error') && hasConnectedOnce && session)) && (
         <div className="server-down-overlay">
-          <div className="radar-container">
-            <div className="radar-circle" />
-            <div className="radar-circle" />
-            <div className="radar-circle" />
-            <div className="radar-circle" />
-            <div className="radar-scanner" />
+          <div className="perspective-grid"></div>
+          <div className="grid-overlay"></div>
+
+          <div className="terminal-window">
+             <div className="terminal-header">
+                <div className="dot dot-red"></div>
+                <div className="dot dot-yellow"></div>
+                <div className="dot dot-green"></div>
+             </div>
+             <div className="terminal-content">
+                <p>&gt; RECOVERY_MODE_ACTIVE</p>
+                <p>&gt; OPTIMIZING_DATABASES...</p>
+                <p>&gt; REROUTING_TRAFFIC...</p>
+                <p>&gt; COMPILING_ASSETS...</p>
+                <p>&gt; ESTABLISHING_SECURE_NODE...</p>
+                <p>&gt; SYNCING_REDIS_CLUSTERS...</p>
+                <p>&gt; HEARTBEAT_MISSING_REROUTING...</p>
+                <p>&gt; CLEANING_GHOST_ENTRIES...</p>
+                <p>&gt; RECOVERY_PROGRESS_98_PERCENT</p>
+             </div>
           </div>
 
-          <div className="server-down-content">
-            <h1>Chaos is paused.</h1>
-            <p>Our server is taking a quick nap (probably upgrading the madness). We'll be back online in just a few minutes.</p>
+          <div className="cyber-orb-container">
+            <div className="orb-glow"></div>
+            <img 
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBTitDRCngRu8Xl3EjpGTqWIDfQlLybZHUtXLXH7N-vrV1jqlBwN7ikFOoX12hvDHBfU4uDFG5jtU-pjCAHpcMT24INkhJ1Odng6WgyKSfcx8PbldrhQja-Bw0SxOZ5PRSNwq4IdUnl_PdYWeuba7d58Cc6OFm6y79RM_R5HwF5QyECvLEyk6SKOX2yBIARWhslT47eFKkW7MX_Wh0wdVu6EhjZaQ8fZ-UWb9EetHGha97-BSm1TGCRzzzP2iKzvAyL--TfwnYFXb76" 
+              alt="Server Orb" 
+              className="cyber-orb"
+            />
+          </div>
 
-            <div className="wa-group-card">
-              <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 600 }}>Get notified when we're back!</p>
-              <a 
-                href="https://chat.whatsapp.com/IhbRhUPtxC5FlHJyUlPEDB" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="wa-group-btn"
-              >
-                <svg className="wa-icon" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 0 5.414 0 12.05c0 2.123.55 4.197 1.592 6.02L0 24l6.149-1.613a11.758 11.758 0 005.9 1.594h.005c6.634 0 12.05-5.414 12.05-12.05 0-3.217-1.252-6.242-3.525-8.514z"/>
-                </svg>
-                Join Chaos Status Group
-              </a>
+          <h1 className="cyber-glitch-title" data-text="CHAOS IS PAUSED">
+            CHAOS IS PAUSED
+          </h1>
+          <p className="cyber-subtext">
+            Our server is taking a quick nap (probably upgrading the madness). 
+            We'll be back online in just a few minutes.
+          </p>
+
+          <div className="cyber-btn-group">
+            <a 
+              href="https://chat.whatsapp.com/IhbRhUPtxC5FlHJyUlPEDB" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="cyber-btn-wa"
+            >
+              <svg className="wa-icon" viewBox="0 0 24 24" fill="currentColor" style={{ width: '24px', height: '24px' }}>
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 0 5.414 0 12.05c0 2.123.55 4.197 1.592 6.02L0 24l6.149-1.613a11.758 11.758 0 005.9 1.594h.005c6.634 0 12.05-5.414 12.05-12.05 0-3.217-1.252-6.242-3.525-8.514z"/>
+              </svg>
+              Join Status Group
+            </a>
+            <button className="cyber-btn-secondary" onClick={() => window.location.reload()}>
+              RETRY CONNECTION
+            </button>
+            <button className="cyber-btn-preview" onClick={() => setSuppressOverlay(true)}>
+              VIEW LANDING PREVIEW
+            </button>
+          </div>
+
+          <div className="neon-progress-container">
+            <div className="progress-header">
+              <span>RECONNECTING...</span>
+              <span>98% COMPLETE</span>
             </div>
-
-            <div className="reconnecting-text">Reconnecting...</div>
+            <div className="progress-track">
+              <div className="progress-bar-fill"></div>
+            </div>
           </div>
         </div>
       )}
