@@ -139,6 +139,34 @@ function App() {
     return () => clearInterval(interval)
   }, [socketState.phase])
 
+  // ── Proactive Server Health Monitor ──────────────────────────
+  // Pings /health every 15s to detect outages even before login
+  useEffect(() => {
+    let mounted = true
+    const checkHealth = async () => {
+      try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 5000)
+        const res = await fetch(`${BACKEND_URL}/health`, {
+          method: 'GET',
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        clearTimeout(timeout)
+        if (mounted) setIsServerDown(!res.ok)
+      } catch {
+        if (mounted) setIsServerDown(true)
+      }
+    }
+
+    checkHealth() // Check immediately on mount
+    const interval = setInterval(checkHealth, 15000)
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
+
   useEffect(() => {
     if (!session?.accessToken) return
 
@@ -809,7 +837,7 @@ function App() {
       )}
 
       {/* Premium Server Down Overlay (Proactive & Reactive) */}
-      {(isServerDown || ((socketState.status === 'disconnected' || socketState.status === 'error') && hasConnectedOnce && session)) && (
+      {!isInitializing && (isServerDown || ((socketState.status === 'disconnected' || socketState.status === 'error') && hasConnectedOnce && session)) && (
         <div className="server-down-overlay">
           <div className="radar-container">
             <div className="radar-circle" />
