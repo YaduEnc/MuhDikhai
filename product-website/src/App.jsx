@@ -280,8 +280,12 @@ function App() {
           }
           setSocketState((prev) => ({ ...prev, phase: 'partner-left' }))
         })
-        socket.on('typing:start', () => setPartnerTyping(true))
-        socket.on('typing:stop', () => setPartnerTyping(false))
+        socket.on('typing:start', (payload) => {
+          if (!payload?.userId || payload.userId === roomRef.current?.partner?.id) setPartnerTyping(true)
+        })
+        socket.on('typing:stop', (payload) => {
+          if (!payload?.userId || payload.userId === roomRef.current?.partner?.id) setPartnerTyping(false)
+        })
 
         socket.on('message:sent', (payload) => {
           // No-op if this is handled in component, but good to have sync

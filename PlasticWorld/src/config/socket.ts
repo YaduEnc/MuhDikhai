@@ -1219,25 +1219,24 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Handle typing indicators
      */
-    socket.on('typing:start', async (data: { recipientId: string }) => {
+    socket.on('typing:start', async (data: { recipientId?: string; roomId?: string }) => {
       try {
-        const conversationId = [userId, data.recipientId].sort().join(':');
+        if (data.roomId) {
+          const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
+          if (currentRoomId && currentRoomId === data.roomId) {
+            socket.to(data.roomId).emit('typing:start', { userId, name });
+          }
+        } else if (data.recipientId) {
+          const conversationId = [userId, data.recipientId].sort().join(':');
 
-        if (!typingUsers.has(conversationId)) {
-          typingUsers.set(conversationId, new Set());
+          if (!typingUsers.has(conversationId)) {
+            typingUsers.set(conversationId, new Set());
+          }
+          typingUsers.get(conversationId)!.add(userId);
+
+          // Notify recipient
+          io.to(`user:${data.recipientId}`).emit('typing:start', { userId, name });
         }
-        typingUsers.get(conversationId)!.add(userId);
-
-        // Notify recipient
-        io.to(`user:${data.recipientId}`).emit('typing:start', {
-          userId,
-          name,
-        });
-
-        // Auto-stop typing after 3 seconds
-        setTimeout(() => {
-          socket.emit('typing:stop', { recipientId: data.recipientId });
-        }, 3000);
       } catch (error) {
         logger.error('Failed to handle typing start', {
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -1246,13 +1245,20 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
       }
     });
 
-    socket.on('typing:stop', (data: { recipientId: string }) => {
+    socket.on('typing:stop', async (data: { recipientId?: string; roomId?: string }) => {
       try {
-        const conversationId = [userId, data.recipientId].sort().join(':');
-        typingUsers.get(conversationId)?.delete(userId);
+        if (data.roomId) {
+          const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
+          if (currentRoomId && currentRoomId === data.roomId) {
+            socket.to(data.roomId).emit('typing:stop', { userId });
+          }
+        } else if (data.recipientId) {
+          const conversationId = [userId, data.recipientId].sort().join(':');
+          typingUsers.get(conversationId)?.delete(userId);
 
-        // Notify recipient
-        io.to(`user:${data.recipientId}`).emit('typing:stop', { userId });
+          // Notify recipient
+          io.to(`user:${data.recipientId}`).emit('typing:stop', { userId });
+        }
       } catch (error) {
         logger.error('Failed to handle typing stop', {
           error: error instanceof Error ? error.message : 'Unknown error',
