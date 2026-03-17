@@ -75,7 +75,14 @@ router.get('/matchmaking-stats', async (_req: any, res: any) => {
         res.json(stats);
     } catch (error) {
         logger.error('Error fetching matchmaking stats:', error);
-        res.status(500).json({ error: 'Failed to fetch matchmaking telemetry' });
+        // Return safe defaults so the admin dashboard doesn't crash
+        res.json({
+            timestamp: new Date().toISOString(),
+            queues: { totalUsers: 0, bucketCounts: {} },
+            metrics: { avgLatencyMs: 0, recentSampleCount: 0, totalMatchedSinceStart: 0, activeRooms: 0, userLocations: [] },
+            health: { redisMemoryUsed: 'unknown' },
+            error: 'Failed to fetch matchmaking telemetry'
+        });
     }
 });
 

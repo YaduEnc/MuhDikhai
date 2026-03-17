@@ -35,7 +35,7 @@ const AdminDashboard = ({ session, authedFetch }) => {
             setLiveStats(liveData);
             setGrowthStats(growthData);
             setReports(reportsData.reports || []);
-            setMatchmaking(matchmakingData);
+            if (matchmakingData?.metrics) setMatchmaking(matchmakingData);
 
         } catch (err) {
             console.error('Failed to fetch admin stats', err);
@@ -166,7 +166,7 @@ const AdminDashboard = ({ session, authedFetch }) => {
                         <div className="vibe-card">
                             <div className="card-header">
                                 <span className="stat-label">Top Behavioral Vibes</span>
-                                <span className="stat-label" style={{ color: '#00ffff' }}>Pairing Latency: {matchmaking.metrics.avgLatencyMs}ms</span>
+                                <span className="stat-label" style={{ color: '#00ffff' }}>Pairing Latency: {matchmaking?.metrics?.avgLatencyMs ?? 0}ms</span>
                             </div>
                             <div className="vibe-list">
                                 {growthStats.topVibes.length > 0 ? growthStats.topVibes.map((v, i) => (
@@ -187,15 +187,15 @@ const AdminDashboard = ({ session, authedFetch }) => {
                                 <div className="warp-speed-gauge">
                                     <span className="warp-label">WARP SPEED</span>
                                     <div className="warp-bar">
-                                        <div className="warp-fill" style={{ width: `${Math.min(100, 100 - (matchmaking.metrics.avgLatencyMs / 50))} %` }}></div>
+                                        <div className="warp-fill" style={{ width: `${Math.min(100, 100 - ((matchmaking?.metrics?.avgLatencyMs ?? 0) / 50))} %` }}></div>
                                     </div>
-                                    <span className="warp-value">{matchmaking.metrics.avgLatencyMs < 500 ? 'OPTIMAL' : 'CONGESTED'}</span>
+                                    <span className="warp-value">{(matchmaking?.metrics?.avgLatencyMs ?? 0) < 500 ? 'OPTIMAL' : 'CONGESTED'}</span>
                                 </div>
                             </div>
-                            <GlobalInteractiveGlobe locations={matchmaking.metrics.userLocations || []} />
+                            <GlobalInteractiveGlobe locations={matchmaking?.metrics?.userLocations || []} />
                             <div className="globe-footer">
                                 <span className="telemetry-ping">📡 REAL-TIME TELEMETRY ACTIVE</span>
-                                <span className="active-nodes">{matchmaking.metrics.userLocations?.length || 0} ACTIVE NODES</span>
+                                <span className="active-nodes">{matchmaking?.metrics?.userLocations?.length || 0} ACTIVE NODES</span>
                             </div>
                         </div>
                     </div>

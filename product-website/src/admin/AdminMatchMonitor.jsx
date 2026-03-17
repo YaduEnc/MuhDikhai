@@ -57,8 +57,8 @@ const AdminMatchMonitor = ({ session, authedFetch }) => {
                         <span className="dot" />
                         CORE FREQUENCY
                     </div>
-                    <div className="gauge-value" style={{ color: getLatencyColor(stats.metrics.avgLatencyMs) }}>
-                        {stats.metrics.avgLatencyMs}
+                    <div className="gauge-value" style={{ color: getLatencyColor(stats?.metrics?.avgLatencyMs ?? 0) }}>
+                        {stats?.metrics?.avgLatencyMs ?? 0}
                         <span className="unit">ms</span>
                     </div>
                     <div className="gauge-label">Avg Connection Latency</div>
@@ -66,19 +66,19 @@ const AdminMatchMonitor = ({ session, authedFetch }) => {
                 <div className="system-health-cards">
                     <div className="mini-stat">
                         <span className="mini-label">REDIS ENTROPY</span>
-                        <span className="mini-value">{stats.health.redisMemoryUsed}</span>
+                        <span className="mini-value">{stats?.health?.redisMemoryUsed ?? '—'}</span>
                     </div>
                     <div className="mini-stat">
                         <span className="mini-label">ACTIVE NODES</span>
-                        <span className="mini-value">{stats.metrics.activeRooms}</span>
+                        <span className="mini-value">{stats?.metrics?.activeRooms ?? 0}</span>
                     </div>
                     <div className="mini-stat">
                         <span className="mini-label">LIFETIME MATCHES</span>
-                        <span className="mini-value">{stats.metrics.totalMatchedSinceStart.toLocaleString()}</span>
+                        <span className="mini-value">{(stats?.metrics?.totalMatchedSinceStart ?? 0).toLocaleString()}</span>
                     </div>
                     <div className="mini-stat highlight">
                         <span className="mini-label">QUEUE DEPTH</span>
-                        <span className="mini-value">{stats.queues.totalUsers}</span>
+                        <span className="mini-value">{stats?.queues?.totalUsers ?? 0}</span>
                     </div>
                 </div>
             </div>
@@ -89,7 +89,7 @@ const AdminMatchMonitor = ({ session, authedFetch }) => {
                   <div className="terminal-status">SCANNING [OFFSET: 0]</div>
                 </div>
                 <div className="buckets-grid">
-                    {Object.entries(stats.queues.bucketCounts).length > 0 ? (
+                    {Object.entries(stats?.queues?.bucketCounts || {}).length > 0 ? (
                         Object.entries(stats.queues.bucketCounts).map(([name, count], i) => (
                             <div key={name} className={`bucket-card ${count > 0 ? 'active' : ''}`} style={{animationDelay: `${i * 0.05}s`}}>
                                 <div className="bucket-info">
@@ -111,7 +111,7 @@ const AdminMatchMonitor = ({ session, authedFetch }) => {
             </div>
 
             <div className="monitor-footer">
-                <p>TELEMETRY SYNC: {new Date(stats.timestamp).toLocaleTimeString()}</p>
+                <p>TELEMETRY SYNC: {stats?.timestamp ? new Date(stats.timestamp).toLocaleTimeString() : '—'}</p>
                 <div className="pulse-indicator">
                     <div className="pulse-dot" />
                     <span>SYSTEM NORMAL</span>
