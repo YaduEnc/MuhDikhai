@@ -168,6 +168,7 @@ import messageRoutes from './routes/message.routes';
 import encryptionRoutes from './routes/encryption.routes';
 import reportRoutes from './routes/report.routes';
 import adminRoutes from './routes/admin.routes';
+import bugRoutes from './routes/bug.routes';
 
 // Mount routes
 app.use(`/api/${apiVersion}/auth`, authRoutes);
@@ -177,6 +178,7 @@ app.use(`/api/${apiVersion}/messages`, messageRoutes);
 app.use(`/api/${apiVersion}/encryption`, encryptionRoutes);
 app.use(`/api/${apiVersion}/reports`, reportRoutes);
 app.use(`/api/${apiVersion}/admin`, adminRoutes);
+app.use(`/api/${apiVersion}/bugs`, bugRoutes);
 
 // API root endpoint
 app.get(`/api/${apiVersion}`, (_req: Request, res: Response) => {
@@ -193,6 +195,7 @@ app.get(`/api/${apiVersion}`, (_req: Request, res: Response) => {
       encryption: `/api/${apiVersion}/encryption`,
       reports: `/api/${apiVersion}/reports`,
       admin: `/api/${apiVersion}/admin`,
+      bugs: `/api/${apiVersion}/bugs`,
     },
   });
 });

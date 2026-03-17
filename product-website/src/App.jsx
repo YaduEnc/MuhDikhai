@@ -11,6 +11,7 @@ import CallOverlay from './components/CallOverlay'
 import VibeCheckModal from './components/VibeCheckModal'
 import LegalPages from './components/LegalPages'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
+import BugReporter from './components/BugReporter'
 import { auth } from './firebaseClient'
 import { onAuthStateChanged } from 'firebase/auth'
 
@@ -913,6 +914,7 @@ function App() {
         </div>
       )}
       <PWAInstallPrompt />
+      <BugReporter />
     </div>
   )
 }

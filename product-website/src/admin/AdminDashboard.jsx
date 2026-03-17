@@ -8,6 +8,7 @@ const AdminDashboard = ({ session, authedFetch }) => {
     const [liveStats, setLiveStats] = useState({ onlineUsers: 0, activeSessions: 0 });
     const [growthStats, setGrowthStats] = useState({ totalUsers: 0, newUsersToday: 0, topVibes: [] });
     const [reports, setReports] = useState([]);
+    const [bugReports, setBugReports] = useState([]);
     const [matchmaking, setMatchmaking] = useState({ metrics: { avgLatencyMs: 0, userLocations: [] } });
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -18,23 +19,26 @@ const AdminDashboard = ({ session, authedFetch }) => {
         try {
             const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
-            const [liveRes, growthRes, reportsRes, matchmakingRes] = await Promise.all([
+            const [liveRes, growthRes, reportsRes, matchmakingRes, bugsRes] = await Promise.all([
                 authedFetch(`${BACKEND_URL}/api/v1/admin/stats/live`),
                 authedFetch(`${BACKEND_URL}/api/v1/admin/stats/growth`),
                 authedFetch(`${BACKEND_URL}/api/v1/admin/reports`),
-                authedFetch(`${BACKEND_URL}/api/v1/admin/matchmaking-stats`)
+                authedFetch(`${BACKEND_URL}/api/v1/admin/matchmaking-stats`),
+                authedFetch(`${BACKEND_URL}/api/v1/bugs`)
             ]);
 
-            const [liveData, growthData, reportsData, matchmakingData] = await Promise.all([
+            const [liveData, growthData, reportsData, matchmakingData, bugsData] = await Promise.all([
                 liveRes.json(),
                 growthRes.json(),
                 reportsRes.json(),
-                matchmakingRes.json()
+                matchmakingRes.json(),
+                bugsRes.json()
             ]);
 
             setLiveStats(liveData);
             setGrowthStats(growthData);
             setReports(reportsData.reports || []);
+            setBugReports(bugsData.reports || []);
             if (matchmakingData?.metrics) setMatchmaking(matchmakingData);
 
         } catch (err) {
@@ -67,6 +71,20 @@ const AdminDashboard = ({ session, authedFetch }) => {
         }
     };
 
+    const handleActionBug = async (bugId, status) => {
+        try {
+            const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+            await authedFetch(`${BACKEND_URL}/api/v1/bugs/${bugId}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            setBugReports(prev => prev.map(b => b.id === bugId ? { ...b, status } : b));
+        } catch (err) {
+            console.error('Bug action failed', err);
+        }
+    };
+
     const handleBanUser = async (userId) => {
         if (!confirm('Are you sure you want to ban this user?')) return;
         try {
@@ -81,6 +99,7 @@ const AdminDashboard = ({ session, authedFetch }) => {
     };
 
     const pendingReportsCount = reports.filter(r => r.status === 'pending').length;
+    const pendingBugsCount = bugReports.filter(b => b.status === 'pending').length;
 
     return (
         <div className="admin-dashboard">
@@ -102,6 +121,10 @@ const AdminDashboard = ({ session, authedFetch }) => {
                         Matchmaking
                         <span className="nav-shortcut">⌥ 3</span>
                     </button>
+                    <button className={activeTab === 'bugs' ? 'active' : ''} onClick={() => setActiveTab('bugs')}>
+                        System Bugs {pendingBugsCount > 0 && <span className="badge">{pendingBugsCount}</span>}
+                        <span className="nav-shortcut">⌥ 4</span>
+                    </button>
                 </nav>
                 <div className="admin-footer">
                     <button className="btn-exit" onClick={() => window.location.href = '/'}>
@@ -116,11 +139,13 @@ const AdminDashboard = ({ session, authedFetch }) => {
                         <h1>
                             {activeTab === 'stats' ? 'Live Overview' : 
                              activeTab === 'matchmaking' ? 'Matching Engine' : 
+                             activeTab === 'bugs' ? 'System Diagnostics' :
                              'Safety Reports'}
                         </h1>
                         <p className="header-subtitle">
                             {activeTab === 'stats' ? 'Global platform health and user metrics.' : 
                              activeTab === 'matchmaking' ? 'Real-time telemetry from partitioned matching queues.' : 
+                             activeTab === 'bugs' ? 'User-submitted bug reports and screenshots.' :
                              'Moderation queue for reported user behavior.'}
                         </p>
                     </div>
@@ -198,6 +223,74 @@ const AdminDashboard = ({ session, authedFetch }) => {
                                 <span className="active-nodes">{matchmaking?.metrics?.userLocations?.length || 0} ACTIVE NODES</span>
                             </div>
                         </div>
+                    </div>
+                ) : activeTab === 'bugs' ? (
+                    <div className="admin-reports-view">
+                        <table className="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Reporter</th>
+                                    <th>Issue</th>
+                                    <th>Device Info</th>
+                                    <th>Screenshot</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {bugReports.map((b, i) => (
+                                    <tr key={b.id} style={{animationDelay: `${i * 0.05}s`}}>
+                                        <td>
+                                            <div className="user-info-cell">
+                                                <strong>{b.reporterName || 'Anonymous'}</strong>
+                                                <span>{b.reporterEmail || 'No Email'}</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div className="incident-cell">
+                                                <span className="incident-reason">{b.title}</span>
+                                                <p className="incident-details">{b.description}</p>
+                                                <span className="report-date">{new Date(b.createdAt).toLocaleDateString()}</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div className="device-info-cell">
+                                                <span className="code-text" title={b.deviceInfo?.userAgent}>
+                                                    {b.deviceInfo?.screenResolution || 'Unknown'}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {b.screenshotUrl ? (
+                                                <a href={`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}${b.screenshotUrl}`} target="_blank" rel="noopener noreferrer" className="screenshot-link">
+                                                    View Image ↗
+                                                </a>
+                                            ) : (
+                                                <span className="code-text dim">No Image</span>
+                                            )}
+                                        </td>
+                                        <td>
+                                            <span className={`pill ${b.status}`}>{b.status}</span>
+                                        </td>
+                                        <td>
+                                            <div className="table-actions">
+                                                {b.status === 'pending' && (
+                                                    <>
+                                                        <button className="btn-resolve" onClick={() => handleActionBug(b.id, 'resolved')}>✓</button>
+                                                        <button className="btn-dismiss" onClick={() => handleActionBug(b.id, 'dismissed')}>×</button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {bugReports.length === 0 && (
+                                    <tr>
+                                        <td colSpan="6" className="empty-table">All systems nominal. No bugs reported.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 ) : (
                     <div className="admin-reports-view">
@@ -323,6 +416,42 @@ const AdminDashboard = ({ session, authedFetch }) => {
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+              }
+              .report-date {
+                font-size: 0.65rem;
+                color: rgba(255, 255, 255, 0.2);
+                margin-top: 4px;
+                font-family: 'JetBrains Mono', monospace;
+              }
+              .device-info-cell .code-text {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.7rem;
+                padding: 4px 8px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 4px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+              }
+              .device-info-cell .code-text.dim {
+                opacity: 0.5;
+                font-style: italic;
+              }
+              .screenshot-link {
+                color: #00ffcc;
+                text-decoration: none;
+                font-size: 0.8rem;
+                font-weight: 700;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 4px 12px;
+                background: rgba(0, 255, 204, 0.1);
+                border: 1px solid rgba(0, 255, 204, 0.2);
+                border-radius: 20px;
+                transition: all 0.2s;
+              }
+              .screenshot-link:hover {
+                background: rgba(0, 255, 204, 0.2);
+                transform: translateY(-2px);
               }
               .loading-spinner {
                 width: 40px;
