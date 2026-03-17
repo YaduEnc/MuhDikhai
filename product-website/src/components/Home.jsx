@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getSoundEnabled, toggleSound, initAudio } from '../utils/soundEngine'
 import { calculateAuraLevel } from '../utils/aura'
+import RadarLoader from './RadarLoader'
 import './Home.css'
 
 function DeleteConfirmationModal({ onConfirm, onCancel }) {
@@ -832,7 +833,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
             {/* Tab Content */}
             <div className="home-tab-content">
                 {loadingHome ? (
-                    <div className="home-loading">Finding your people...</div>
+                    <RadarLoader />
                 ) : (
                     <>
                         {homeTab === 'matches' && (
