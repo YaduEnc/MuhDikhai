@@ -1,0 +1,131 @@
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
+import { auth } from './firebaseClient'
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
+const API_BASE_URL = `${BACKEND_URL}/api/v1`
+
+const STORAGE_KEY = 'muhdikhai_session'
+
+export function getStoredSession() {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+export function clearSession() {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(STORAGE_KEY)
+}
+
+export function saveSession(session) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+}
+
+/**
+ * Exchanges a Firebase ID Token for a backend session
+ */
+export async function exchangeIdToken(idToken) {
+  const deviceInfo = {
+    deviceName: navigator.userAgent.substring(0, 100),
+    deviceType: 'web',
+  }
+
+  const response = await fetch(`${API_BASE_URL}/auth/google-signin`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ idToken, deviceInfo }),
+  })
+
+  if (!response.ok) {
+    let message = 'Sign-in failed'
+    try {
+      const payload = await response.json()
+      if (payload?.error?.message) {
+        message = payload.error.message
+      }
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message)
+  }
+
+  const payload = await response.json()
+  const session = {
+    accessToken: payload.data.accessToken,
+    refreshToken: payload.data.refreshToken,
+    accessExpiresAt: payload.data.accessExpiresAt,
+    refreshExpiresAt: payload.data.refreshExpiresAt,
+    user: payload.data.user,
+    device: payload.data.device,
+  }
+
+  saveSession(session)
+  return session
+}
+
+export async function signInWithGoogle() {
+  const provider = new GoogleAuthProvider()
+  const result = await signInWithPopup(auth, provider)
+  const user = result.user
+  const idToken = await user.getIdToken()
+  return exchangeIdToken(idToken)
+}
+
+/**
+ * Attempts to restore a backend session silently if a Firebase user exists
+ */
+export async function signInSilently(firebaseUser) {
+  if (!firebaseUser) return null
+  try {
+    const idToken = await firebaseUser.getIdToken()
+    return await exchangeIdToken(idToken)
+  } catch (error) {
+    console.warn('Silent sign-in failed:', error)
+    return null
+  }
+}
+
+export async function refreshSession(refreshToken) {
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refreshToken }),
+  })
+
+  if (!response.ok) {
+    let message = 'Token refresh failed'
+    try {
+      const payload = await response.json()
+      if (payload?.error?.message) {
+        message = payload.error.message
+      }
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message)
+  }
+
+  const payload = await response.json()
+  const oldSession = getStoredSession()
+  const nextSession = {
+    ...oldSession,
+    accessToken: payload.data.accessToken,
+    refreshToken: payload.data.refreshToken,
+    accessExpiresAt: payload.data.accessExpiresAt,
+    refreshExpiresAt: payload.data.refreshExpiresAt,
+  }
+
+  saveSession(nextSession)
+  return nextSession
+}
+

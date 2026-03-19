@@ -1,0 +1,123 @@
+@import '../legacy/src/index.css';
+@import '../legacy/src/App.css';
+@import '../legacy/src/components/ExperienceBackground.css';
+@import '../legacy/src/components/Chat.css';
+@import '../legacy/src/components/Home.css';
+@import '../legacy/src/components/Landing.css';
+@import '../legacy/src/components/Onboarding.css';
+@import '../legacy/src/components/FriendChat.css';
+@import '../legacy/src/components/CallOverlay.css';
+@import '../legacy/src/components/VibeCheckModal.css';
+@import '../legacy/src/components/LegalPages.css';
+@import '../legacy/src/components/BugReporter.css';
+@import '../legacy/src/components/DoodleBoard.css';
+@import '../legacy/src/components/GhostProtocol.css';
+@import '../legacy/src/components/RadarLoader.css';
+@import '../legacy/src/admin/AdminDashboard.css';
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: #020617;
+}
+
+.ssr-shell {
+  min-height: 100vh;
+  padding: 56px 24px 72px;
+  max-width: 1120px;
+  margin: 0 auto;
+  color: #e6f0ff;
+}
+
+.hero h1 {
+  margin: 0 0 12px;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.05;
+}
+
+.eyebrow {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: #73f6d5;
+  margin-bottom: 12px;
+}
+
+.hero p {
+  max-width: 760px;
+  color: #bfd0ea;
+  line-height: 1.7;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+
+.btn-primary,
+.btn-ghost {
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.btn-primary {
+  background: linear-gradient(90deg, #00e0ff, #4f8cff);
+  color: #061022;
+}
+
+.btn-ghost {
+  border: 1px solid rgba(122, 167, 255, 0.42);
+  color: #d6e4ff;
+}
+
+.cards {
+  margin-top: 36px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  border-radius: 16px;
+  border: 1px solid rgba(138, 162, 202, 0.2);
+  background: rgba(9, 20, 47, 0.74);
+  padding: 18px;
+}
+
+.card h3 {
+  margin: 0 0 8px;
+}
+
+.card p {
+  margin: 0;
+  color: #b8cae7;
+  line-height: 1.6;
+}
+
+.legal-links {
+  margin-top: 28px;
+  display: flex;
+  gap: 14px;
+}
+
+.legal-links a {
+  color: #8eb5ff;
+}
+
+.legal-shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 64px 24px;
+  color: #e6f0ff;
+}

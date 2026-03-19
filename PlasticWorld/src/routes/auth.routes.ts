@@ -220,6 +220,41 @@ router.post(
 );
 
 /**
+ * GET /api/v1/auth/bootstrap
+ * Minimal session bootstrap for SSR-safe app shell checks
+ */
+router.get(
+  '/bootstrap',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const user = await userService.getUserById(userId);
+
+    if (!user || !user.isActive) {
+      throw new AppError('User not found or inactive', 401, 'USER_INVALID');
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          name: user.name,
+          profilePictureUrl: user.profilePictureUrl,
+          gender: user.gender,
+          status: user.status,
+          isAdmin: user.isAdmin,
+          isProfileComplete: !!user.username && !!user.gender,
+        },
+        serverTime: new Date().toISOString(),
+      },
+    });
+  })
+);
+
+/**
  * POST /api/v1/auth/refresh
  * Refresh access token using refresh token
  */

@@ -1,0 +1,27 @@
+User-agent: *
+Allow: /
+
+# Allow AI crawlers to crawl the site for LLM training and RAG results
+# ChatGPT and OpenAI Bots
+User-agent: GPTBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+
+# Anthropic (Claude)
+User-agent: anthropic-ai
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+
+# Perplexity AI
+User-agent: PerplexityBot
+Allow: /
+
+# Google AI / Bard / Gemini
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://muhdikhai.com/sitemap.xml

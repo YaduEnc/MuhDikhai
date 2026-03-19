@@ -1,0 +1,183 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;800&family=Manrope:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  /* ── Cyber-Indian Palette ── */
+  --bg-deep: #020108;
+  --bg-card: rgba(8, 5, 18, 0.7);
+  --bg-glass: rgba(255, 255, 255, 0.03);
+
+  /* Neons */
+  --neon-pink: #ff0055;
+  --neon-cyan: #00ffcc;
+  --neon-saffron: #ffae00;
+  --neon-violet: #bc13fe;
+
+  /* Gradients */
+  --grad-royal: linear-gradient(135deg, var(--neon-pink), var(--neon-violet));
+  --grad-cyber: linear-gradient(135deg, var(--neon-cyan), var(--neon-violet));
+  --grad-vibrant: linear-gradient(135deg, var(--neon-pink), var(--neon-saffron));
+
+  /* Text */
+  --text-primary: #ffffff;
+  --text-secondary: #8b8fb0;
+  --text-muted: #5e627e;
+
+  /* System */
+  --stroke: rgba(255, 255, 255, 0.08);
+  --stroke-glow: rgba(255, 255, 255, 0.15);
+  --shadow-glow: 0 0 30px rgba(255, 0, 85, 0.2);
+
+  --radius-xl: 32px;
+  --radius-lg: 24px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: 'Manrope', sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  overflow-x: hidden;
+  cursor: crosshair;
+  /* Adds a techy vibe */
+}
+
+h1,
+h2,
+h3,
+.heading-font {
+  font-family: 'Sora', sans-serif;
+  letter-spacing: -0.03em;
+}
+
+code,
+.mono-font {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Custom Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--stroke);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-pink);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+/* ── Sensitive Media Blur ────────────────────────────── */
+.media-privacy-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  cursor: pointer;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.blur-media {
+  filter: blur(40px);
+  opacity: 0.6;
+  transition: filter 300ms ease, opacity 300ms ease;
+  max-width: 100%;
+  display: block;
+}
+
+.blur-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 2;
+  transition: opacity 200ms ease;
+}
+
+.blur-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.blur-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 12px;
+  border-radius: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.media-privacy-wrap:hover .blur-overlay {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.media-privacy-wrap:hover .blur-text {
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.revealed .blur-media {
+  filter: blur(0);
+  opacity: 1;
+}
+
+.revealed .blur-overlay {
+  opacity: 0;
+  pointer-events: none;
+}

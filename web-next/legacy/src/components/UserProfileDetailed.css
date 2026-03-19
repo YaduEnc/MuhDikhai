@@ -1,0 +1,306 @@
+/* ── User Profile Detailed ─────────────────────────────────── */
+.upd-container {
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+    animation: upd-fade 0.5s var(--ease-out);
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+}
+
+@keyframes upd-fade {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.upd-back-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: color 0.2s;
+}
+
+.upd-back-btn:hover {
+    color: #fff;
+}
+
+.upd-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+}
+
+/* ── Identity Card (Left) ─────────────────────────────────── */
+.upd-identity-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.upd-image-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/5;
+    border-radius: var(--radius-2xl);
+    overflow: hidden;
+    background: var(--bg-card);
+    border: 1px solid var(--stroke);
+}
+
+.upd-main-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: grayscale(0.2);
+    transition: filter 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.upd-main-image:hover {
+    filter: grayscale(0);
+}
+
+.upd-image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #222, #111);
+    color: var(--text-muted);
+}
+
+.upd-image-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2.5rem 1.5rem 1.5rem;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+    pointer-events: none;
+}
+
+.upd-identity-info {
+    margin-bottom: 0.5rem;
+}
+
+.upd-name-age {
+    font-family: 'Sora', sans-serif;
+    font-size: 2.4rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin: 0;
+}
+
+.upd-location {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin: 0.3rem 0;
+}
+
+.upd-loc-icon {
+    filter: grayscale(1);
+}
+
+.upd-hover-tag {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    padding: 0.5rem 0.8rem;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.upd-aura-glow {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 10px;
+    background: var(--aura-color);
+    filter: blur(40px);
+    opacity: 0.6;
+}
+
+.upd-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.upd-action-btn {
+    padding: 1.25rem;
+    border: none;
+    border-radius: var(--radius-xl);
+    font-weight: 800;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-out);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: 'Sora', sans-serif;
+}
+
+.upd-action-btn.pass {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+}
+
+.upd-action-btn.connect {
+    background: #FF5C5C;
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(255, 92, 92, 0.3);
+}
+
+.upd-action-btn.edit {
+    grid-column: span 2;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.upd-action-btn:hover {
+    transform: translateY(-2px);
+}
+
+/* ── Intel Panel (Right) ─────────────────────────────────── */
+.upd-intel-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+}
+
+.upd-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.upd-section-label {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.upd-mood-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.upd-mood-chip {
+    padding: 0.6rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--stroke);
+    border-radius: 99px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.upd-mood-placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+.upd-bio {
+    font-size: 1.15rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.upd-basics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.upd-basic-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.upd-basic-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.upd-basic-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.upd-prompts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.upd-prompt-card {
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--stroke);
+    border-radius: var(--radius-xl);
+}
+
+.upd-prompt-title {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
+}
+
+.upd-prompt-text {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.3;
+    margin: 0;
+}
+
+.upd-prompt-placeholder {
+    padding: 2rem;
+    border: 1px dashed var(--stroke);
+    border-radius: var(--radius-xl);
+    color: var(--text-muted);
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 800px) {
+    .upd-content {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+
+    .upd-container {
+        padding: 1rem;
+    }
+}

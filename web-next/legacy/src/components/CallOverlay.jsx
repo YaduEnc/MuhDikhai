@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useWebRTC } from '../hooks/useWebRTC'
 import { playIncomingDrop, playOutgoingTick } from '../utils/soundEngine'
 import { calculateAuraLevel } from '../utils/aura'
-import './CallOverlay.css'
 
 export default function CallOverlay({
     socket,

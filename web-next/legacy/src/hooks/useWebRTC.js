@@ -5,9 +5,9 @@ const STUN_SERVERS = [
     { urls: 'stun:stun1.l.google.com:19302' },
 ]
 
-const TURN_URL = import.meta.env.VITE_TURN_URL
-const TURN_USERNAME = import.meta.env.VITE_TURN_USERNAME
-const TURN_PASSWORD = import.meta.env.VITE_TURN_PASSWORD
+const TURN_URL = process.env.NEXT_PUBLIC_TURN_URL
+const TURN_USERNAME = process.env.NEXT_PUBLIC_TURN_USERNAME
+const TURN_PASSWORD = process.env.NEXT_PUBLIC_TURN_PASSWORD
 
 const ICE_SERVERS = [
     ...STUN_SERVERS,

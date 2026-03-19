@@ -1326,6 +1326,57 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     });
 
     /**
+     * WebRTC: Quality telemetry ingestion (optional)
+     */
+    socket.on('webrtc:telemetry', async (data: {
+      roomId?: string;
+      recipientId?: string;
+      metrics?: {
+        setupTimeMs?: number | null;
+        avgRttMs?: number | null;
+        packetLossPct?: number | null;
+        reconnectCount?: number;
+        connectionState?: string;
+        qualityProfile?: 'high' | 'medium' | 'low' | string;
+      };
+      at?: string;
+    }) => {
+      try {
+        if (data.roomId) {
+          const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
+          if (!currentRoomId || currentRoomId !== data.roomId) return;
+        }
+
+        const pub = redisClient.getClient();
+        const key = data.roomId
+          ? `webrtc:telemetry:room:${data.roomId}`
+          : `webrtc:telemetry:user:${userId}`;
+
+        const payload = {
+          userId,
+          recipientId: data.recipientId || null,
+          at: data.at || new Date().toISOString(),
+          metrics: {
+            setupTimeMs: data.metrics?.setupTimeMs ?? null,
+            avgRttMs: data.metrics?.avgRttMs ?? null,
+            packetLossPct: data.metrics?.packetLossPct ?? null,
+            reconnectCount: data.metrics?.reconnectCount ?? 0,
+            connectionState: data.metrics?.connectionState ?? 'unknown',
+            qualityProfile: data.metrics?.qualityProfile ?? 'high',
+          },
+        };
+
+        await pub.hset(key, userId, JSON.stringify(payload));
+        await pub.expire(key, 900);
+      } catch (error) {
+        logger.warn('Failed to ingest WebRTC telemetry', {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
+
+    /**
      * Friend Chat: Mutual Doodle Board (Scratch Pad)
      */
     socket.on('friend:doodle:draw', (data: { recipientId: string; x1: number; y1: number; x2: number; y2: number; color: string; width: number }) => {
