@@ -1,5 +1,6 @@
 import './globals.css'
 import RuntimeSanityGuard from '@/components/RuntimeSanityGuard'
+import { Analytics } from '@vercel/analytics/next'
 
 export const metadata = {
   title: 'MuhDikhai Next',
@@ -12,6 +13,7 @@ export default function RootLayout({ children }) {
       <body>
         <RuntimeSanityGuard />
         {children}
+        <Analytics />
       </body>
     </html>
   )

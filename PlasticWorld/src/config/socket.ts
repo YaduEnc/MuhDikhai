@@ -204,10 +204,8 @@ function inverseQueueKeys(gender: string, preference: string, topic?: string): s
   } else {
     if (topic) {
       keys.push(queueKey(preference, gender, topic));
-      keys.push(queueKey(preference, 'everyone', topic));
     }
     keys.push(queueKey(preference, gender));
-    keys.push(queueKey(preference, 'everyone'));
   }
 
   return [...new Set(keys)];
