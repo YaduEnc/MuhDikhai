@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getSoundEnabled, toggleSound, initAudio } from '../utils/soundEngine'
 import { calculateAuraLevel } from '../utils/aura'
-import RadarLoader from './RadarLoader'
 import './Home.css'
 
 function getAvatarUrl(user) {
@@ -634,6 +633,41 @@ function FriendsList({ friends, onOpenChat, unreadCounts = {} }) {
     )
 }
 
+function HomeTabSkeleton({ variant = 'matches', count = 4 }) {
+    const items = Array.from({ length: count })
+    const isMatches = variant === 'matches'
+    const isRequests = variant === 'requests'
+
+    return (
+        <div
+            className={`home-skeleton-list ${isMatches ? 'home-skeleton-list--matches' : ''}`}
+            role="status"
+            aria-live="polite"
+        >
+            <span className="home-skeleton-announcer">Loading {variant}...</span>
+            {items.map((_, idx) => (
+                <div key={`${variant}-${idx}`} className={`recent-match-card skeleton-card skeleton-card--${variant}`}>
+                    <div className="recent-avatar skeleton-avatar">
+                        <span className="skeleton-block" />
+                    </div>
+                    <div className="recent-info">
+                        <span className="skeleton-block skeleton-line skeleton-line--title" />
+                        <span className="skeleton-block skeleton-line skeleton-line--meta" />
+                    </div>
+                    {isRequests ? (
+                        <div className="skeleton-actions">
+                            <span className="skeleton-block skeleton-action" />
+                            <span className="skeleton-block skeleton-action" />
+                        </div>
+                    ) : (
+                        <span className="skeleton-block skeleton-pill" />
+                    )}
+                </div>
+            ))}
+        </div>
+    )
+}
+
 export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts }) {
 
     const [selectedTopics, setSelectedTopics] = useState([])
@@ -900,7 +934,11 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
             {/* Tab Content */}
             <div className="home-tab-content">
                 {loadingHome ? (
-                    <RadarLoader />
+                    <>
+                        {homeTab === 'matches' && <HomeTabSkeleton variant="matches" count={3} />}
+                        {homeTab === 'friends' && <HomeTabSkeleton variant="friends" count={4} />}
+                        {homeTab === 'requests' && <HomeTabSkeleton variant="requests" count={3} />}
+                    </>
                 ) : (
                     <>
                         {homeTab === 'matches' && (

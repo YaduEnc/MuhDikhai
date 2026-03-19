@@ -16,6 +16,24 @@ const TypingDots = memo(function TypingDots({ name }) {
     )
 })
 
+const HistorySkeleton = memo(function HistorySkeleton() {
+    const rows = [false, true, false, true, false, false]
+    return (
+        <div className="fc-history-skeleton" role="status" aria-live="polite">
+            <span className="fc-sr-only">Loading chat history...</span>
+            {rows.map((isMine, idx) => (
+                <div key={`history-skeleton-${idx}`} className={`fc-skeleton-row ${isMine ? 'mine' : 'theirs'}`}>
+                    {!isMine && <span className="fc-skeleton-avatar fc-skeleton-block" />}
+                    <div className={`fc-skeleton-bubble ${isMine ? 'mine' : 'theirs'}`}>
+                        <span className="fc-skeleton-block fc-skeleton-line fc-skeleton-line--one" />
+                        <span className="fc-skeleton-block fc-skeleton-line fc-skeleton-line--two" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+})
+
 // ─── GIF Picker ───────────────────────────────────────────────────────────────
 const GifPicker = memo(function GifPicker({ onSelect, onClose }) {
     const [query, setQuery] = useState('')
@@ -499,10 +517,7 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
             {/* Messages */}
             <main className="fc-messages">
                 {loading ? (
-                    <div className="fc-loading">
-                        <div className="fc-loading-dots"><span /><span /><span /></div>
-                        <span>Loading messages...</span>
-                    </div>
+                    <HistorySkeleton />
                 ) : messages.length === 0 ? (
                     <div className="fc-empty">
                         <div className="fc-empty-icon">💬</div>
