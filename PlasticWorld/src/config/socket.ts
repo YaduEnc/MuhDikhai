@@ -225,6 +225,60 @@ async function acquireMatchLock(pub: any, userId: string, retries = 10, delayMs 
   return false;
 }
 
+const CLEANUP_RANDOM_ROOM_LUA = `
+-- KEYS[1] = random:user_rooms hash
+-- KEYS[2] = random:rooms hash
+-- ARGV[1] = roomId
+-- ARGV[2] = primaryUserId
+-- ARGV[3] = otherUserId (optional)
+
+local roomId = ARGV[1]
+local primaryUserId = ARGV[2]
+local otherUserId = ARGV[3]
+
+local removedPrimary = 0
+if redis.call('HGET', KEYS[1], primaryUserId) == roomId then
+  redis.call('HDEL', KEYS[1], primaryUserId)
+  removedPrimary = 1
+end
+
+local removedOther = 0
+if otherUserId ~= '' and redis.call('HGET', KEYS[1], otherUserId) == roomId then
+  redis.call('HDEL', KEYS[1], otherUserId)
+  removedOther = 1
+end
+
+local removedRoom = 0
+if redis.call('HGET', KEYS[2], roomId) then
+  redis.call('HDEL', KEYS[2], roomId)
+  removedRoom = 1
+end
+
+return { removedPrimary, removedOther, removedRoom }
+`;
+
+async function cleanupRandomRoomState(pub: any, roomId: string, primaryUserId: string, otherUserId?: string): Promise<{
+  removedPrimary: boolean;
+  removedOther: boolean;
+  removedRoom: boolean;
+}> {
+  const result = await pub.eval(
+    CLEANUP_RANDOM_ROOM_LUA,
+    2,
+    'random:user_rooms',
+    'random:rooms',
+    roomId,
+    primaryUserId,
+    otherUserId || ''
+  ) as [number, number, number];
+
+  return {
+    removedPrimary: Number(result?.[0] || 0) === 1,
+    removedOther: Number(result?.[1] || 0) === 1,
+    removedRoom: Number(result?.[2] || 0) === 1,
+  };
+}
+
 // ─── Atomic Lua Script for Match-or-Enqueue ─────────────────────────
 // This script atomically: checks inverse queues for a valid partner,
 // validates heartbeat, acquires lock, and either matches or enqueues.
@@ -852,17 +906,21 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           const roomStr = await pub.hget('random:rooms', existingRoomId);
           if (roomStr) {
             const room = JSON.parse(roomStr);
-            const partnerId = room.users.find((id: string) => id !== userId);
-            const partner = partnerId ? await userService.getPublicUserProfile(partnerId) : null;
-            socket.join(existingRoomId);
-            socket.emit('random:matched', { roomId: existingRoomId, partner, topic: room.topic });
-            return;
+            if (!Array.isArray(room?.users) || !room.users.includes(userId)) {
+              await pub.hdel('random:user_rooms', userId);
+            } else {
+              const partnerId = room.users.find((id: string) => id !== userId);
+              const partner = partnerId ? await userService.getPublicUserProfile(partnerId) : null;
+              socket.join(existingRoomId);
+              socket.emit('random:matched', { roomId: existingRoomId, partner, topic: room.topic });
+              return;
+            }
           }
           // Stale room pointer, clean it
           await pub.hdel('random:user_rooms', userId);
         }
 
-        const lockMe = await pub.set(`matchq:lock:${userId}`, '1', 'EX', 5, 'NX');
+        const lockMe = await acquireMatchLock(pub, userId, 8, 120);
         if (!lockMe) {
           socket.emit('random:waiting');
           return;
@@ -1102,10 +1160,12 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Random chat: leave current room / queue
      */
-    socket.on('random:leave', async () => {
+    socket.on('random:leave', async (payload?: { roomId?: string }) => {
       let lockMeAcquired = false;
       const pub = redisClient.getClient();
       try {
+        const requestedRoomId = typeof payload?.roomId === 'string' ? payload.roomId.trim() : '';
+
         const lockMe = await acquireMatchLock(pub, userId);
         if (lockMe) lockMeAcquired = true;
         else logger.warn('random:leave lock timeout, proceeding anyway', { userId });
@@ -1118,7 +1178,24 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         // Note: We do NOT try to remove from list queues (O(N)). 
         // Instead, the pop logic validates heartbeat, so ghost entries are harmlessly skipped.
 
-        const roomId = await pub.hget('random:user_rooms', userId);
+        const mappedRoomId = await pub.hget('random:user_rooms', userId);
+        if (!lockMeAcquired && !requestedRoomId) {
+          // Without a lock and without an explicit target room, cleanup can race and
+          // accidentally tear down a brand-new rematch. Bail out safely.
+          socket.emit('random:ended');
+          emitMatchingStats(io);
+          return;
+        }
+
+        if (requestedRoomId && mappedRoomId && mappedRoomId !== requestedRoomId) {
+          // Stale leave for an old room after a rematch; do not touch current mapping.
+          io.in(`user:${userId}`).socketsLeave(requestedRoomId);
+          socket.emit('random:ended', { roomId: requestedRoomId });
+          emitMatchingStats(io);
+          return;
+        }
+
+        const roomId = requestedRoomId || mappedRoomId;
         if (!roomId) {
           socket.emit('random:ended');
           emitMatchingStats(io);
@@ -1126,25 +1203,26 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         }
 
         const roomStr = await pub.hget('random:rooms', roomId);
+        let otherUserId: string | undefined;
         if (roomStr) {
           const room = JSON.parse(roomStr);
-          const otherUserId = room.users.find((id: string) => id !== userId);
+          otherUserId = room.users.find((id: string) => id !== userId);
 
           io.to(roomId).emit('random:left', { roomId, userId });
+        }
 
-          const pipeline = pub.pipeline();
-          pipeline.hdel('random:user_rooms', userId);
-          pipeline.hdel('random:rooms', roomId);
-          pipeline.decr('matchq:counter:matched');
-          if (otherUserId) {
-            pipeline.hdel('random:user_rooms', otherUserId);
-          }
-          await pipeline.exec();
-
+        const cleanup = await cleanupRandomRoomState(pub, roomId, userId, otherUserId);
+        if (cleanup.removedRoom) {
+          await pub.decr('matchq:counter:matched');
           cleanupRoomMedia(roomId);
         }
 
-        socket.leave(roomId);
+        // Ensure no stale socket memberships survive across rematches.
+        io.in(`user:${userId}`).socketsLeave(roomId);
+        if (otherUserId) {
+          io.in(`user:${otherUserId}`).socketsLeave(roomId);
+        }
+
         socket.emit('random:ended', { roomId });
         emitMatchingStats(io);
       } catch (error) {
@@ -1567,37 +1645,27 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
                 const roomId = await pub.hget('random:user_rooms', userId);
                 if (roomId) {
                   const roomStr = await pub.hget('random:rooms', roomId);
+                  let otherUserId: string | undefined;
                   if (roomStr) {
                     const room = JSON.parse(roomStr);
-                    const otherUserId = room.users.find((id: string) => id !== userId);
+                    otherUserId = room.users.find((id: string) => id !== userId);
 
                     // Notify the room that somebody left/disconnected
                     io.to(roomId).emit('random:left', {
                       roomId,
                       userId,
                     });
+                  }
 
-                    const pipeline = pub.pipeline();
-                    pipeline.hdel('random:user_rooms', userId);
-                    pipeline.hdel('random:rooms', roomId);
-                    pipeline.decr('matchq:counter:matched');
-                    if (otherUserId) {
-                      pipeline.hdel('random:user_rooms', otherUserId);
-                    }
-                    await pipeline.exec();
-
-                    if (otherUserId) {
-                      const otherSockets = activeUsers.get(otherUserId) ?? new Set<string>();
-                      for (const id of otherSockets) {
-                        const s = io.sockets.sockets.get(id);
-                        if (s) s.leave(roomId);
-                      }
-                    }
-
-                    // Trigger ephemeral media cleanup
+                  const cleanup = await cleanupRandomRoomState(pub, roomId, userId, otherUserId);
+                  if (cleanup.removedRoom) {
+                    await pub.decr('matchq:counter:matched');
                     cleanupRoomMedia(roomId);
-                  } else {
-                    await pub.hdel('random:user_rooms', userId);
+                  }
+
+                  io.in(`user:${userId}`).socketsLeave(roomId);
+                  if (otherUserId) {
+                    io.in(`user:${otherUserId}`).socketsLeave(roomId);
                   }
                 }
 

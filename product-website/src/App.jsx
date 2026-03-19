@@ -336,8 +336,13 @@ function App() {
             )
           )
         })
-        socket.on('random:left', () => {
+        socket.on('random:left', (payload) => {
           const currentRoom = roomRef.current
+          const activeRoomId = currentRoom?.roomId || currentRoom?.id
+          // Ignore stale leave events from old rooms after a rematch.
+          if (payload?.roomId && activeRoomId && payload.roomId !== activeRoomId) {
+            return
+          }
           const currentPhase = socketPhaseRef.current
           // Only show vibe check if we were actually matched and there is a partner to vote on
           if (currentPhase === 'matched' && currentRoom?.partner?.id) {
@@ -507,7 +512,9 @@ function App() {
   const handleSignOut = () => {
     refreshingRef.current = false
     if (socketRef.current) {
-      socketRef.current.emit('random:leave')
+      const currentRoom = roomRef.current
+      const roomId = currentRoom?.roomId || currentRoom?.id
+      socketRef.current.emit('random:leave', roomId ? { roomId } : undefined)
       socketRef.current.disconnect()
       socketRef.current = null
     }
@@ -523,7 +530,8 @@ function App() {
 
   const handleLeaveChat = () => {
     const currentRoom = roomRef.current
-    if (socketRef.current) socketRef.current.emit('random:leave')
+    const roomId = currentRoom?.roomId || currentRoom?.id
+    if (socketRef.current) socketRef.current.emit('random:leave', roomId ? { roomId } : undefined)
 
     // Trigger vibe check if we were in a match
     if (socketPhaseRef.current === 'matched' && currentRoom?.partner) {
@@ -900,8 +908,9 @@ function App() {
             onSearchAgain={() => {
               const currentRoom = roomRef.current;
               const currentPhase = socketPhaseRef.current;
+              const roomId = currentRoom?.roomId || currentRoom?.id;
               // Leave current first
-              socketRef.current?.emit('random:leave');
+              socketRef.current?.emit('random:leave', roomId ? { roomId } : undefined);
 
               // Trigger vibe check if we were in a match
               if (currentPhase === 'matched' && currentRoom?.partner) {
