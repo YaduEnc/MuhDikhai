@@ -39,3 +39,5 @@ PlasticWorld/.env
 # Uploads
 PlasticWorld/public/uploads/*
 !PlasticWorld/public/uploads/.gitkeep
+.vercel
+.env*.local
