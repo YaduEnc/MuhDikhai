@@ -24,19 +24,31 @@ class MatchmakingTelemetryService {
             key.startsWith('matchq:heartbeat:') || 
             key.startsWith('matchq:counter:') || 
             key.startsWith('matchq:lock:') ||
-            key.startsWith('matchq:metrics:')
+            key.startsWith('matchq:metrics:') ||
+            key === 'matchq:stream'
           ) continue;
-          
-          const count = await pub.llen(key);
-          bucketCounts[key] = count;
-          totalInQueue += count;
+
+          try {
+            // Only LLEN list keys. Streams/hashes under matchq:* would throw WRONGTYPE.
+            const keyType = await pub.type(key);
+            if (keyType !== 'list') continue;
+
+            const count = await pub.llen(key);
+            bucketCounts[key] = count;
+            totalInQueue += count;
+          } catch (error) {
+            logger.warn('Skipping invalid matchmaking queue key during telemetry scan', {
+              key,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
         }
       } while (cursor !== '0');
 
       // 2. Get Average Latency from the last 100 matches
       const latencies = await pub.lrange('matchq:metrics:latencies', 0, -1);
       const avgLatency = latencies.length > 0
-        ? latencies.reduce((sum, val) => sum + parseInt(val), 0) / latencies.length
+        ? latencies.reduce((sum, val) => sum + parseInt(val, 10), 0) / latencies.length
         : 0;
 
       // 3. Get Redis Info
@@ -77,7 +89,7 @@ class MatchmakingTelemetryService {
         metrics: {
           avgLatencyMs: Math.round(avgLatency),
           recentSampleCount: latencies.length,
-          totalMatchedSinceStart: parseInt(totalMatched),
+          totalMatchedSinceStart: parseInt(totalMatched, 10),
           activeRooms,
           userLocations
         },

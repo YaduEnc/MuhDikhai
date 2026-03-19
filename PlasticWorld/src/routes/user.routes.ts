@@ -16,6 +16,7 @@ import { deleteFirebaseUser } from '../config/firebase';
 import { upload } from '../middleware/multer';
 import matchService from '../services/match.service';
 import logger from '../utils/logger';
+import { buildPublicUploadUrl } from '../utils/publicUrl';
 
 const router = Router();
 
@@ -189,11 +190,8 @@ router.post(
       throw new AppError('No file uploaded', 400, 'NO_FILE');
     }
 
-    // Return the URL to the uploaded file (respecting proxies/tunnels)
-    const protocol = req.get('x-forwarded-proto') || req.protocol;
-    const host = req.get('x-forwarded-host') || req.get('host');
-    const baseUrl = `${protocol}://${host}`;
-    const avatarUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    // Return a stable public URL (handles reverse proxies and production hosts)
+    const avatarUrl = buildPublicUploadUrl(req, req.file.filename);
 
     res.status(200).json({
       success: true,
