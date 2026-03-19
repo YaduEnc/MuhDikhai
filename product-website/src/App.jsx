@@ -203,6 +203,33 @@ function App() {
     }
   }, [])
 
+  const emitBrowserGeoIfGranted = useCallback((socket) => {
+    if (!socket || typeof window === 'undefined') return
+    if (!window.isSecureContext || !('geolocation' in navigator)) return
+    if (!navigator.permissions?.query) return
+
+    navigator.permissions
+      .query({ name: 'geolocation' })
+      .then((permissionStatus) => {
+        if (permissionStatus.state !== 'granted') return
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            socket.emit('presence:geo:update', {
+              lat: position.coords.latitude,
+              long: position.coords.longitude,
+            })
+          },
+          () => { },
+          {
+            enableHighAccuracy: false,
+            maximumAge: 10 * 60 * 1000,
+            timeout: 8000,
+          }
+        )
+      })
+      .catch(() => { })
+  }, [])
+
   useEffect(() => {
     if (!session?.accessToken) return
 
@@ -235,6 +262,7 @@ function App() {
           refreshingRef.current = false
           setSocketState((prev) => ({ ...prev, socket, status: 'connected' }))
           setHasConnectedOnce(true)
+          emitBrowserGeoIfGranted(socket)
           // Fetch unread counts on connect
           authedFetch(`${BACKEND_URL}/api/v1/messages/unread-counts`)
             .then(r => r.json())
@@ -338,6 +366,28 @@ function App() {
         socket.on('message:deleted', (data) => {
           // Same as above
         })
+        socket.on('message:read', (payload) => {
+          if (payload?.userId !== sessionRef.current?.user?.id) return
+          const senderId = payload?.senderId
+          if (!senderId) return
+          setUnreadCounts((prev) => {
+            if (!(senderId in prev)) return prev
+            const next = { ...prev }
+            delete next[senderId]
+            return next
+          })
+        })
+        socket.on('messages:read', (payload) => {
+          if (payload?.userId !== sessionRef.current?.user?.id) return
+          const senderId = payload?.senderId
+          if (!senderId) return
+          setUnreadCounts((prev) => {
+            if (!(senderId in prev)) return prev
+            const next = { ...prev }
+            delete next[senderId]
+            return next
+          })
+        })
         // Track unread messages when NOT in that friend's chat
         socket.on('message:received', (payload) => {
           const senderId = payload?.message?.senderId || payload?.senderId
@@ -393,7 +443,7 @@ function App() {
       cancelled = true
       if (socket) socket.disconnect()
     }
-  }, [session?.accessToken, socketVersion])
+  }, [session?.accessToken, socketVersion, emitBrowserGeoIfGranted])
 
   const handleSendMessage = (content, replyToMessageId, isVanish = false) => {
     if (socketState.phase === 'friend-chat' && activeFriend) {

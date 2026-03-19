@@ -27,6 +27,24 @@ interface AuthenticatedSocket extends Socket {
   user?: SocketUser;
 }
 
+function parseHeaderNumber(value?: string | string[]): number | null {
+  const raw = firstHeaderValue(value);
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function isValidLatLong(lat: number, long: number): boolean {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(long) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    long >= -180 &&
+    long <= 180
+  );
+}
+
 function firstHeaderValue(value?: string | string[]): string | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] || null) : value;
@@ -99,6 +117,15 @@ function resolveClientIp(socket: AuthenticatedSocket): string | null {
 
   // Prefer the first public IP, fall back to first candidate.
   return candidates.find((ip) => !isPrivateOrLoopbackIp(ip)) || candidates[0];
+}
+
+function resolveEdgeGeo(socket: AuthenticatedSocket): { lat: number; long: number } | null {
+  const headers = socket.handshake.headers || {};
+  const lat = parseHeaderNumber(headers['x-vercel-ip-latitude'] as string | string[]);
+  const long = parseHeaderNumber(headers['x-vercel-ip-longitude'] as string | string[]);
+  if (lat === null || long === null) return null;
+  if (!isValidLatLong(lat, long)) return null;
+  return { lat, long };
 }
 
 // Store active users (userId -> Set of socketIds)
@@ -745,21 +772,39 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     }
     activeUsers.get(userId)!.add(socket.id);
     
-    // GeoIP Telemetry (proxy-aware)
+    // Geo telemetry priority:
+    // 1) Edge headers (Vercel etc), 2) IP lookup, 3) optional browser update event later.
     const resolvedIp = resolveClientIp(socket);
-    const lookupIp = !resolvedIp || resolvedIp === '::1' || resolvedIp === '127.0.0.1'
-      ? '122.161.48.1' // Local/dev fallback to keep telemetry visible
-      : resolvedIp;
-    const geo = geoip.lookup(lookupIp);
-    if (geo?.ll?.length === 2) {
-      const [lat, long] = geo.ll;
-      if (Number.isFinite(lat) && Number.isFinite(long)) {
-        pubClient.geoadd('presence:geo', long, lat, userId).catch((err) => logger.warn('Geo telemetry GEOADD failed', { error: err }));
-        // Store user's last known location for API visibility
-        pubClient.hset(`user:${userId}:meta`, 'location', JSON.stringify({ lat, long, city: geo.city, country: geo.country, ip: resolvedIp })).catch(() => {});
-      }
+    const edgeGeo = resolveEdgeGeo(socket);
+    if (edgeGeo) {
+      pubClient.geoadd('presence:geo', edgeGeo.long, edgeGeo.lat, userId).catch((err) => logger.warn('Geo telemetry GEOADD failed', { error: err }));
+      pubClient
+        .hset(
+          `user:${userId}:meta`,
+          'location',
+          JSON.stringify({
+            lat: edgeGeo.lat,
+            long: edgeGeo.long,
+            source: 'edge-header',
+            ip: resolvedIp,
+          })
+        )
+        .catch(() => {});
     } else {
-      logger.debug('Geo lookup unavailable for socket connection', { userId, ip: resolvedIp });
+      const lookupIp = !resolvedIp || resolvedIp === '::1' || resolvedIp === '127.0.0.1'
+        ? '122.161.48.1' // Local/dev fallback to keep telemetry visible
+        : resolvedIp;
+      const geo = geoip.lookup(lookupIp);
+      if (geo?.ll?.length === 2) {
+        const [lat, long] = geo.ll;
+        if (isValidLatLong(lat, long)) {
+          pubClient.geoadd('presence:geo', long, lat, userId).catch((err) => logger.warn('Geo telemetry GEOADD failed', { error: err }));
+          // Store user's last known location for API visibility
+          pubClient.hset(`user:${userId}:meta`, 'location', JSON.stringify({ lat, long, city: geo.city, country: geo.country, source: 'geoip', ip: resolvedIp })).catch(() => {});
+        }
+      } else {
+        logger.debug('Geo lookup unavailable for socket connection', { userId, ip: resolvedIp });
+      }
     }
 
     // Join user's personal room
@@ -768,6 +813,27 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     // Notify everyone that user is online and total count
     io.emit('user:online', { userId, name });
     io.emit('presence:count', { count: activeUsers.size });
+
+    // Optional browser-provided geolocation fallback (when client has permission).
+    socket.on('presence:geo:update', async (payload: { lat?: number; long?: number }) => {
+      try {
+        const lat = Number(payload?.lat);
+        const long = Number(payload?.long);
+        if (!isValidLatLong(lat, long)) return;
+
+        await pubClient.geoadd('presence:geo', long, lat, userId);
+        await pubClient.hset(
+          `user:${userId}:meta`,
+          'location',
+          JSON.stringify({ lat, long, source: 'browser', ip: resolvedIp })
+        );
+      } catch (error) {
+        logger.warn('Failed to process browser geo update', {
+          error: error instanceof Error ? error.message : String(error),
+          userId,
+        });
+      }
+    });
 
     /**
      * Random chat: join the gentle queue

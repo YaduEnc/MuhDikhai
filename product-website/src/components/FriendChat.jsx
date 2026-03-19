@@ -306,6 +306,7 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
     const scrollRef = useRef(null)
     const typingTimeoutRef = useRef(null)
     const mainInputRef = useRef(null)
+    const readSentRef = useRef(new Set())
 
     const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
 
@@ -326,6 +327,47 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
     useEffect(() => {
         fetchHistory()
     }, [fetchHistory])
+
+    useEffect(() => {
+        readSentRef.current.clear()
+    }, [friend.user.id])
+
+    const markVisibleMessagesRead = useCallback((sourceMessages) => {
+        if (!socket?.connected || !session?.user?.id) return
+        const unreadIds = sourceMessages
+            .filter((msg) =>
+                msg?.id &&
+                msg.senderId === friend.user.id &&
+                msg.recipientId === session.user.id &&
+                msg.status !== 'read' &&
+                !readSentRef.current.has(msg.id)
+            )
+            .map((msg) => msg.id)
+
+        if (unreadIds.length === 0) return
+
+        const unreadIdSet = new Set(unreadIds)
+        unreadIds.forEach((id) => readSentRef.current.add(id))
+        socket.emit('messages:read', { messageIds: unreadIds, senderId: friend.user.id })
+        setMessages((prev) =>
+            prev.map((msg) =>
+                unreadIdSet.has(msg.id)
+                    ? { ...msg, status: 'read', readAt: msg.readAt || new Date().toISOString() }
+                    : msg
+            )
+        )
+    }, [socket, friend.user.id, session?.user?.id])
+
+    useEffect(() => {
+        markVisibleMessagesRead(messages)
+    }, [messages, markVisibleMessagesRead])
+
+    useEffect(() => {
+        if (!socket) return
+        const onConnect = () => markVisibleMessagesRead(messages)
+        socket.on('connect', onConnect)
+        return () => socket.off('connect', onConnect)
+    }, [socket, messages, markVisibleMessagesRead])
 
     useEffect(() => {
         if (!socket) return
