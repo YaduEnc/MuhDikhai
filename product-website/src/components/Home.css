@@ -666,6 +666,13 @@
   justify-content: center;
 }
 
+.profile-avatar-panel {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .avatar-edit-btn {
   position: absolute;
   bottom: 0;
@@ -688,11 +695,24 @@
     background 0.15s ease-out;
 }
 
+.avatar-edit-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .avatar-edit-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6);
   background: linear-gradient(135deg, #fbbf77, #f87171);
   color: #020617;
+}
+
+.avatar-edit-btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+  background: radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.18), transparent 55%),
+    rgba(7, 9, 26, 0.98);
+  color: #f9fafb;
 }
 
 .profile-avatar-img {
@@ -1200,6 +1220,15 @@
   box-shadow: 0 14px 40px rgba(15, 23, 42, 0.9);
 }
 
+.avatar-upload-wrap.is-uploading {
+  cursor: progress;
+}
+
+.avatar-upload-wrap.is-uploading:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 .avatar-upload-wrap .profile-avatar {
   width: 100%;
   height: 100%;
@@ -1221,6 +1250,38 @@
 
 .avatar-upload-wrap:hover .avatar-edit-overlay {
   opacity: 1;
+}
+
+.avatar-upload-progress {
+  width: 116px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.avatar-upload-progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.avatar-upload-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22d3ee, #f59e0b);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.55);
+  transition: width 140ms linear;
+}
+
+.avatar-upload-progress-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 @keyframes avatar-pulse {

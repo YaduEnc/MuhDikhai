@@ -62,19 +62,33 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
         gender: session?.user?.gender || 'prefer_not_to_say'
     })
     const [isSaving, setIsSaving] = useState(false)
+    const [isAvatarUploading, setIsAvatarUploading] = useState(false)
+    const [uploadProgress, setUploadProgress] = useState(0)
+    const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(null)
     const [error, setError] = useState('')
     const fileInputRef = useRef(null)
 
     const auraPoints = session?.user?.auraPoints || 0
     const auraLevel = calculateAuraLevel(auraPoints)
     const auraProgress = Math.max(0, Math.min(auraPoints, 100))
-    const avatarUrl = getAvatarUrl(session?.user)
+    const avatarUrl = avatarPreviewUrl || getAvatarUrl(session?.user)
 
     const hasBio = !!(session?.user?.bio && session.user.bio.trim().length > 0)
     const bioText = hasBio
         ? session.user.bio
         : 'Add a short line about yourself so others know who is on the other side.'
     const hasGender = !!(session?.user?.gender && session.user.gender !== 'prefer_not_to_say')
+
+    useEffect(() => () => {
+        if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl)
+    }, [avatarPreviewUrl])
+
+    const clearPreview = useCallback(() => {
+        setAvatarPreviewUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev)
+            return null
+        })
+    }, [])
 
     const handleFileChange = async (e) => {
         const file = e.target.files?.[0]
@@ -83,15 +97,34 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
             setError('Photo must be less than 10MB')
             return
         }
-        setIsSaving(true)
+        if (!file.type.startsWith('image/')) {
+            setError('Please choose an image file')
+            return
+        }
+
+        const localPreview = URL.createObjectURL(file)
+
+        setAvatarPreviewUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev)
+            return localPreview
+        })
+        setIsAvatarUploading(true)
+        setUploadProgress(0)
         setError('')
         try {
-            const url = await onUploadAvatar(file)
+            const url = await onUploadAvatar(file, {
+                onProgress: (progress) => setUploadProgress(progress),
+            })
+            setUploadProgress(100)
             await onUpdateProfile({ profilePictureUrl: url })
+            clearPreview()
         } catch (err) {
+            clearPreview()
             setError(err.message || 'Failed to upload photo')
         } finally {
-            setIsSaving(false)
+            setIsAvatarUploading(false)
+            window.setTimeout(() => setUploadProgress(0), 500)
+            if (fileInputRef.current) fileInputRef.current.value = ''
         }
     }
 
@@ -120,30 +153,41 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                     <div className="profile-card profile-identity-card">
                         <div className="profile-card-header">
                             <div className="profile-header-main">
-                                <div className="profile-avatar-wrapper">
-                                    <div className="profile-avatar lg">
-                                        {avatarUrl ? (
-                                            <img src={avatarUrl} alt="avatar" className="profile-avatar-img" />
-                                        ) : (
-                                            <span className="profile-avatar-initials">
-                                                {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
-                                            </span>
-                                        )}
+                                <div className="profile-avatar-panel">
+                                    <div className="profile-avatar-wrapper">
+                                        <div className="profile-avatar lg">
+                                            {avatarUrl ? (
+                                                <img src={avatarUrl} alt="avatar" className="profile-avatar-img" />
+                                            ) : (
+                                                <span className="profile-avatar-initials">
+                                                    {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <button
+                                            className="avatar-edit-btn"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            title="Change avatar"
+                                            disabled={isAvatarUploading}
+                                        >
+                                            ✎
+                                        </button>
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            style={{ display: 'none' }}
+                                            accept="image/*"
+                                            onChange={handleFileChange}
+                                        />
                                     </div>
-                                    <button
-                                        className="avatar-edit-btn"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        title="Change avatar"
-                                    >
-                                        ✎
-                                    </button>
-                                    <input
-                                        type="file"
-                                        ref={fileInputRef}
-                                        style={{ display: 'none' }}
-                                        accept="image/*"
-                                        onChange={handleFileChange}
-                                    />
+                                    {isAvatarUploading && (
+                                        <div className="avatar-upload-progress" role="status" aria-live="polite">
+                                            <div className="avatar-upload-progress-track">
+                                                <span className="avatar-upload-progress-fill" style={{ width: `${uploadProgress}%` }} />
+                                            </div>
+                                            <span className="avatar-upload-progress-label">Uploading {uploadProgress}%</span>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="profile-info">
                                     <h2 className="profile-name">{session?.user?.name}</h2>
@@ -265,30 +309,43 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                 <div className="profile-card profile-identity-card profile-identity-card--editing">
                     <div className="profile-card-header">
                         <div className="profile-header-main">
-                            <div
-                                className="avatar-upload-wrap avatar-upload-wrap--editing"
-                                onClick={() => fileInputRef.current?.click()}
-                                title="Change profile photo"
-                            >
-                                <div className="profile-avatar lg">
-                                    {avatarUrl ? (
-                                        <img src={avatarUrl} alt="avatar" className="profile-avatar-img" />
-                                    ) : (
-                                        <span className="profile-avatar-initials">
-                                            {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
-                                        </span>
-                                    )}
+                            <div className="profile-avatar-panel">
+                                <div
+                                    className={`avatar-upload-wrap avatar-upload-wrap--editing ${isAvatarUploading ? 'is-uploading' : ''}`}
+                                    onClick={() => {
+                                        if (!isAvatarUploading) fileInputRef.current?.click()
+                                    }}
+                                    title={isAvatarUploading ? 'Uploading photo...' : 'Change profile photo'}
+                                >
+                                    <div className="profile-avatar lg">
+                                        {avatarUrl ? (
+                                            <img src={avatarUrl} alt="avatar" className="profile-avatar-img" />
+                                        ) : (
+                                            <span className="profile-avatar-initials">
+                                                {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="avatar-edit-overlay">
+                                        <span>{isAvatarUploading ? `${uploadProgress}%` : 'Change photo'}</span>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        style={{ display: 'none' }}
+                                        accept="image/*"
+                                        onChange={handleFileChange}
+                                        disabled={isAvatarUploading}
+                                    />
                                 </div>
-                                <div className="avatar-edit-overlay">
-                                    <span>Change photo</span>
-                                </div>
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    style={{ display: 'none' }}
-                                    accept="image/*"
-                                    onChange={handleFileChange}
-                                />
+                                {isAvatarUploading && (
+                                    <div className="avatar-upload-progress" role="status" aria-live="polite">
+                                        <div className="avatar-upload-progress-track">
+                                            <span className="avatar-upload-progress-fill" style={{ width: `${uploadProgress}%` }} />
+                                        </div>
+                                        <span className="avatar-upload-progress-label">Uploading {uploadProgress}%</span>
+                                    </div>
+                                )}
                             </div>
                             <div className="profile-info">
                                 <span className="card-eyebrow">Editing profile</span>
@@ -356,8 +413,8 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                     {error && <div className="modal-error modal-error--inline">{error}</div>}
 
                     <div className="profile-edit-footer">
-                        <button className="btn-primary" onClick={handleSave} disabled={isSaving}>
-                            {isSaving ? 'Saving...' : 'Save profile'}
+                        <button className="btn-primary" onClick={handleSave} disabled={isSaving || isAvatarUploading}>
+                            {isSaving ? 'Saving...' : isAvatarUploading ? 'Uploading photo...' : 'Save profile'}
                         </button>
                     </div>
                 </div>

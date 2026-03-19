@@ -524,17 +524,80 @@ function App() {
     }
   }
 
-  const handleUploadAvatar = async (file) => {
+  const uploadAvatarWithToken = (token, file, onProgress) => new Promise((resolve, reject) => {
     const formData = new FormData()
     formData.append('avatar', file)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${BACKEND_URL}/api/v1/users/me/avatar`)
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+    if (typeof onProgress === 'function') {
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return
+        const percent = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)))
+        onProgress(percent)
+      }
+    }
+
+    xhr.onerror = () => reject(new Error('Avatar upload failed due to a network error'))
+    xhr.onabort = () => reject(new Error('Avatar upload was cancelled'))
+    xhr.onload = () => {
+      const isSuccess = xhr.status >= 200 && xhr.status < 300
+      let payload = null
+      try {
+        payload = xhr.responseText ? JSON.parse(xhr.responseText) : null
+      } catch {
+        // Fallback message handled below.
+      }
+
+      if (!isSuccess || !payload?.success || !payload?.data?.url) {
+        const error = new Error(payload?.error?.message || `Failed to upload avatar (status ${xhr.status})`)
+        error.status = xhr.status
+        reject(error)
+        return
+      }
+      resolve(payload.data.url)
+    }
+
+    xhr.send(formData)
+  })
+
+  const handleUploadAvatar = async (file, options = {}) => {
+    const cur = sessionRef.current
+    if (!cur?.accessToken) throw new Error('Not authenticated')
+
+    const onProgress = options?.onProgress
+
     try {
-      const res = await authedFetch(`${BACKEND_URL}/api/v1/users/me/avatar`, { method: 'POST', body: formData })
-      const json = await res.json()
-      if (!json.success) throw new Error(json.error?.message || 'Failed to upload avatar')
-      return json.data.url
+      const validSession = await getValidSession(cur)
+      if (validSession.accessToken !== cur.accessToken) {
+        const normalized = normalizeSession(validSession)
+        sessionRef.current = normalized
+        setSession(normalized)
+        saveSession(normalized)
+      }
+
+      const token = validSession.accessToken || cur.accessToken
+      return await uploadAvatarWithToken(token, file, onProgress)
     } catch (error) {
-      console.error('Avatar upload failed:', error)
-      throw error
+      const shouldRetry = error?.status === 401 && cur?.refreshToken
+      if (!shouldRetry) {
+        console.error('Avatar upload failed:', error)
+        throw error
+      }
+
+      try {
+        const next = await refreshSession(cur.refreshToken)
+        const normalized = normalizeSession(next)
+        sessionRef.current = normalized
+        setSession(normalized)
+        saveSession(normalized)
+        return await uploadAvatarWithToken(normalized.accessToken, file, onProgress)
+      } catch (retryError) {
+        console.error('Avatar upload failed:', retryError)
+        throw retryError
+      }
     }
   }
 
