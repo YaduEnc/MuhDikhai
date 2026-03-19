@@ -115,6 +115,8 @@ function App() {
   const sessionRef = useRef(session)
   const chatMessagesRef = useRef(chatMessages)
   const roomRef = useRef(room)
+  const activeFriendRef = useRef(activeFriend)
+  const socketPhaseRef = useRef(socketState.phase)
   const refreshingRef = useRef(false)
 
   useEffect(() => {
@@ -128,6 +130,14 @@ function App() {
   useEffect(() => {
     roomRef.current = room
   }, [room])
+
+  useEffect(() => {
+    activeFriendRef.current = activeFriend
+  }, [activeFriend])
+
+  useEffect(() => {
+    socketPhaseRef.current = socketState.phase
+  }, [socketState.phase])
 
   useEffect(() => {
     const handlePopState = () => {
@@ -325,14 +335,14 @@ function App() {
         })
         // Track unread messages when NOT in that friend's chat
         socket.on('message:received', (payload) => {
-          const senderId = payload.message?.senderId
-          if (senderId) {
-            setUnreadCounts(prev => {
-              // Only increment if NOT viewing this friend's chat
-              const currentFriend = sessionRef.current // we'll rely on component re-render
-              return { ...prev, [senderId]: (prev[senderId] || 0) + 1 }
-            })
-          }
+          const senderId = payload?.message?.senderId || payload?.senderId
+          if (!senderId) return
+
+          const currentFriendId = activeFriendRef.current?.user?.id
+          const isViewingSenderChat = socketPhaseRef.current === 'friend-chat' && currentFriendId === senderId
+          if (isViewingSenderChat) return
+
+          setUnreadCounts(prev => ({ ...prev, [senderId]: (prev[senderId] || 0) + 1 }))
         })
 
         socket.on('disconnect', () => setSocketState((prev) => ({ ...prev, status: 'disconnected' })))
@@ -660,6 +670,8 @@ function App() {
   }
 
   const handleOpenFriendChat = (friend) => {
+    activeFriendRef.current = friend
+    socketPhaseRef.current = 'friend-chat'
     setActiveFriend(friend)
     setSocketState(prev => ({ ...prev, phase: 'friend-chat' }))
     // Clear unread count for this friend
@@ -671,6 +683,8 @@ function App() {
   }
 
   const handleBackFromFriendChat = () => {
+    activeFriendRef.current = null
+    socketPhaseRef.current = 'idle'
     setActiveFriend(null)
     setSocketState(prev => ({ ...prev, phase: 'idle' }))
   }
