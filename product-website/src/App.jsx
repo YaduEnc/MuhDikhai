@@ -118,6 +118,10 @@ function App() {
   const activeFriendRef = useRef(activeFriend)
   const socketPhaseRef = useRef(socketState.phase)
   const refreshingRef = useRef(false)
+  const setSocketPhase = useCallback((phase) => {
+    socketPhaseRef.current = phase
+    setSocketState((prev) => ({ ...prev, phase }))
+  }, [])
 
   useEffect(() => {
     sessionRef.current = session
@@ -260,10 +264,10 @@ function App() {
 
         socket.on('presence:count', (payload) => setOnlineCount(payload.count))
         socket.on('random:stats', (stats) => setMatchingStats(stats))
-        socket.on('random:waiting', () => setSocketState((prev) => ({ ...prev, phase: 'matching' })))
+        socket.on('random:waiting', () => setSocketPhase('matching'))
         socket.on('random:matched', (payload) => {
           setRoom(payload)
-          setSocketState((prev) => ({ ...prev, phase: 'matched' }))
+          setSocketPhase('matched')
           setChatMessages([])
           playMatchThump()
         })
@@ -306,15 +310,16 @@ function App() {
         })
         socket.on('random:left', () => {
           const currentRoom = roomRef.current
+          const currentPhase = socketPhaseRef.current
           // Only show vibe check if we were actually matched and there is a partner to vote on
-          if (socketState.phase === 'matched' && currentRoom?.partner?.id) {
+          if (currentPhase === 'matched' && currentRoom?.partner?.id) {
             setVibeCheckState({
               show: true,
               partner: currentRoom.partner,
               roomId: currentRoom.roomId || currentRoom.id
             })
           }
-          setSocketState((prev) => ({ ...prev, phase: 'partner-left' }))
+          setSocketPhase('partner-left')
         })
         socket.on('typing:start', (payload) => {
           if (!payload?.userId || payload.userId === roomRef.current?.partner?.id) setPartnerTyping(true)
@@ -462,6 +467,7 @@ function App() {
     setIsTransitioning(false)
     setRoom(null)
     setChatMessages([])
+    socketPhaseRef.current = 'idle'
     setSocketState({ status: 'disconnected', phase: 'idle', socket: null })
   }
 
@@ -470,7 +476,7 @@ function App() {
     if (socketRef.current) socketRef.current.emit('random:leave')
 
     // Trigger vibe check if we were in a match
-    if (socketState.phase === 'matched' && currentRoom?.partner) {
+    if (socketPhaseRef.current === 'matched' && currentRoom?.partner) {
       setVibeCheckState({
         show: true,
         partner: currentRoom.partner,
@@ -482,7 +488,7 @@ function App() {
     setIsTransitioning(false)
     setRoom(null)
     setChatMessages([])
-    setSocketState((prev) => ({ ...prev, phase: 'idle' }))
+    setSocketPhase('idle')
   }
 
   const authedFetch = useCallback(async (url, opts = {}) => {
@@ -671,9 +677,8 @@ function App() {
 
   const handleOpenFriendChat = (friend) => {
     activeFriendRef.current = friend
-    socketPhaseRef.current = 'friend-chat'
     setActiveFriend(friend)
-    setSocketState(prev => ({ ...prev, phase: 'friend-chat' }))
+    setSocketPhase('friend-chat')
     // Clear unread count for this friend
     setUnreadCounts(prev => {
       const next = { ...prev }
@@ -684,9 +689,8 @@ function App() {
 
   const handleBackFromFriendChat = () => {
     activeFriendRef.current = null
-    socketPhaseRef.current = 'idle'
     setActiveFriend(null)
-    setSocketState(prev => ({ ...prev, phase: 'idle' }))
+    setSocketPhase('idle')
   }
 
   const handleInitiateCall = (partner, type) => {
@@ -788,7 +792,7 @@ function App() {
               setIsTransitioning(true)
               setMatchPrefs({ topics, preference })
               setChatMessages([])
-              setSocketState((prev) => ({ ...prev, phase: 'matching' }))
+              setSocketPhase('matching')
               setTimeout(() => { setShowChat(true); setIsTransitioning(false); }, 600)
               setTimeout(() => socketRef.current?.emit('random:join', { topics, preference }), 50)
             }}
@@ -845,11 +849,12 @@ function App() {
             callOverlayStatus={callOverlayState.status}
             onSearchAgain={() => {
               const currentRoom = roomRef.current;
+              const currentPhase = socketPhaseRef.current;
               // Leave current first
               socketRef.current?.emit('random:leave');
 
               // Trigger vibe check if we were in a match
-              if (socketState.phase === 'matched' && currentRoom?.partner) {
+              if (currentPhase === 'matched' && currentRoom?.partner) {
                 setVibeCheckState({
                   show: true,
                   partner: currentRoom.partner,
@@ -858,7 +863,7 @@ function App() {
               }
 
               // Reset local state immediately
-              setSocketState((prev) => ({ ...prev, phase: 'matching' }));
+              setSocketPhase('matching');
               setRoom(null);
               setChatMessages([]);
               // Delay re-join to let the backend finish cleaning up the leave
