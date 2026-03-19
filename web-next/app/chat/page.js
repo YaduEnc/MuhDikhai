@@ -1,11 +1,5 @@
-import NoSsrRealtimeIsland from '@/components/NoSsrRealtimeIsland'
-import SessionBootstrapProbe from '@/components/SessionBootstrapProbe'
+import RealtimeClientApp from '@/components/RealtimeClientApp'
 
 export default function ChatPage() {
-  return (
-    <>
-      <SessionBootstrapProbe />
-      <NoSsrRealtimeIsland routeMode="chat" />
-    </>
-  )
+  return <RealtimeClientApp autoMatchOnMount />
 }

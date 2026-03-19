@@ -1,11 +1,5 @@
-import NoSsrRealtimeIsland from '@/components/NoSsrRealtimeIsland'
-import SessionBootstrapProbe from '@/components/SessionBootstrapProbe'
+import RealtimeClientApp from '@/components/RealtimeClientApp'
 
 export default function AppPage() {
-  return (
-    <>
-      <SessionBootstrapProbe />
-      <NoSsrRealtimeIsland routeMode="app" />
-    </>
-  )
+  return <RealtimeClientApp />
 }

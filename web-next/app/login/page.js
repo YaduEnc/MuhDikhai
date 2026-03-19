@@ -1,5 +1,5 @@
 import AuthGatewayApp from '@/components/AuthGatewayApp'
 
-export default function HomePage() {
+export default function LoginPage() {
   return <AuthGatewayApp />
 }

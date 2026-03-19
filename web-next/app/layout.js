@@ -1,4 +1,5 @@
 import './globals.css'
+import RuntimeSanityGuard from '@/components/RuntimeSanityGuard'
 
 export const metadata = {
   title: 'MuhDikhai Next',
@@ -8,7 +9,10 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <RuntimeSanityGuard />
+        {children}
+      </body>
     </html>
   )
 }

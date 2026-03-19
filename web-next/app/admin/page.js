@@ -1,11 +1,5 @@
-import NoSsrRealtimeIsland from '@/components/NoSsrRealtimeIsland'
-import SessionBootstrapProbe from '@/components/SessionBootstrapProbe'
+import AdminClientApp from '@/components/AdminClientApp'
 
 export default function AdminPage() {
-  return (
-    <>
-      <SessionBootstrapProbe />
-      <NoSsrRealtimeIsland routeMode="admin" />
-    </>
-  )
+  return <AdminClientApp />
 }
