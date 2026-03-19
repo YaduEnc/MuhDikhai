@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import createGlobe from 'cobe';
 
 const GlobalInteractiveGlobe = ({ locations = [] }) => {
@@ -6,13 +6,36 @@ const GlobalInteractiveGlobe = ({ locations = [] }) => {
   const pointerInteracting = useRef(null);
   const pointerInteractionMovement = useRef(0);
   const r = useRef(0);
+  const markers = useMemo(
+    () => (Array.isArray(locations)
+      ? locations
+        .map((loc) => ({
+          lat: Number(loc?.location?.[0]),
+          lng: Number(loc?.location?.[1]),
+          size: Number(loc?.size) || 0.05,
+        }))
+        .filter((loc) =>
+          Number.isFinite(loc.lat) &&
+          Number.isFinite(loc.lng) &&
+          Math.abs(loc.lat) <= 90 &&
+          Math.abs(loc.lng) <= 180
+        )
+      : []),
+    [locations]
+  );
 
   useEffect(() => {
+    if (!canvasRef.current) return undefined;
+
     let phi = 0;
     let width = 0;
-    const onResize = () => canvasRef.current && (width = canvasRef.current.offsetWidth);
+    const onResize = () => {
+      if (!canvasRef.current) return;
+      width = Math.max(canvasRef.current.offsetWidth || 0, 320);
+    };
     window.addEventListener('resize', onResize);
     onResize();
+    const resizeTick = window.requestAnimationFrame(onResize);
 
     const globe = createGlobe(canvasRef.current, {
       devicePixelRatio: 2,
@@ -27,9 +50,9 @@ const GlobalInteractiveGlobe = ({ locations = [] }) => {
       baseColor: [0.01, 0.04, 0.05],
       markerColor: [0, 1, 1], // Neon Cyan
       glowColor: [0, 0.5, 0.5],
-      markers: locations.map(loc => ({
-        location: loc.location,
-        size: loc.size || 0.05
+      markers: markers.map((loc) => ({
+        location: [loc.lat, loc.lng],
+        size: Math.max(0.03, Math.min(0.12, loc.size)),
       })),
       onRender: (state) => {
         // This Baby rotates!
@@ -42,12 +65,15 @@ const GlobalInteractiveGlobe = ({ locations = [] }) => {
       },
     });
 
-    setTimeout(() => (canvasRef.current.style.opacity = '1'));
+    setTimeout(() => {
+      if (canvasRef.current) canvasRef.current.style.opacity = '1';
+    });
     return () => {
+      window.cancelAnimationFrame(resizeTick);
       globe.destroy();
       window.removeEventListener('resize', onResize);
     };
-  }, [locations]);
+  }, [markers]);
 
   return (
     <div
@@ -61,15 +87,15 @@ const GlobalInteractiveGlobe = ({ locations = [] }) => {
       }}
       onPointerDown={(e) => {
         pointerInteracting.current = e.clientX - pointerInteractionMovement.current;
-        canvasRef.current.style.cursor = 'grabbing';
+        if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing';
       }}
       onPointerUp={() => {
         pointerInteracting.current = null;
-        canvasRef.current.style.cursor = 'grab';
+        if (canvasRef.current) canvasRef.current.style.cursor = 'grab';
       }}
       onPointerOut={() => {
         pointerInteracting.current = null;
-        canvasRef.current.style.cursor = 'grab';
+        if (canvasRef.current) canvasRef.current.style.cursor = 'grab';
       }}
       onMouseMove={(e) => {
         if (pointerInteracting.current !== null) {

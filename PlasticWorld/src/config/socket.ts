@@ -27,6 +27,80 @@ interface AuthenticatedSocket extends Socket {
   user?: SocketUser;
 }
 
+function firstHeaderValue(value?: string | string[]): string | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] || null) : value;
+}
+
+function normalizeIp(rawIp?: string | null): string | null {
+  if (!rawIp) return null;
+  const first = rawIp.split(',')[0]?.trim();
+  if (!first) return null;
+
+  // Handle IPv6 in brackets + optional port: [::1]:12345
+  const bracketMatch = first.match(/^\[(.*)\](?::\d+)?$/);
+  let ip = bracketMatch ? bracketMatch[1] : first;
+
+  // Handle IPv4 with port: 1.2.3.4:5678
+  if (/^\d+\.\d+\.\d+\.\d+:\d+$/.test(ip)) {
+    ip = ip.split(':')[0];
+  }
+
+  // Handle IPv6-mapped IPv4: ::ffff:1.2.3.4
+  if (ip.startsWith('::ffff:')) {
+    ip = ip.slice(7);
+  }
+
+  return ip;
+}
+
+function isPrivateOrLoopbackIp(ip?: string | null): boolean {
+  if (!ip) return true;
+
+  // IPv6 local ranges
+  if (
+    ip === '::1' ||
+    ip === '::' ||
+    ip.startsWith('fc') ||
+    ip.startsWith('fd') ||
+    ip.startsWith('fe80:')
+  ) {
+    return true;
+  }
+
+  // IPv4 private + loopback + link-local
+  const octets = ip.split('.').map(Number);
+  if (octets.length !== 4 || octets.some((n) => Number.isNaN(n) || n < 0 || n > 255)) {
+    return false;
+  }
+  const [a, b] = octets;
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254)
+  );
+}
+
+function resolveClientIp(socket: AuthenticatedSocket): string | null {
+  const headers = socket.handshake.headers || {};
+  const candidates = [
+    firstHeaderValue(headers['cf-connecting-ip'] as string | string[]),
+    firstHeaderValue(headers['x-real-ip'] as string | string[]),
+    firstHeaderValue(headers['true-client-ip'] as string | string[]),
+    firstHeaderValue(headers['x-forwarded-for'] as string | string[]),
+    socket.handshake.address,
+  ]
+    .map((ip) => normalizeIp(ip))
+    .filter((ip): ip is string => Boolean(ip));
+
+  if (candidates.length === 0) return null;
+
+  // Prefer the first public IP, fall back to first candidate.
+  return candidates.find((ip) => !isPrivateOrLoopbackIp(ip)) || candidates[0];
+}
+
 // Store active users (userId -> Set of socketIds)
 const activeUsers = new Map<string, Set<string>>();
 
@@ -671,14 +745,21 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     }
     activeUsers.get(userId)!.add(socket.id);
     
-    // GeoIP Telemetry
-    const ip = socket.handshake.address === '::1' ? '122.161.48.1' : socket.handshake.address.replace('::ffff:', '');
-    const geo = geoip.lookup(ip);
-    if (geo) {
+    // GeoIP Telemetry (proxy-aware)
+    const resolvedIp = resolveClientIp(socket);
+    const lookupIp = !resolvedIp || resolvedIp === '::1' || resolvedIp === '127.0.0.1'
+      ? '122.161.48.1' // Local/dev fallback to keep telemetry visible
+      : resolvedIp;
+    const geo = geoip.lookup(lookupIp);
+    if (geo?.ll?.length === 2) {
       const [lat, long] = geo.ll;
-      pubClient.geoadd('presence:geo', long, lat, userId).catch(() => {});
-      // Store user's last known location for API visibility
-      pubClient.hset(`user:${userId}:meta`, 'location', JSON.stringify({ lat, long, city: geo.city, country: geo.country })).catch(() => {});
+      if (Number.isFinite(lat) && Number.isFinite(long)) {
+        pubClient.geoadd('presence:geo', long, lat, userId).catch((err) => logger.warn('Geo telemetry GEOADD failed', { error: err }));
+        // Store user's last known location for API visibility
+        pubClient.hset(`user:${userId}:meta`, 'location', JSON.stringify({ lat, long, city: geo.city, country: geo.country, ip: resolvedIp })).catch(() => {});
+      }
+    } else {
+      logger.debug('Geo lookup unavailable for socket connection', { userId, ip: resolvedIp });
     }
 
     // Join user's personal room

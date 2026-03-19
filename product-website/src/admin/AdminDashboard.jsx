@@ -4,6 +4,12 @@ import AdminMatchMonitor from './AdminMatchMonitor';
 import GlobalInteractiveGlobe from './GlobalInteractiveGlobe';
 import './AdminDashboard.css';
 
+const unwrapPayload = (payload) => {
+    if (!payload || typeof payload !== 'object') return payload;
+    if (payload.data && typeof payload.data === 'object') return payload.data;
+    return payload;
+};
+
 const AdminDashboard = ({ session, authedFetch }) => {
     const [liveStats, setLiveStats] = useState({ onlineUsers: 0, activeSessions: 0 });
     const [growthStats, setGrowthStats] = useState({ totalUsers: 0, newUsersToday: 0, topVibes: [] });
@@ -35,11 +41,24 @@ const AdminDashboard = ({ session, authedFetch }) => {
                 bugsRes.json()
             ]);
 
-            setLiveStats(liveData);
-            setGrowthStats(growthData);
-            setReports(reportsData.reports || []);
-            setBugReports(bugsData.reports || []);
-            if (matchmakingData?.metrics) setMatchmaking(matchmakingData);
+            const livePayload = unwrapPayload(liveData);
+            const growthPayload = unwrapPayload(growthData);
+            const reportsPayload = unwrapPayload(reportsData);
+            const bugsPayload = unwrapPayload(bugsData);
+            const matchmakingPayload = unwrapPayload(matchmakingData);
+
+            setLiveStats({
+                onlineUsers: livePayload?.onlineUsers || 0,
+                activeSessions: livePayload?.activeSessions || 0,
+            });
+            setGrowthStats({
+                totalUsers: growthPayload?.totalUsers || 0,
+                newUsersToday: growthPayload?.newUsersToday || 0,
+                topVibes: Array.isArray(growthPayload?.topVibes) ? growthPayload.topVibes : [],
+            });
+            setReports(Array.isArray(reportsPayload?.reports) ? reportsPayload.reports : []);
+            setBugReports(Array.isArray(bugsPayload?.reports) ? bugsPayload.reports : []);
+            if (matchmakingPayload?.metrics) setMatchmaking(matchmakingPayload);
 
         } catch (err) {
             console.error('Failed to fetch admin stats', err);
