@@ -25,7 +25,19 @@ import {
   clearSession,
   signInSilently,
 } from '@/src/authClient'
-import { initAudio, playMatchThump, playIncomingDrop, playOutgoingTick } from '@/src/utils/soundEngine'
+import {
+  initAudio,
+  playMatchThump,
+  playOutgoingTick,
+  playQueueEnterChirp,
+  playRadarPing,
+  playReadAck,
+  startIncomingCallRingtone,
+  stopIncomingCallRingtone,
+  playCallConnectedChirp,
+  playHangupTone,
+  playPartnerLeftDissolve,
+} from '@/src/utils/soundEngine'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
 
@@ -118,6 +130,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
   const roomRef = useRef(room)
   const activeFriendRef = useRef(activeFriend)
   const socketPhaseRef = useRef(socketState.phase)
+  const callOverlayStateRef = useRef(callOverlayState)
   const refreshingRef = useRef(false)
   const setSocketPhase = useCallback((phase) => {
     socketPhaseRef.current = phase
@@ -144,6 +157,10 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
     socketPhaseRef.current = socketState.phase
   }, [socketState.phase])
 
+  useEffect(() => {
+    callOverlayStateRef.current = callOverlayState
+  }, [callOverlayState])
+
   // Silent Auto-Login Observer
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -167,6 +184,36 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
     }, 10_000)
     return () => clearInterval(interval)
   }, [socketState.phase])
+
+  useEffect(() => {
+    if (socketState.phase !== 'matching') return
+
+    let timeoutId = null
+    const schedulePing = () => {
+      const delay = 6000 + Math.floor(Math.random() * 2001)
+      timeoutId = window.setTimeout(() => {
+        playRadarPing()
+        schedulePing()
+      }, delay)
+    }
+
+    schedulePing()
+    return () => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [socketState.phase])
+
+  useEffect(() => {
+    if (callOverlayState.status !== 'incoming') {
+      stopIncomingCallRingtone()
+    }
+
+    return () => {
+      stopIncomingCallRingtone()
+    }
+  }, [callOverlayState.status])
 
   // ── Proactive Server Health Monitor ──────────────────────────
   // Pings /health every 15s to detect outages even before login
@@ -285,7 +332,12 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
 
         socket.on('presence:count', (payload) => setOnlineCount(payload.count))
         socket.on('random:stats', (stats) => setMatchingStats(stats))
-        socket.on('random:waiting', () => setSocketPhase('matching'))
+        socket.on('random:waiting', () => {
+          if (socketPhaseRef.current !== 'matching') {
+            playQueueEnterChirp()
+          }
+          setSocketPhase('matching')
+        })
         socket.on('random:matched', (payload) => {
           setRoom(payload)
           setSocketPhase('matched')
@@ -321,6 +373,9 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
           setChatMessages((prev) => prev.filter((m) => m.id !== data.messageId))
         })
         socket.on('random:read', (payload) => {
+          const shouldPlayReadAck = chatMessagesRef.current.some(
+            (m) => m.id === payload.messageId && m.fromUserId === sessionRef.current?.user?.id && !m.read
+          )
           setChatMessages((prev) =>
             prev.map((m) =>
               m.id === payload.messageId && m.fromUserId === sessionRef.current?.user?.id
@@ -328,6 +383,9 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
                 : m
             )
           )
+          if (shouldPlayReadAck) {
+            playReadAck()
+          }
         })
         socket.on('random:left', (payload) => {
           const currentRoom = roomRef.current
@@ -344,6 +402,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
               partner: currentRoom.partner,
               roomId: currentRoom.roomId || currentRoom.id
             })
+            playPartnerLeftDissolve()
           }
           setSocketPhase('partner-left')
         })
@@ -402,30 +461,30 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
 
         // Global Call Signaling
         socket.on('webrtc:call-request', (data) => {
-          // If we are already in a call or requesting, auto-decline or ignore?
-          // For now, only show if idle
-          setCallOverlayState(current => {
-            if (current.status !== 'idle') return current
+          if (callOverlayStateRef.current.status !== 'idle') return
 
-            // Use roomId from backend, fall back to current room
-            const callRoomId = data.roomId || roomRef.current?.roomId
-            return {
-              status: 'incoming',
-              partner: { ...(data.caller || roomRef.current?.partner), roomId: callRoomId },
-              type: data.recipientId ? 'friend' : 'random',
-              isInitiator: false
-            }
+          const callRoomId = data.roomId || roomRef.current?.roomId
+          setCallOverlayState({
+            status: 'incoming',
+            partner: { ...(data.caller || roomRef.current?.partner), roomId: callRoomId },
+            type: data.recipientId ? 'friend' : 'random',
+            isInitiator: false
           })
-          playIncomingDrop()
+          startIncomingCallRingtone()
         })
 
         socket.on('webrtc:call-response', (data) => {
+          const wasInCallFlow = callOverlayStateRef.current.status !== 'idle'
+          stopIncomingCallRingtone()
           if (data.status === 'accepted') {
             setCallOverlayState(prev => ({ ...prev, status: 'active' }))
+            if (wasInCallFlow) {
+              playCallConnectedChirp()
+            }
           } else {
             setCallOverlayState(prev => ({ ...prev, status: 'idle', partner: null }))
-            if (data.status === 'declined') {
-              // Optional: show a small toast or just reset
+            if (data.status === 'declined' && wasInCallFlow) {
+              playHangupTone()
             }
           }
         })
@@ -504,6 +563,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
 
   const handleSignOut = () => {
     refreshingRef.current = false
+    stopIncomingCallRingtone()
     if (socketRef.current) {
       const currentRoom = roomRef.current
       const roomId = currentRoom?.roomId || currentRoom?.id
@@ -746,6 +806,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
 
   const handleInitiateCall = (partner, type) => {
     if (!socketRef.current) return
+    initAudio()
     const roomId = partner.roomId || partner.id
     const recipientId = type === 'friend' ? (partner.user?.id || partner.id) : null
 
@@ -772,24 +833,30 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
 
   const handleAcceptCall = () => {
     if (!socketRef.current) return
+    initAudio()
     const roomId = roomRef.current?.roomId || roomRef.current?.id || callOverlayState.partner?.id
+    stopIncomingCallRingtone()
     socketRef.current.emit('webrtc:call-response', {
       roomId,
       recipientId: callOverlayState.type === 'friend' ? callOverlayState.partner.id : null,
       status: 'accepted'
     })
     setCallOverlayState(prev => ({ ...prev, status: 'active' }))
+    playCallConnectedChirp()
   }
 
   const handleEndCall = () => {
     if (!socketRef.current) return
+    initAudio()
     const roomId = roomRef.current?.roomId || roomRef.current?.id || callOverlayState.partner?.id
+    stopIncomingCallRingtone()
     socketRef.current.emit('webrtc:call-response', {
       roomId,
       recipientId: callOverlayState.type === 'friend' ? callOverlayState.partner.id : null,
       status: 'declined' // used for ending too
     })
     setCallOverlayState({ status: 'idle', partner: null, type: 'random', isInitiator: false })
+    playHangupTone()
   }
 
   const isSignedIn = Boolean(session?.user)
