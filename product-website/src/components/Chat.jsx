@@ -346,6 +346,14 @@ const ProfileModal = memo(function ProfileModal({ partnerId, session, onClose })
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
+        const handleEsc = (event) => {
+            if (event.key === 'Escape') onClose()
+        }
+        window.addEventListener('keydown', handleEsc)
+        return () => window.removeEventListener('keydown', handleEsc)
+    }, [onClose])
+
+    useEffect(() => {
         const fetchProfile = async () => {
             try {
                 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
@@ -363,10 +371,21 @@ const ProfileModal = memo(function ProfileModal({ partnerId, session, onClose })
         fetchProfile()
     }, [partnerId, session.accessToken])
 
+    const formatGender = (gender) => {
+        if (!gender) return 'Not specified'
+        return gender
+            .replace(/_/g, ' ')
+            .split(' ')
+            .filter(Boolean)
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ')
+    }
+
     return (
         <div className="profile-modal-overlay" onClick={onClose}>
             <div className="profile-modal-card" onClick={e => e.stopPropagation()}>
-                <button className="profile-modal-close" onClick={onClose}>✕</button>
+                <span className="profile-modal-glow" aria-hidden="true" />
+                <button className="profile-modal-close-btn" onClick={onClose} aria-label="Close profile">✕</button>
                 {loading ? (
                     <div className="profile-loading">Loading...</div>
                 ) : profile ? (
@@ -378,20 +397,21 @@ const ProfileModal = memo(function ProfileModal({ partnerId, session, onClose })
                                 (profile.name || '?')[0].toUpperCase()
                             )}
                         </div>
-                        <h3 className="profile-modal-name">{profile.name}</h3>
+                        <h3 className="profile-modal-name">{profile.name || 'Unknown User'}</h3>
                         {profile.username && <p className="profile-modal-username">@{profile.username}</p>}
 
                         <div className="profile-modal-details">
                             <div className="pm-detail">
                                 <span className="pm-label">Gender</span>
-                                <span className="pm-value" style={{ textTransform: 'capitalize' }}>
-                                    {profile.gender?.replace(/_/g, ' ') || 'Unknown'}
+                                <span className="pm-value">
+                                    {formatGender(profile.gender)}
                                 </span>
                             </div>
                             <div className="pm-detail">
                                 <span className="pm-label">Aura</span>
                                 <div className="pm-aura-badge" style={{ borderColor: calculateAuraLevel(profile.auraPoints || 0).color }}>
                                     <span className="pm-aura-pts">{profile.auraPoints || 0}</span>
+                                    <span className="pm-aura-divider" aria-hidden="true">•</span>
                                     <span className="pm-aura-txt" style={{ color: calculateAuraLevel(profile.auraPoints || 0).color }}>
                                         {calculateAuraLevel(profile.auraPoints || 0).name}
                                     </span>
@@ -399,12 +419,10 @@ const ProfileModal = memo(function ProfileModal({ partnerId, session, onClose })
                             </div>
                         </div>
 
-                        {profile.bio && (
-                            <div className="profile-modal-bio">
-                                <h4>About</h4>
-                                <p>{profile.bio}</p>
-                            </div>
-                        )}
+                        <div className="profile-modal-bio">
+                            <h4>About</h4>
+                            <p>{profile.bio?.trim() || 'No bio added yet.'}</p>
+                        </div>
 
                     </div>
                 ) : (
