@@ -835,6 +835,40 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     });
 
     /**
+     * Random chat: read receipt
+     */
+    socket.on('random:read', async (data: { roomId?: string; messageId?: string }) => {
+      try {
+        const messageId = typeof data?.messageId === 'string' ? data.messageId.trim() : '';
+        if (!messageId || messageId.length > 128) {
+          return;
+        }
+
+        const currentRoomId = await redisClient.getClient().hget('random:user_rooms', userId);
+        if (!currentRoomId) {
+          return;
+        }
+
+        // If client passed roomId, ensure it matches server-side room state.
+        if (data?.roomId && data.roomId !== currentRoomId) {
+          return;
+        }
+
+        socket.to(currentRoomId).emit('random:read', {
+          roomId: currentRoomId,
+          messageId,
+          readByUserId: userId,
+          readAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        logger.error('Failed to relay random chat read receipt', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          userId,
+        });
+      }
+    });
+
+    /**
      * Random chat: handle message reaction
      */
     socket.on('random:reaction', async (data: { roomId: string; messageId: string; emoji: string }) => {

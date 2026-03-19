@@ -453,6 +453,7 @@ export default function Chat({
     const messagesAreaRef = useRef(null)
     const inputRef = useRef(null)
     const typingTimeoutRef = useRef(null)
+    const lastReadSentRef = useRef(null)
 
     const isMatched = socketState.phase === 'matched'
     const isMatching = socketState.phase === 'matching'
@@ -473,22 +474,26 @@ export default function Chat({
         }
     }, [chatMessages, session?.user?.id])
 
+    // Reset read-receipt dedupe marker when room changes
+    useEffect(() => {
+        lastReadSentRef.current = null
+    }, [room?.roomId, room?.id])
+
     // Emit read receipt
     useEffect(() => {
-        // Mark last message as read if it's from partner
         const lastMsg = chatMessages[chatMessages.length - 1]
-        if (lastMsg && lastMsg.fromUserId !== session?.user?.id && socketState.socket) {
-            if (socketState.phase === 'friend-chat') {
-                socketState.socket.emit('message:read', { messageId: lastMsg.id })
-            } else {
-                socketState.socket.emit('random:read', {
-                    roomId: room?.id,
-                    messageId: lastMsg.id
-                })
-            }
-        }
+        const targetRoomId = room?.roomId || room?.id
 
-    }, [chatMessages, room?.id, session?.user?.id, socketState.socket])
+        if (!lastMsg || !targetRoomId || !socketState.socket) return
+        if (lastMsg.fromUserId === session?.user?.id) return
+        if (lastReadSentRef.current === lastMsg.id) return
+
+        socketState.socket.emit('random:read', {
+            roomId: targetRoomId,
+            messageId: lastMsg.id
+        })
+        lastReadSentRef.current = lastMsg.id
+    }, [chatMessages, room?.roomId, room?.id, session?.user?.id, socketState.socket])
 
     // Close pickers on Escape
     useEffect(() => {

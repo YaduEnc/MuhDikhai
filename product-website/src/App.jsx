@@ -266,7 +266,13 @@ function App() {
           setChatMessages((prev) => prev.filter((m) => m.id !== data.messageId))
         })
         socket.on('random:read', (payload) => {
-          setChatMessages((prev) => prev.map((m) => (m.id === payload.messageId ? { ...m, read: true } : m)))
+          setChatMessages((prev) =>
+            prev.map((m) =>
+              m.id === payload.messageId && m.fromUserId === sessionRef.current?.user?.id
+                ? { ...m, read: true }
+                : m
+            )
+          )
         })
         socket.on('random:left', () => {
           const currentRoom = roomRef.current
