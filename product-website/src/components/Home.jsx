@@ -4,6 +4,10 @@ import { calculateAuraLevel } from '../utils/aura'
 import RadarLoader from './RadarLoader'
 import './Home.css'
 
+function getAvatarUrl(user) {
+    return user?.profilePictureUrl || user?.photoURL || null
+}
+
 function DeleteConfirmationModal({ onConfirm, onCancel }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -64,6 +68,7 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
     const auraPoints = session?.user?.auraPoints || 0
     const auraLevel = calculateAuraLevel(auraPoints)
     const auraProgress = Math.max(0, Math.min(auraPoints, 100))
+    const avatarUrl = getAvatarUrl(session?.user)
 
     const hasBio = !!(session?.user?.bio && session.user.bio.trim().length > 0)
     const bioText = hasBio
@@ -117,8 +122,8 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                             <div className="profile-header-main">
                                 <div className="profile-avatar-wrapper">
                                     <div className="profile-avatar lg">
-                                        {session?.user?.photoURL ? (
-                                            <img src={session.user.photoURL} alt="avatar" className="profile-avatar-img" />
+                                        {avatarUrl ? (
+                                            <img src={avatarUrl} alt="avatar" className="profile-avatar-img" />
                                         ) : (
                                             <span className="profile-avatar-initials">
                                                 {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
@@ -266,8 +271,8 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                                 title="Change profile photo"
                             >
                                 <div className="profile-avatar lg">
-                                    {session?.user?.photoURL ? (
-                                        <img src={session.user.photoURL} alt="avatar" className="profile-avatar-img" />
+                                    {avatarUrl ? (
+                                        <img src={avatarUrl} alt="avatar" className="profile-avatar-img" />
                                     ) : (
                                         <span className="profile-avatar-initials">
                                             {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
@@ -481,40 +486,43 @@ function FriendRequests({ requests, onRespond }) {
 
     return (
         <div className="friends-list">
-            {requests.map((req) => (
-                <div
-                    key={req.id}
-                    className="recent-match-card"
-                    style={{ '--aura-color': req.user?.auraPoints !== undefined ? calculateAuraLevel(req.user.auraPoints).color : 'var(--stroke)' }}
-                >
-                    <div className="recent-avatar">
-                        {req.user?.profilePictureUrl ? (
-                            <img src={req.user.profilePictureUrl} alt="avatar" />
-                        ) : (
-                            <span className="avatar-placeholder">{req.user?.name?.[0]?.toUpperCase() || 'S'}</span>
-                        )}
-                    </div>
-                    <div className="recent-info">
-                        <span className="recent-name">
-                            {req.user?.name || 'Stranger'}
-                            {req.user?.auraPoints !== undefined && (
-                                <span
-                                    className="partner-aura-badge"
-                                    title={`Aura: ${calculateAuraLevel(req.user.auraPoints).name}`}
-                                    style={{ color: calculateAuraLevel(req.user.auraPoints).color, fontSize: '0.8rem', marginLeft: '0.4rem' }}
-                                >
-                                    ✧
-                                </span>
+            {requests.map((req) => {
+                const avatarUrl = getAvatarUrl(req.user)
+                return (
+                    <div
+                        key={req.id}
+                        className="recent-match-card"
+                        style={{ '--aura-color': req.user?.auraPoints !== undefined ? calculateAuraLevel(req.user.auraPoints).color : 'var(--stroke)' }}
+                    >
+                        <div className="recent-avatar">
+                            {avatarUrl ? (
+                                <img src={avatarUrl} alt="avatar" />
+                            ) : (
+                                <span className="avatar-placeholder">{req.user?.name?.[0]?.toUpperCase() || 'S'}</span>
                             )}
-                        </span>
-                        <span className="recent-topic">Wants to be your friend</span>
+                        </div>
+                        <div className="recent-info">
+                            <span className="recent-name">
+                                {req.user?.name || 'Stranger'}
+                                {req.user?.auraPoints !== undefined && (
+                                    <span
+                                        className="partner-aura-badge"
+                                        title={`Aura: ${calculateAuraLevel(req.user.auraPoints).name}`}
+                                        style={{ color: calculateAuraLevel(req.user.auraPoints).color, fontSize: '0.8rem', marginLeft: '0.4rem' }}
+                                    >
+                                        ✧
+                                    </span>
+                                )}
+                            </span>
+                            <span className="recent-topic">Wants to be your friend</span>
+                        </div>
+                        <div className="friend-actions">
+                            <button className="friend-accept-btn" onClick={() => onRespond(req.id, 'accept')}>Accept</button>
+                            <button className="friend-deny-btn" onClick={() => onRespond(req.id, 'deny')}>Deny</button>
+                        </div>
                     </div>
-                    <div className="friend-actions">
-                        <button className="friend-accept-btn" onClick={() => onRespond(req.id, 'accept')}>Accept</button>
-                        <button className="friend-deny-btn" onClick={() => onRespond(req.id, 'deny')}>Deny</button>
-                    </div>
-                </div>
-            ))}
+                )
+            })}
         </div>
     )
 }
@@ -528,6 +536,7 @@ function FriendsList({ friends, onOpenChat, unreadCounts = {} }) {
         <div className="friends-list">
             {friends.map((friend) => {
                 const unread = unreadCounts[friend.user?.id] || 0
+                const avatarUrl = getAvatarUrl(friend.user)
                 return (
                     <div
                         key={friend.id}
@@ -535,8 +544,8 @@ function FriendsList({ friends, onOpenChat, unreadCounts = {} }) {
                         style={{ '--aura-color': friend.user?.auraPoints !== undefined ? calculateAuraLevel(friend.user.auraPoints).color : 'var(--stroke)' }}
                     >
                         <div className="recent-avatar">
-                            {friend.user?.profilePictureUrl ? (
-                                <img src={friend.user.profilePictureUrl} alt="avatar" />
+                            {avatarUrl ? (
+                                <img src={avatarUrl} alt="avatar" />
                             ) : (
                                 <span className="avatar-placeholder">{friend.user?.name?.[0]?.toUpperCase() || 'S'}</span>
                             )}
@@ -637,6 +646,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
         hour < 5 ? 'Still awake?' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 21 ? 'Good evening' : 'Good night'
 
     const name = session?.user?.name?.split(' ')[0] || 'you'
+    const sessionAvatarUrl = getAvatarUrl(session?.user)
 
 
     const toggleTopic = (topic) => {
@@ -840,43 +850,46 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                             recentMatches.length > 0 ? (
                                 <div className="home-recents-section">
                                     <div className="recents-list">
-                                        {recentMatches.map((match) => (
-                                            <div
-                                                key={match.id}
-                                                className="recent-match-card"
-                                                style={{ '--aura-color': match.partner?.auraPoints !== undefined ? calculateAuraLevel(match.partner.auraPoints).color : 'var(--stroke)' }}
-                                            >
-                                                <div className="recent-avatar">
-                                                    {match.partner?.profilePictureUrl ? (
-                                                        <img src={match.partner.profilePictureUrl} alt="avatar" />
-                                                    ) : (
-                                                        <span className="avatar-placeholder">{match.partner?.name?.[0]?.toUpperCase() || 'S'}</span>
-                                                    )}
-                                                </div>
-                                                <div className="recent-info">
-                                                    <span className="recent-name">
-                                                        {match.partner?.name || 'Stranger'}
-                                                        {match.partner?.auraPoints !== undefined && (
-                                                            <span
-                                                                className="partner-aura-badge"
-                                                                title={`Aura: ${calculateAuraLevel(match.partner.auraPoints).name}`}
-                                                                style={{ color: calculateAuraLevel(match.partner.auraPoints).color, fontSize: '0.8rem', marginLeft: '0.4rem' }}
-                                                            >
-                                                                ✧
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                    {match.sharedTopic && <span className="recent-topic">Talked about {match.sharedTopic}</span>}
-                                                </div>
-                                                <button
-                                                    className="recent-add-btn"
-                                                    title="Send Friend Request"
-                                                    onClick={() => handleRecentAddFriend(match.partner.id)}
+                                        {recentMatches.map((match) => {
+                                            const avatarUrl = getAvatarUrl(match.partner)
+                                            return (
+                                                <div
+                                                    key={match.id}
+                                                    className="recent-match-card"
+                                                    style={{ '--aura-color': match.partner?.auraPoints !== undefined ? calculateAuraLevel(match.partner.auraPoints).color : 'var(--stroke)' }}
                                                 >
-                                                    + Friend
-                                                </button>
-                                            </div>
-                                        ))}
+                                                    <div className="recent-avatar">
+                                                        {avatarUrl ? (
+                                                            <img src={avatarUrl} alt="avatar" />
+                                                        ) : (
+                                                            <span className="avatar-placeholder">{match.partner?.name?.[0]?.toUpperCase() || 'S'}</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="recent-info">
+                                                        <span className="recent-name">
+                                                            {match.partner?.name || 'Stranger'}
+                                                            {match.partner?.auraPoints !== undefined && (
+                                                                <span
+                                                                    className="partner-aura-badge"
+                                                                    title={`Aura: ${calculateAuraLevel(match.partner.auraPoints).name}`}
+                                                                    style={{ color: calculateAuraLevel(match.partner.auraPoints).color, fontSize: '0.8rem', marginLeft: '0.4rem' }}
+                                                                >
+                                                                    ✧
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                        {match.sharedTopic && <span className="recent-topic">Talked about {match.sharedTopic}</span>}
+                                                    </div>
+                                                    <button
+                                                        className="recent-add-btn"
+                                                        title="Send Friend Request"
+                                                        onClick={() => handleRecentAddFriend(match.partner.id)}
+                                                    >
+                                                        + Friend
+                                                    </button>
+                                                </div>
+                                            )
+                                        })}
                                     </div>
                                 </div>
                             ) : (
@@ -897,8 +910,8 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                 {/* Profile */}
                 <button className="home-card" type="button" onClick={() => setView('profile')}>
                     <div className="home-card-icon-wrap">
-                        {session?.user?.photoURL ? (
-                            <img src={session.user.photoURL} alt="avatar" className="home-card-avatar" />
+                        {sessionAvatarUrl ? (
+                            <img src={sessionAvatarUrl} alt="avatar" className="home-card-avatar" />
                         ) : (
                             <span className="home-card-avatar-initials">
                                 {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}

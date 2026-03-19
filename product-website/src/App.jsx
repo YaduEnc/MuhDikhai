@@ -28,6 +28,24 @@ import './App.css'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'
 
+function normalizeUser(user) {
+  if (!user) return user
+  const avatarUrl = user.profilePictureUrl || user.photoURL || null
+  return {
+    ...user,
+    profilePictureUrl: avatarUrl,
+    photoURL: avatarUrl,
+  }
+}
+
+function normalizeSession(rawSession) {
+  if (!rawSession) return rawSession
+  return {
+    ...rawSession,
+    user: normalizeUser(rawSession.user),
+  }
+}
+
 async function getValidSession(session) {
   if (!session?.accessToken) throw new Error('No session')
   if (!session.refreshToken) return session
@@ -53,7 +71,7 @@ async function getValidSession(session) {
 }
 
 function App() {
-  const [session, setSession] = useState(() => getSession())
+  const [session, setSession] = useState(() => normalizeSession(getSession()))
   const [onlineCount, setOnlineCount] = useState(0)
   const [showChat, setShowChat] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -126,7 +144,7 @@ function App() {
       if (user && !sessionRef.current?.accessToken) {
         setAuthLoading(true)
         const next = await signInSilently(user)
-        if (next) setSession(next)
+        if (next) setSession(normalizeSession(next))
         setAuthLoading(false)
       }
       setIsInitializing(false)
@@ -183,8 +201,9 @@ function App() {
         if (cancelled) return
 
         if (validSession.accessToken !== sessionRef.current?.accessToken) {
-          sessionRef.current = validSession
-          setSession(validSession)
+          const normalized = normalizeSession(validSession)
+          sessionRef.current = normalized
+          setSession(normalized)
           setSocketVersion((v) => v + 1)
           return
         }
@@ -216,9 +235,10 @@ function App() {
             refreshingRef.current = true
             try {
               const next = await refreshSession(sessionRef.current.refreshToken)
-              saveSession(next)
-              sessionRef.current = next
-              setSession(next)
+              const normalized = normalizeSession(next)
+              saveSession(normalized)
+              sessionRef.current = normalized
+              setSession(normalized)
               setSocketVersion((v) => v + 1)
             } catch {
               handleSignOut()
@@ -411,7 +431,7 @@ function App() {
     setAuthLoading(true)
     try {
       const next = await signInWithGoogle()
-      setSession(next)
+      setSession(normalizeSession(next))
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Something went wrong')
     } finally {
@@ -463,10 +483,11 @@ function App() {
     if (res.status === 401 && cur.refreshToken) {
       try {
         const next = await refreshSession(cur.refreshToken)
-        setSession(next)
-        saveSession(next)
-        sessionRef.current = next
-        res = await doFetch(next.accessToken)
+        const normalized = normalizeSession(next)
+        setSession(normalized)
+        saveSession(normalized)
+        sessionRef.current = normalized
+        res = await doFetch(normalized.accessToken)
       } catch (err) {
         console.error('Session refresh failed:', err)
         handleSignOut()
@@ -490,11 +511,13 @@ function App() {
         user: {
           ...sessionRef.current.user,
           ...json.data.user,
+          profilePictureUrl: json.data.user.profilePictureUrl || sessionRef.current.user.profilePictureUrl,
           photoURL: json.data.user.profilePictureUrl || sessionRef.current.user.photoURL,
         },
       }
-      setSession(nextSession)
-      saveSession(nextSession)
+      const normalized = normalizeSession(nextSession)
+      setSession(normalized)
+      saveSession(normalized)
     } catch (error) {
       console.error('Profile update failed:', error)
       throw error
@@ -708,7 +731,9 @@ function App() {
           <Onboarding
             session={session}
             onComplete={(updatedUser) => {
-              const next = { ...session, user: updatedUser }; setSession(next); saveSession(next);
+              const next = normalizeSession({ ...session, user: updatedUser })
+              setSession(next)
+              saveSession(next)
             }}
           />
         )}
