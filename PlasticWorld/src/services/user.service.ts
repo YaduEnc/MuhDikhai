@@ -22,6 +22,15 @@ export interface User {
   updatedAt: Date;
 }
 
+export interface AuraSummary {
+  level: number;
+  name: string;
+  minPoints: number;
+  color: string;
+  nextLevel: number | null;
+  progress: number;
+}
+
 export const AURA_LEVELS = [
   { level: 1, name: 'Dissolved Mist', minPoints: 0, color: '#94a3b8' },      // Grey/Muted
   { level: 2, name: 'Fading Whisper', minPoints: 50, color: '#f87171' },    // Soft Red
@@ -160,7 +169,7 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin",
+          created_at as "createdAt", updated_at as "updatedAt", rooms_entered as "roomsEntered", is_admin as "isAdmin",
           aura_points as "auraPoints"
         FROM users
         WHERE ${whereClause}
@@ -189,7 +198,7 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin",
+          created_at as "createdAt", updated_at as "updatedAt", rooms_entered as "roomsEntered", is_admin as "isAdmin",
           aura_points as "auraPoints"
         FROM users
         WHERE ${whereClause}
@@ -214,7 +223,7 @@ class UserService {
           phone_number as "phoneNumber", name, age,
           profile_picture_url as "profilePictureUrl", bio, gender,
           status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin",
+          created_at as "createdAt", updated_at as "updatedAt", rooms_entered as "roomsEntered", is_admin as "isAdmin",
           aura_points as "auraPoints"
         FROM users
         WHERE id = $1 AND is_active = true
@@ -267,7 +276,7 @@ class UserService {
            phone_number as "phoneNumber", name, age,
            profile_picture_url as "profilePictureUrl", bio, gender,
            status, last_seen as "lastSeen", is_active as "isActive",
-           created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin",
+           created_at as "createdAt", updated_at as "updatedAt", rooms_entered as "roomsEntered", is_admin as "isAdmin",
            aura_points as "auraPoints"`,
         [userId]
       );
@@ -337,7 +346,7 @@ class UserService {
            phone_number as "phoneNumber", name, age,
            profile_picture_url as "profilePictureUrl", bio, gender,
            status, last_seen as "lastSeen", is_active as "isActive",
-           created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin",
+           created_at as "createdAt", updated_at as "updatedAt", rooms_entered as "roomsEntered", is_admin as "isAdmin",
            aura_points as "auraPoints"`,
         values
       );
@@ -384,19 +393,34 @@ class UserService {
   /**
    * Vibe check
    */
-  async submitVibeCheck(voterId: string, targetId: string, roomId: string, vibe: 'warm' | 'cold'): Promise<{ auraPoints: number; level: any }> {
+  async submitVibeCheck(voterId: string, targetId: string, roomId: string, vibe: 'warm' | 'cold'): Promise<{ applied: boolean; auraPoints: number; level: AuraSummary }> {
     try {
-      await database.query(
-        `INSERT INTO vibe_check_history (voter_id, target_id, room_id, vibe) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
-        [voterId, targetId, roomId, vibe]
-      );
       const pointChange = vibe === 'warm' ? 5 : -10;
-      const result = await database.query<{ auraPoints: number }>(
-        `UPDATE users SET aura_points = GREATEST(0, aura_points + $1) WHERE id = $2 RETURNING aura_points as "auraPoints"`,
-        [pointChange, targetId]
+      const result = await database.query<{ applied: boolean; auraPoints: number }>(
+        `WITH inserted AS (
+            INSERT INTO vibe_check_history (voter_id, target_id, room_id, vibe)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT DO NOTHING
+            RETURNING 1
+          ),
+          updated AS (
+            UPDATE users
+            SET aura_points = GREATEST(0, aura_points + $5)
+            WHERE id = $2
+              AND EXISTS (SELECT 1 FROM inserted)
+            RETURNING aura_points
+          )
+          SELECT
+            EXISTS(SELECT 1 FROM inserted) as applied,
+            COALESCE(
+              (SELECT aura_points FROM updated),
+              (SELECT aura_points FROM users WHERE id = $2)
+            ) as "auraPoints"`,
+        [voterId, targetId, roomId, vibe, pointChange]
       );
+      const applied = result.rows[0]?.applied || false;
       const auraPoints = result.rows[0]?.auraPoints || 0;
-      return { auraPoints, level: this.calculateAuraLevel(auraPoints) };
+      return { applied, auraPoints, level: this.calculateAuraLevel(auraPoints) };
     } catch (error) {
       logger.error('Vibe check failed', { error, voterId, targetId });
       throw error;
@@ -455,14 +479,17 @@ class UserService {
     }
   }
 
-  calculateAuraLevel(points: number) {
+  calculateAuraLevel(points: number): AuraSummary {
     const reverseLevels = [...AURA_LEVELS].reverse();
     const current = reverseLevels.find((l: any) => points >= l.minPoints) || AURA_LEVELS[0];
     const next = AURA_LEVELS.find((l: any) => l.level === current.level + 1) || null;
+    const progress = next
+      ? ((points - current.minPoints) / (next.minPoints - current.minPoints)) * 100
+      : 100;
     return {
       ...current,
       nextLevel: next ? next.minPoints : null,
-      progress: next ? ((points - current.minPoints) / (next.minPoints - current.minPoints)) * 100 : 100
+      progress: Math.max(0, Math.min(100, progress))
     };
   }
 }

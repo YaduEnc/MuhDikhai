@@ -46,6 +46,29 @@ export interface Block {
 
 class FriendshipService {
   /**
+   * Count accepted friends for a user
+   */
+  async countAcceptedFriends(userId: string): Promise<number> {
+    try {
+      const result = await database.query<{ count: string }>(
+        `SELECT COUNT(*) as count
+         FROM friendships
+         WHERE status = 'accepted'
+         AND (requester_id = $1 OR addressee_id = $1)`,
+        [userId]
+      );
+
+      return parseInt(result.rows[0]?.count || '0', 10);
+    } catch (error) {
+      logger.error('Failed to count accepted friends', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        userId,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Check if two users are friends (accepted status)
    */
   async areFriends(userId1: string, userId2: string): Promise<boolean> {

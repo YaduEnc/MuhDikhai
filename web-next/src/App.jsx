@@ -626,6 +626,38 @@ function App({ routeMode = 'app' }) {
     return res
   }, [])
 
+  const hydrateCurrentUser = useCallback(async () => {
+    const cur = sessionRef.current
+    if (!cur?.accessToken) return
+
+    try {
+      const res = await authedFetch(`${BACKEND_URL}/api/v1/users/me`)
+      const json = await res.json()
+      if (!json.success || !json.data?.user) return
+
+      const nextSession = normalizeSession({
+        ...sessionRef.current,
+        user: {
+          ...sessionRef.current?.user,
+          ...json.data.user,
+          profilePictureUrl: json.data.user.profilePictureUrl || sessionRef.current?.user?.profilePictureUrl,
+          photoURL: json.data.user.profilePictureUrl || sessionRef.current?.user?.photoURL,
+        },
+      })
+
+      sessionRef.current = nextSession
+      setSession(nextSession)
+      saveSession(nextSession)
+    } catch (error) {
+      console.error('Failed to hydrate current user:', error)
+    }
+  }, [authedFetch])
+
+  useEffect(() => {
+    if (!session?.accessToken) return
+    hydrateCurrentUser()
+  }, [session?.accessToken, hydrateCurrentUser])
+
   const handleUpdateProfile = async (data) => {
     try {
       const res = await authedFetch(`${BACKEND_URL}/api/v1/users/me`, {
@@ -1025,6 +1057,7 @@ function App({ routeMode = 'app' }) {
               })
               const json = await res.json()
               if (!json.success) throw new Error(json.error?.message || 'Vote failed')
+              if (!json.data?.applied) throw new Error('You already rated this room')
 
               // Optionally update own level if feedback affects us? 
               // No, it affects the target. But we might want to refresh our own aura points later.

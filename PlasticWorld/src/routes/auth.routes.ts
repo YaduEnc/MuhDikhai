@@ -4,6 +4,7 @@ import jwtService from '../services/jwt.service';
 import sessionService from '../services/session.service';
 import userService from '../services/user.service';
 import deviceService from '../services/device.service';
+import friendshipService from '../services/friendship.service';
 import { authenticate } from '../middleware/auth.middleware';
 import { AppError } from '../middleware/errorHandler';
 import { asyncHandler } from '../middleware/errorHandler';
@@ -18,6 +19,33 @@ import logger from '../utils/logger';
 // Note: database is imported dynamically in refresh route to avoid circular dependency
 
 const router = Router();
+
+async function buildClientUser(user: any) {
+  const aura = userService.calculateAuraLevel(user.auraPoints || 0);
+  const friendCount = await friendshipService.countAcceptedFriends(user.id);
+
+  return {
+    id: user.id,
+    firebaseUid: user.firebaseUid,
+    email: user.email,
+    username: user.username,
+    phoneNumber: user.phoneNumber,
+    name: user.name,
+    age: user.age,
+    profilePictureUrl: user.profilePictureUrl,
+    bio: user.bio,
+    gender: user.gender,
+    status: user.status,
+    isAdmin: user.isAdmin,
+    roomsEntered: user.roomsEntered || 0,
+    friendCount,
+    auraPoints: user.auraPoints,
+    auraLevel: aura.name,
+    auraColor: aura.color,
+    nextAuraPoints: aura.nextLevel,
+    auraProgress: aura.progress,
+  };
+}
 
 /**
  * POST /api/v1/auth/google-signin
@@ -128,6 +156,8 @@ router.post(
       deviceId: device.id,
     });
 
+    const clientUser = await buildClientUser(user);
+
     res.status(200).json({
       success: true,
       data: {
@@ -136,17 +166,7 @@ router.post(
         accessExpiresAt: tokenPair.accessExpiresAt,
         refreshExpiresAt: tokenPair.refreshExpiresAt,
         user: {
-          id: user.id,
-          firebaseUid: user.firebaseUid,
-          email: user.email,
-          username: user.username,
-          name: user.name,
-          profilePictureUrl: user.profilePictureUrl,
-          bio: user.bio,
-          gender: user.gender,
-          age: user.age,
-          status: user.status,
-          isAdmin: user.isAdmin,
+          ...clientUser,
           isProfileComplete: !!user.username && !!user.age,
         },
         device: {
@@ -197,22 +217,13 @@ router.post(
       username,
     });
 
+    const clientUser = await buildClientUser(updatedUser);
+
     res.status(200).json({
       success: true,
       data: {
         user: {
-          id: updatedUser.id,
-          firebaseUid: updatedUser.firebaseUid,
-          email: updatedUser.email,
-          username: updatedUser.username,
-          phoneNumber: updatedUser.phoneNumber,
-          name: updatedUser.name,
-          age: updatedUser.age,
-          profilePictureUrl: updatedUser.profilePictureUrl,
-          bio: updatedUser.bio,
-          gender: updatedUser.gender,
-          status: updatedUser.status,
-          isAdmin: updatedUser.isAdmin,
+          ...clientUser,
         },
       },
     });
@@ -234,17 +245,13 @@ router.get(
       throw new AppError('User not found or inactive', 401, 'USER_INVALID');
     }
 
+    const clientUser = await buildClientUser(user);
+
     res.status(200).json({
       success: true,
       data: {
         user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          name: user.name,
-          profilePictureUrl: user.profilePictureUrl,
-          gender: user.gender,
-          status: user.status,
+          ...clientUser,
           isAdmin: user.isAdmin,
           isProfileComplete: !!user.username && !!user.gender,
         },

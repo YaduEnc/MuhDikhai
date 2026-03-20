@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import userService from '../services/user.service';
 import sessionService from '../services/session.service';
+import friendshipService from '../services/friendship.service';
 import { authenticate } from '../middleware/auth.middleware';
 import { AppError } from '../middleware/errorHandler';
 import { asyncHandler } from '../middleware/errorHandler';
@@ -20,6 +21,35 @@ import { buildPublicUploadUrl } from '../utils/publicUrl';
 
 const router = Router();
 
+async function buildProfileUser(user: any) {
+  const aura = userService.calculateAuraLevel(user.auraPoints || 0);
+  const friendCount = await friendshipService.countAcceptedFriends(user.id);
+
+  return {
+    id: user.id,
+    firebaseUid: user.firebaseUid,
+    username: user.username,
+    email: user.email,
+    phoneNumber: user.phoneNumber,
+    name: user.name,
+    age: user.age,
+    profilePictureUrl: user.profilePictureUrl,
+    bio: user.bio,
+    gender: user.gender,
+    status: user.status,
+    lastSeen: user.lastSeen,
+    roomsEntered: user.roomsEntered || 0,
+    friendCount,
+    auraPoints: user.auraPoints,
+    auraLevel: aura.name,
+    auraColor: aura.color,
+    nextAuraPoints: aura.nextLevel,
+    auraProgress: aura.progress,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
+
 /**
  * GET /api/v1/users/me
  * Get current authenticated user's full profile
@@ -36,26 +66,12 @@ router.get(
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
+    const profileUser = await buildProfileUser(user);
+
     res.status(200).json({
       success: true,
       data: {
-        user: {
-          id: user.id,
-          firebaseUid: user.firebaseUid,
-          username: user.username,
-          email: user.email,
-          phoneNumber: user.phoneNumber,
-          name: user.name,
-          age: user.age,
-          profilePictureUrl: user.profilePictureUrl,
-          bio: user.bio,
-          gender: user.gender,
-          status: user.status,
-          lastSeen: user.lastSeen,
-          auraPoints: user.auraPoints,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-        },
+        user: profileUser,
       },
     });
   })
@@ -152,26 +168,12 @@ router.put(
       updatedFields: Object.keys(updateData),
     });
 
+    const profileUser = await buildProfileUser(updatedUser);
+
     res.status(200).json({
       success: true,
       data: {
-        user: {
-          id: updatedUser.id,
-          firebaseUid: updatedUser.firebaseUid,
-          username: updatedUser.username,
-          email: updatedUser.email,
-          phoneNumber: updatedUser.phoneNumber,
-          name: updatedUser.name,
-          age: updatedUser.age,
-          profilePictureUrl: updatedUser.profilePictureUrl,
-          bio: updatedUser.bio,
-          gender: updatedUser.gender,
-          auraPoints: updatedUser.auraPoints,
-          status: updatedUser.status,
-          lastSeen: updatedUser.lastSeen,
-          createdAt: updatedUser.createdAt,
-          updatedAt: updatedUser.updatedAt,
-        },
+        user: profileUser,
       },
     });
   })

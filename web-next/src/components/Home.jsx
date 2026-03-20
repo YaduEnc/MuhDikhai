@@ -68,7 +68,9 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
 
     const auraPoints = session?.user?.auraPoints || 0
     const auraLevel = calculateAuraLevel(auraPoints)
-    const auraProgress = Math.max(0, Math.min(auraPoints, 100))
+    const auraProgress = auraLevel.progress
+    const roomsEntered = session?.user?.roomsEntered || 0
+    const friendCount = session?.user?.friendCount || 0
     const avatarUrl = avatarPreviewUrl || getAvatarUrl(session?.user)
 
     const hasBio = !!(session?.user?.bio && session.user.bio.trim().length > 0)
@@ -262,7 +264,7 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                                 </div>
                                 <div className="aura-card-value">
                                     <span className="aura-point-value">{auraPoints}</span>
-                                    <span className="aura-point-label">Dissolved Mist</span>
+                                    <span className="aura-point-label">{auraLevel.name}</span>
                                 </div>
                             </div>
 
@@ -274,7 +276,11 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                                     />
                                 </div>
                                 <div className="aura-progress-meta">
-                                    <span className="aura-progress-label">0 = Dissolved Mist</span>
+                                    <span className="aura-progress-label">
+                                        {auraLevel.nextLevel !== null
+                                            ? `Next tier at ${auraLevel.nextLevel} points`
+                                            : 'Top aura tier reached'}
+                                    </span>
                                     <span className="aura-progress-range">Climb as you match, talk, and stay kind.</span>
                                 </div>
                             </div>
@@ -282,11 +288,11 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                             <div className="aura-substats">
                                 <div className="aura-substat">
                                     <span className="aura-substat-label">Conversations completed</span>
-                                    <span className="aura-substat-value">—</span>
+                                    <span className="aura-substat-value">{roomsEntered}</span>
                                 </div>
                                 <div className="aura-substat">
                                     <span className="aura-substat-label">Friends made</span>
-                                    <span className="aura-substat-value">—</span>
+                                    <span className="aura-substat-value">{friendCount}</span>
                                 </div>
                             </div>
                         </div>

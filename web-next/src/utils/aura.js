@@ -11,10 +11,11 @@ export function calculateAuraLevel(points = 0) {
     const current = reverseLevels.find(l => points >= l.minPoints) || AURA_LEVELS[0];
 
     const next = AURA_LEVELS.find(l => l.level === current.level + 1) || null;
+    const progress = next ? ((points - current.minPoints) / (next.minPoints - current.minPoints)) * 100 : 100;
 
     return {
         ...current,
         nextLevel: next ? next.minPoints : null,
-        progress: next ? ((points - current.minPoints) / (next.minPoints - current.minPoints)) * 100 : 100
+        progress: Math.max(0, Math.min(100, progress))
     };
 }

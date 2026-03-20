@@ -13,7 +13,7 @@ export default function VibeCheckModal({ partner, roomId, onVote, onSkip }) {
             // Add a small delay for feedback before closing
             setTimeout(() => onSkip(), 1200)
         } catch (err) {
-            setError('Failed to record vibe. Try skipping.')
+            setError(err?.message || 'Failed to record vibe. Try skipping.')
             setStatus('idle')
         }
     }

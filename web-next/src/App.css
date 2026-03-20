@@ -7,6 +7,19 @@
   position: relative;
   z-index: 2;
   transition: padding 0.3s ease;
+  animation: app-page-rise 0.55s var(--ease-out);
+}
+
+.page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at top left, rgba(255, 0, 85, 0.08), transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(0, 255, 204, 0.06), transparent 22%);
+  opacity: 0.9;
 }
 
 .page.is-chat-page {
@@ -44,6 +57,9 @@ main {
   padding: 1.5rem 0;
   border-bottom: 1px solid var(--stroke);
   backdrop-filter: blur(10px);
+  transition:
+    border-color 180ms ease,
+    background 180ms ease;
 }
 
 .nav-left {
@@ -122,6 +138,16 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.nav-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(14, 19, 42, 0.96);
 }
 
 .nav-dot {
@@ -247,6 +273,20 @@ main {
   border-color: rgba(248, 113, 113, 0.3);
   color: #f87171;
   transform: translateY(-1px);
+}
+
+@keyframes app-page-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
 }
 
 .hero {
