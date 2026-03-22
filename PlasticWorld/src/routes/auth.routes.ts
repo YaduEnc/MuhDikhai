@@ -167,7 +167,7 @@ router.post(
         refreshExpiresAt: tokenPair.refreshExpiresAt,
         user: {
           ...clientUser,
-          isProfileComplete: !!user.username && !!user.age,
+          isProfileComplete: !!user.username && !!user.gender && !!(user.bio && user.bio.trim().length > 0),
         },
         device: {
           id: device.id,
@@ -254,7 +254,7 @@ router.get(
         user: {
           ...clientUser,
           isAdmin: user.isAdmin,
-          isProfileComplete: !!user.username && !!user.gender,
+          isProfileComplete: !!user.username && !!user.gender && !!(user.bio && user.bio.trim().length > 0),
         },
         serverTime: new Date().toISOString(),
       },

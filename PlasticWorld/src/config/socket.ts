@@ -20,6 +20,7 @@ interface SocketUser {
   username?: string;
   name: string;
   profilePictureUrl?: string;
+  bio?: string | null;
   gender: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
 }
 
@@ -477,6 +478,7 @@ export const socketAuth = async (socket: AuthenticatedSocket, next: (err?: Exten
       username: user.username,
       name: user.name,
       profilePictureUrl: user.profilePictureUrl,
+      bio: user.bio || null,
       gender: user.gender || 'prefer_not_to_say',
     };
 
@@ -894,9 +896,28 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
       let lockMeAcquired = false;
       const pub = redisClient.getClient();
       try {
+        const freshUser = await userService.getUserById(userId);
+        const hasGender = Boolean(freshUser?.gender);
+        const hasBio = Boolean(freshUser?.bio && freshUser.bio.trim().length > 0);
+        if (!freshUser || !freshUser.isActive || !hasGender || !hasBio) {
+          socket.emit('random:error', {
+            error: 'Please complete your profile (gender and bio) before matching.',
+          });
+          return;
+        }
+
+        // Refresh socket profile snapshot in case user updated onboarding data mid-session.
+        if (socket.user) {
+          socket.user.username = freshUser.username;
+          socket.user.name = freshUser.name;
+          socket.user.profilePictureUrl = freshUser.profilePictureUrl;
+          socket.user.bio = freshUser.bio || null;
+          socket.user.gender = freshUser.gender || 'prefer_not_to_say';
+        }
+
         const userTopics = payload?.topics || [];
         const preference = payload?.preference || 'everyone';
-        const userGender = socket.user?.gender || 'prefer_not_to_say';
+        const userGender = freshUser.gender || 'prefer_not_to_say';
 
         // 1. If user already has an active room, rejoin it
         const existingRoomId = await pub.hget('random:user_rooms', userId);

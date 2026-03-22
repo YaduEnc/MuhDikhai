@@ -805,6 +805,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
     const [selectedTopics, setSelectedTopics] = useState([])
     const [customTopic, setCustomTopic] = useState('')
     const [matchingPreference, setMatchingPreference] = useState('everyone') // 'male', 'female', 'everyone'
+    const [matchValidationError, setMatchValidationError] = useState('')
 
 
 
@@ -897,6 +898,13 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
 
 
     const handleStartMatch = () => {
+        const hasGender = !!session?.user?.gender
+        const hasBio = !!(session?.user?.bio && session.user.bio.trim().length > 0)
+        if (!hasGender || !hasBio) {
+            setMatchValidationError('Before matching, please complete your profile with gender and bio.')
+            return
+        }
+        setMatchValidationError('')
         onStartMatch(selectedTopics, matchingPreference)
     }
 
@@ -1041,6 +1049,14 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                     <span className="arrow-text">LAUNCH</span>
                 </div>
             </button>
+            {matchValidationError && (
+                <div className="home-match-warning" role="alert">
+                    <span>{matchValidationError}</span>
+                    <button type="button" onClick={() => setView('profile')}>
+                        Complete profile
+                    </button>
+                </div>
+            )}
 
             {/* Home Tabs */}
             <div className="home-tabs">

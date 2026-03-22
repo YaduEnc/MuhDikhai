@@ -33,6 +33,13 @@ function normalizeSession(rawSession) {
   }
 }
 
+function hasCompleteProfile(user) {
+  if (!user) return false
+  const hasGender = Boolean(user.gender)
+  const hasBio = Boolean(user.bio && String(user.bio).trim().length > 0)
+  return hasGender && hasBio
+}
+
 export default function AuthGatewayApp() {
   const router = useRouter()
   const [session, setSession] = useState(() => normalizeSession(getSession()))
@@ -118,7 +125,7 @@ export default function AuthGatewayApp() {
     )
   }
 
-  if (!session.user.gender) {
+  if (!hasCompleteProfile(session.user)) {
     return (
       <Onboarding
         session={session}

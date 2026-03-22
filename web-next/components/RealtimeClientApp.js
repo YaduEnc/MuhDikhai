@@ -60,6 +60,13 @@ function normalizeSession(rawSession) {
   }
 }
 
+function hasCompleteProfile(user) {
+  if (!user) return false
+  const hasGender = Boolean(user.gender)
+  const hasBio = Boolean(user.bio && String(user.bio).trim().length > 0)
+  return hasGender && hasBio
+}
+
 async function getValidSession(session) {
   if (!session?.accessToken) throw new Error('No session')
   if (!session.refreshToken) return session
@@ -878,10 +885,11 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
   }
 
   const isSignedIn = Boolean(session?.user)
+  const isProfileComplete = hasCompleteProfile(session?.user)
   const isAnyChat = Boolean(showChat || socketState.phase === 'friend-chat')
-  const isHome = Boolean(isSignedIn && !isAnyChat && session.user.gender)
-  const isInChat = Boolean(showChat && isSignedIn && session.user.gender)
-  const needsOnboarding = Boolean(isSignedIn && !session.user.gender)
+  const isHome = Boolean(isSignedIn && !isAnyChat && isProfileComplete)
+  const isInChat = Boolean(showChat && isSignedIn && isProfileComplete)
+  const needsOnboarding = Boolean(isSignedIn && !isProfileComplete)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -911,7 +919,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
 
   useEffect(() => {
     if (!autoMatchOnMount) return
-    if (!isSignedIn || !session?.user?.gender) return
+    if (!isSignedIn || !isProfileComplete) return
     if (showChat || socketState.phase !== 'idle') return
 
     initAudio()
@@ -932,7 +940,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
       clearTimeout(t1)
       clearTimeout(t2)
     }
-  }, [autoMatchOnMount, isSignedIn, session?.user?.gender, showChat, socketState.phase, setSocketPhase])
+  }, [autoMatchOnMount, isSignedIn, isProfileComplete, showChat, socketState.phase, setSocketPhase])
 
 
   return (
@@ -975,6 +983,9 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
             onlineCount={onlineCount}
             isTransitioning={isTransitioning}
             onStartMatch={(topics, preference) => {
+              if (!hasCompleteProfile(sessionRef.current?.user)) {
+                return
+              }
               initAudio()
               setIsTransitioning(true)
               setMatchPrefs({ topics, preference })
