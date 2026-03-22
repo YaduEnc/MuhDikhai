@@ -40,6 +40,7 @@ import {
 } from '@/src/utils/soundEngine'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
+const BETA_WELCOME_NOTICE_VERSION = 'college-launch-v1'
 
 function normalizeUser(user) {
   if (!user) return user
@@ -108,6 +109,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
   const [isServerDown, setIsServerDown] = useState(false)
   const [suppressOverlay, setSuppressOverlay] = useState(false)
   const [matchingStats, setMatchingStats] = useState(null)
+  const [showBetaWelcomeModal, setShowBetaWelcomeModal] = useState(false)
 
   const [callOverlayState, setCallOverlayState] = useState({
     status: 'idle', // 'idle', 'requesting', 'incoming', 'active'
@@ -882,6 +884,32 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
   const needsOnboarding = Boolean(isSignedIn && !session.user.gender)
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!isHome || !session?.user?.id) return
+
+    const storageKey = `muhdikhai:beta-welcome:${BETA_WELCOME_NOTICE_VERSION}:${session.user.id}`
+    const alreadySeen = window.localStorage.getItem(storageKey) === '1'
+    if (!alreadySeen) {
+      setShowBetaWelcomeModal(true)
+    }
+  }, [isHome, session?.user?.id])
+
+  const handleAcknowledgeBetaWelcome = useCallback(() => {
+    if (typeof window !== 'undefined' && session?.user?.id) {
+      const storageKey = `muhdikhai:beta-welcome:${BETA_WELCOME_NOTICE_VERSION}:${session.user.id}`
+      window.localStorage.setItem(storageKey, '1')
+    }
+    setShowBetaWelcomeModal(false)
+  }, [session?.user?.id])
+
+  const handleOpenBugReporterFromWelcome = useCallback(() => {
+    if (typeof window !== 'undefined' && typeof window.openBugReporter === 'function') {
+      window.openBugReporter()
+    }
+    handleAcknowledgeBetaWelcome()
+  }, [handleAcknowledgeBetaWelcome])
+
+  useEffect(() => {
     if (!autoMatchOnMount) return
     if (!isSignedIn || !session?.user?.gender) return
     if (showChat || socketState.phase !== 'idle') return
@@ -1047,6 +1075,36 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
           />
         )}
       </main>
+
+      {showBetaWelcomeModal && isHome && (
+        <div className="beta-welcome-overlay" role="dialog" aria-modal="true" aria-labelledby="beta-welcome-title">
+          <div className="beta-welcome-card">
+            <span className="beta-welcome-chip">Early Access Beta</span>
+            <h2 id="beta-welcome-title">You are one of our first users</h2>
+            <p className="beta-welcome-copy">
+              Thanks for joining early. Please follow the community rules, respect others in chats and calls, and share feedback so we can improve fast.
+            </p>
+            <ul className="beta-welcome-points">
+              <li>Read and follow Terms, Safety, and Privacy.</li>
+              <li>Be respectful and avoid abusive behavior.</li>
+              <li>Report issues quickly through bug report.</li>
+            </ul>
+            <div className="beta-welcome-links">
+              <a href="/terms">Terms</a>
+              <a href="/safety">Safety</a>
+              <a href="/privacy">Privacy</a>
+            </div>
+            <div className="beta-welcome-actions">
+              <button type="button" className="btn-ghost beta-welcome-btn" onClick={handleOpenBugReporterFromWelcome}>
+                Feedback / Bug Report
+              </button>
+              <button type="button" className="btn-primary beta-welcome-btn" onClick={handleAcknowledgeBetaWelcome}>
+                I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {vibeCheckState.show && (
         <VibeCheckModal

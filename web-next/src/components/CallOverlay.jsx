@@ -147,22 +147,22 @@ export default function CallOverlay({
 
                 {callState.status === 'active' && (
                     <div className="call-active-view">
-                        <div className="video-grid">
-                            <div className="video-tile remote">
+                        <div className="call-video-grid">
+                            <div className="call-video-tile remote">
                                 {remoteStream ? (
                                     <video autoPlay playsInline ref={el => { if (el) el.srcObject = remoteStream }} />
                                 ) : (
-                                    <div className="video-placeholder">Connecting...</div>
+                                    <div className="call-video-placeholder">Connecting...</div>
                                 )}
-                                <div className="tile-label">{partner?.name}</div>
+                                <div className="call-video-label">{partner?.name}</div>
                             </div>
-                            <div className="video-tile local">
+                            <div className="call-video-tile local">
                                 {localStream ? (
                                     <video autoPlay playsInline muted ref={el => { if (el) el.srcObject = localStream }} />
                                 ) : (
-                                    <div className="video-placeholder">Your Camera</div>
+                                    <div className="call-video-placeholder">Your Camera</div>
                                 )}
-                                <div className="tile-label">You</div>
+                                <div className="call-video-label">You</div>
                             </div>
                         </div>
 

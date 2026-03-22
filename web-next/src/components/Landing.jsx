@@ -153,6 +153,31 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                             Sign in with Google, set up a tiny profile, and get dropped into beautifully chaotic rooms built for late-night conversations, fast chemistry, and clean exits.
                         </p>
 
+                        <div className="landing-beta-banner" role="note" aria-live="polite">
+                            <div className="landing-beta-banner-head">
+                                <span className="landing-beta-badge">BETA</span>
+                                <strong>You are one of our first users.</strong>
+                            </div>
+                            <p>
+                                Please read and follow the community rules, be respectful with everyone, and report issues quickly so we can improve before public rollout.
+                            </p>
+                            <div className="landing-beta-links">
+                                <a href="/terms">Terms</a>
+                                <a href="/safety">Safety</a>
+                                <a href="/privacy">Privacy</a>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (typeof window !== 'undefined' && typeof window.openBugReporter === 'function') {
+                                            window.openBugReporter()
+                                        }
+                                    }}
+                                >
+                                    Feedback / Bug Report
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="hero-proof-row">
                             <div className="hero-proof-card">
                                 <span className="hero-proof-label">Hosted flow</span>

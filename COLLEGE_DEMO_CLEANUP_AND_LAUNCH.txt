@@ -1,0 +1,246 @@
+COLLEGE DEMO CLEANUP + LAUNCH RUNBOOK (FOR YOUR PROJECT)
+Workspace: /Users/sujeetkumarsingh/Desktop/MuhDikhai
+Date prepared: 2026-03-23
+
+IMPORTANT
+- These steps DELETE test data permanently.
+- Run this only when you are sure you want a fresh start.
+- Keep one backup first (commands included below).
+
+==================================================
+0) OPEN TERMINAL AND GO TO PROJECT
+==================================================
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai
+
+Optional sanity check:
+pwd
+ls -la
+
+==================================================
+1) INSTALL/VERIFY REQUIRED TOOLS
+==================================================
+node -v
+npm -v
+psql --version
+redis-cli --version
+
+If PostgreSQL service is not running:
+brew services start postgresql@14
+pg_isready -h 127.0.0.1 -p 5432
+
+If Redis is not running:
+brew services start redis
+redis-cli ping
+
+If you use Docker instead of brew services:
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai/PlasticWorld
+docker compose up -d postgres redis
+docker compose ps
+
+==================================================
+2) LOAD BACKEND ENV INTO CURRENT SHELL
+==================================================
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai/PlasticWorld
+set -a
+source .env
+set +a
+
+Check key values (do not share private keys):
+echo "DB_HOST=$DB_HOST"
+echo "DB_PORT=$DB_PORT"
+echo "DB_NAME=$DB_NAME"
+echo "DB_USER=$DB_USER"
+echo "FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID"
+
+==================================================
+3) TAKE BACKUP BEFORE CLEANUP (RECOMMENDED)
+==================================================
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai
+mkdir -p backups
+
+# PostgreSQL backup
+PGPASSWORD="$DB_PASSWORD" pg_dump \
+  -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME" \
+  > "backups/pre_cleanup_$(date +%Y%m%d_%H%M%S).sql"
+
+==================================================
+4) STOP APP SERVERS (IF RUNNING)
+==================================================
+# If backend/frontend are running in terminals, stop with Ctrl+C.
+# Optional: check if ports are in use
+lsof -i :3000
+lsof -i :3001
+
+==================================================
+5) CLEAR POSTGRES DATA (KEEP MIGRATION HISTORY TABLE)
+==================================================
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai/PlasticWorld
+set -a
+source .env
+set +a
+
+PGPASSWORD="$DB_PASSWORD" psql \
+  -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+  -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+DECLARE t RECORD;
+BEGIN
+  FOR t IN
+    SELECT tablename
+    FROM pg_tables
+    WHERE schemaname = 'public'
+      AND tablename <> 'schema_migrations'
+  LOOP
+    EXECUTE format('TRUNCATE TABLE public.%I RESTART IDENTITY CASCADE;', t.tablename);
+  END LOOP;
+END $$;
+SQL
+
+Verify table row counts after cleanup:
+PGPASSWORD="$DB_PASSWORD" psql \
+  -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+  -c "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename;"
+
+==================================================
+6) CLEAR REDIS CACHE/SESSIONS
+==================================================
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai/PlasticWorld
+set -a
+source .env
+set +a
+
+if [ -n "$REDIS_PASSWORD" ]; then
+  redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" -a "$REDIS_PASSWORD" FLUSHALL
+else
+  redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" FLUSHALL
+fi
+
+==================================================
+7) CLEAR LOCAL UPLOADED MEDIA (KEEP .gitkeep)
+==================================================
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai/PlasticWorld
+find public/uploads -mindepth 1 ! -name ".gitkeep" -delete
+find public/uploads -type f | sort
+
+==================================================
+8) DELETE ALL FIREBASE AUTH USERS (IRREVERSIBLE)
+==================================================
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai/PlasticWorld
+set -a
+source .env
+set +a
+
+node <<'NODE'
+const admin = require('firebase-admin');
+
+const projectId = process.env.FIREBASE_PROJECT_ID;
+const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+
+if (!projectId || !clientEmail || !privateKey) {
+  console.error('Missing Firebase env vars. Check .env');
+  process.exit(1);
+}
+
+admin.initializeApp({
+  credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
+});
+
+async function deleteAllUsers() {
+  let nextPageToken = undefined;
+  let totalDeleted = 0;
+
+  do {
+    const listResult = await admin.auth().listUsers(1000, nextPageToken);
+    const uids = listResult.users.map((u) => u.uid);
+    if (uids.length > 0) {
+      const result = await admin.auth().deleteUsers(uids);
+      totalDeleted += result.successCount;
+      if (result.failureCount > 0) {
+        console.error(`Batch failures: ${result.failureCount}`);
+      }
+    }
+    nextPageToken = listResult.pageToken;
+  } while (nextPageToken);
+
+  console.log(`Deleted Firebase Auth users: ${totalDeleted}`);
+}
+
+deleteAllUsers()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+NODE
+
+==================================================
+9) RE-RUN DB MIGRATIONS ON CLEAN DATABASE
+==================================================
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai/PlasticWorld
+npm run db:migrate
+
+==================================================
+10) START BACKEND + FRONTEND FOR SMOKE TEST
+==================================================
+# Terminal 1 (backend)
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai/PlasticWorld
+npm run dev
+
+# Terminal 2 (frontend)
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai/web-next
+npm run dev
+
+Open:
+http://localhost:3001  (or the Next.js port shown in terminal)
+
+Smoke test checklist:
+1. Sign in with Google works.
+2. New user is created in DB.
+3. Username/profile name shows in UI.
+4. Default avatar appears when no upload exists.
+5. Upload profile photo works.
+6. Logout/login works.
+7. Room/chat open and send message works.
+
+==================================================
+11) PRODUCTION BUILD TEST (MANDATORY BEFORE PUBLISH)
+==================================================
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai/PlasticWorld
+npm run build
+
+cd /Users/sujeetkumarsingh/Desktop/MuhDikhai/web-next
+npm run build
+
+If both builds pass, you are much safer to publish.
+
+==================================================
+12) QUICK DEMO-DAY HARDENING FOR ~60 USERS
+==================================================
+1. Keep one admin account ready before invite.
+2. Keep backend logs visible during demo.
+3. Set clear group rule: real names + no abuse.
+4. Keep one rollback backup (DB dump from Step 3).
+5. Prepare quick support message if login fails.
+6. Monitor CPU/memory/network during first 30 minutes.
+
+==================================================
+13) OPTIONAL DEFAULT AVATAR PLAN (DICEBEAR)
+==================================================
+If user has no uploaded profile photo, generate avatar by username:
+https://api.dicebear.com/9.x/avataaars/svg?seed=<username>
+
+Example:
+https://api.dicebear.com/9.x/avataaars/svg?seed=sujeet
+
+Tip:
+- Save this as fallback URL in frontend if profilePictureUrl is empty.
+- This gives stable avatar per username without storing an image file.
+
+==================================================
+DONE CRITERIA
+==================================================
+You are ready to invite your college group when:
+1. Cleanup completed (Postgres + Redis + uploads + Firebase Auth).
+2. `npm run build` passes for backend and frontend.
+3. Smoke tests pass with at least 2 test accounts after reset.
