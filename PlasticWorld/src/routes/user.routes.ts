@@ -14,7 +14,7 @@ import {
   vibeCheckSchema,
 } from '../utils/validation';
 import { deleteFirebaseUser } from '../config/firebase';
-import { upload } from '../middleware/multer';
+import { avatarUpload } from '../middleware/multer';
 import matchService from '../services/match.service';
 import logger from '../utils/logger';
 import { buildPublicUploadUrl } from '../utils/publicUrl';
@@ -106,6 +106,9 @@ router.put(
   asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user!.id;
     const { username, phoneNumber, name, bio, profilePictureUrl, gender } = req.body;
+    const normalizedUsername = typeof username === 'string'
+      ? userService.normalizeUsername(username)
+      : undefined;
 
     // Check if user exists
     const existingUser = await userService.getUserById(userId);
@@ -114,8 +117,11 @@ router.put(
     }
 
     // Check username availability if provided and different from current
-    if (username !== undefined && username !== existingUser.username) {
-      const isUsernameAvailable = await userService.isUsernameAvailable(username);
+    if (
+      normalizedUsername !== undefined &&
+      normalizedUsername !== userService.normalizeUsername(existingUser.username || '')
+    ) {
+      const isUsernameAvailable = await userService.isUsernameAvailable(normalizedUsername, userId);
       if (!isUsernameAvailable) {
         throw new AppError('Username is already taken', 409, 'USERNAME_TAKEN');
       }
@@ -142,7 +148,7 @@ router.put(
     } = {};
 
     if (username !== undefined) {
-      updateData.username = username;
+      updateData.username = normalizedUsername;
     }
     if (phoneNumber !== undefined) {
       updateData.phoneNumber = phoneNumber || null; // Allow empty string to clear
@@ -180,13 +186,48 @@ router.put(
 );
 
 /**
+ * GET /api/v1/users/username-availability
+ * Check if a username is available (case-insensitive)
+ */
+router.get(
+  '/username-availability',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const rawUsername = typeof req.query.username === 'string' ? req.query.username : '';
+    const normalizedUsername = userService.normalizeUsername(rawUsername);
+
+    if (!normalizedUsername) {
+      throw new AppError('Username is required', 400, 'USERNAME_REQUIRED');
+    }
+
+    if (normalizedUsername.length < 3 || normalizedUsername.length > 30) {
+      throw new AppError('Username must be between 3 and 30 characters', 400, 'INVALID_USERNAME_LENGTH');
+    }
+
+    if (!/^[a-z0-9_]+$/.test(normalizedUsername)) {
+      throw new AppError('Username can only contain lowercase letters, numbers, and underscores', 400, 'INVALID_USERNAME_FORMAT');
+    }
+
+    const available = await userService.isUsernameAvailable(normalizedUsername, req.user!.id);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        username: normalizedUsername,
+        available,
+      },
+    });
+  })
+);
+
+/**
  * POST /api/v1/users/me/avatar
  * Upload profile picture
  */
 router.post(
   '/me/avatar',
   authenticate,
-  upload.single('avatar'),
+  avatarUpload.single('avatar'),
   asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) {
       throw new AppError('No file uploaded', 400, 'NO_FILE');

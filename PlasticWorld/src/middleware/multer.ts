@@ -15,25 +15,43 @@ const storage = multer.diskStorage({
     },
 });
 
-// File filter
-const fileFilter = (_req: any, file: any, cb: any) => {
-    const allowedTypes = [
-        'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-        'video/mp4', 'video/webm', 'video/quicktime'
-    ];
+const MEDIA_ALLOWED_TYPES = [
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+    'video/mp4', 'video/webm', 'video/quicktime'
+];
 
-    if (allowedTypes.includes(file.mimetype)) {
+const AVATAR_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+const mediaFileFilter = (_req: any, file: any, cb: any) => {
+    if (MEDIA_ALLOWED_TYPES.includes(file.mimetype)) {
         cb(null, true);
-    } else {
-        cb(new AppError('Invalid file type. Only standard images and videos (MP4, WEBM) are allowed.', 400, 'INVALID_FILE_TYPE'), false);
+        return;
     }
+    cb(new AppError('Invalid file type. Only standard images and videos (MP4, WEBM) are allowed.', 400, 'INVALID_FILE_TYPE'), false);
 };
 
-// Export upload middleware
+const avatarFileFilter = (_req: any, file: any, cb: any) => {
+    if (AVATAR_ALLOWED_TYPES.includes(file.mimetype)) {
+        cb(null, true);
+        return;
+    }
+    cb(new AppError('Invalid avatar type. Only JPEG, PNG, WEBP, or GIF images are allowed.', 400, 'INVALID_AVATAR_TYPE'), false);
+};
+
+// General media upload middleware (chat media, etc.)
 export const upload = multer({
     storage,
-    fileFilter,
+    fileFilter: mediaFileFilter,
     limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB limit for video
+        fileSize: 50 * 1024 * 1024, // 50MB limit for media/video
+    },
+});
+
+// Dedicated avatar upload middleware
+export const avatarUpload = multer({
+    storage,
+    fileFilter: avatarFileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB max avatar image
     },
 });

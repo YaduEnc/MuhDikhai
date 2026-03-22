@@ -1,4 +1,7 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createDefaultAvatarDataUrl, normalizeUsernameInput } from '../utils/avatar'
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
 
 const GENDERS = [
     { id: 'male', label: 'He / Him', icon: '♂', mood: 'Clear presence' },
@@ -23,7 +26,7 @@ const STEP_META = [
     {
         index: '01',
         title: 'Shape your first impression',
-        caption: 'Name + identity',
+        caption: 'Name + username + identity',
         description: 'Choose how the room will meet you. Keep it simple, human, and easy to trust.',
     },
     {
@@ -45,11 +48,13 @@ export default function Onboarding({ session, onComplete }) {
     const [loading, setLoading] = useState(false)
     const [uploading, setUploading] = useState(false)
     const [error, setError] = useState('')
+    const [usernameState, setUsernameState] = useState({ checking: false, available: null, message: '' })
     const fileInputRef = useRef(null)
 
     const [profile, setProfile] = useState({
         name: session?.user?.name || '',
-        gender: '',
+        username: normalizeUsernameInput(session?.user?.username || ''),
+        gender: session?.user?.gender || '',
         avatar: AVATARS[0].id,
         customAvatarUrl: '',
         bio: '',
@@ -59,13 +64,81 @@ export default function Onboarding({ session, onComplete }) {
     const selectedAvatar = useMemo(() => AVATARS.find((avatar) => avatar.id === profile.avatar) || AVATARS[0], [profile.avatar])
     const selectedGender = useMemo(() => GENDERS.find((gender) => gender.id === profile.gender), [profile.gender])
     const completion = `${Math.round((step / STEP_META.length) * 100)}%`
+    const handlePreview = profile.username ? `@${profile.username}` : '@username'
+
+    useEffect(() => {
+        if (step !== 1) return undefined
+
+        if (!profile.username) {
+            setUsernameState({ checking: false, available: null, message: 'Choose a username.' })
+            return undefined
+        }
+        if (profile.username.length < 3) {
+            setUsernameState({ checking: false, available: null, message: 'At least 3 characters.' })
+            return undefined
+        }
+
+        setUsernameState({ checking: true, available: null, message: 'Checking availability...' })
+        const timer = window.setTimeout(async () => {
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/v1/users/username-availability?username=${encodeURIComponent(profile.username)}`, {
+                    headers: {
+                        Authorization: `Bearer ${session.accessToken}`,
+                    },
+                })
+                const result = await response.json()
+                if (!response.ok || !result?.success) {
+                    throw new Error(result?.error?.message || 'Could not verify username')
+                }
+                setUsernameState({
+                    checking: false,
+                    available: Boolean(result?.data?.available),
+                    message: result?.data?.available ? 'Username is available.' : 'Username is already taken.',
+                })
+            } catch {
+                setUsernameState({ checking: false, available: null, message: 'Could not check username right now.' })
+            }
+        }, 350)
+
+        return () => window.clearTimeout(timer)
+    }, [profile.username, session.accessToken, step])
 
     const handleNext = () => setStep((prev) => Math.min(STEP_META.length, prev + 1))
     const handlePrev = () => setStep((prev) => Math.max(1, prev - 1))
 
+    const handleIdentityContinue = () => {
+        if (!profile.name.trim()) {
+            setError('Please add your name.')
+            return
+        }
+        if (!profile.username || profile.username.length < 3) {
+            setError('Username must be at least 3 characters.')
+            return
+        }
+        if (usernameState.available === false) {
+            setError('Please choose another username.')
+            return
+        }
+        if (!profile.gender) {
+            setError('Pick your identity signal to continue.')
+            return
+        }
+
+        setError('')
+        handleNext()
+    }
+
     const handleFileUpload = async (e) => {
         const file = e.target.files?.[0]
         if (!file) return
+        if (!file.type.startsWith('image/')) {
+            setError('Only image files are allowed for profile photo.')
+            return
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setError('Profile photo must be less than 5MB.')
+            return
+        }
 
         setUploading(true)
         setError('')
@@ -74,7 +147,6 @@ export default function Onboarding({ session, onComplete }) {
         formData.append('avatar', file)
 
         try {
-            const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
             const response = await fetch(`${BACKEND_URL}/api/v1/users/me/avatar`, {
                 method: 'POST',
                 headers: {
@@ -98,25 +170,39 @@ export default function Onboarding({ session, onComplete }) {
         }
     }
 
+    const handleUseDefaultAvatar = () => {
+        setProfile((prev) => ({
+            ...prev,
+            avatar: AVATARS[0].id,
+            customAvatarUrl: '',
+        }))
+    }
+
     const handleSubmit = async () => {
         setLoading(true)
         setError('')
         try {
-            let profilePictureUrl = ''
-            if (profile.avatar === 'custom' && profile.customAvatarUrl) {
-                profilePictureUrl = profile.customAvatarUrl
-            } else {
-                profilePictureUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'Muhdikhai')}&background=${selectedAvatar.color.replace('#', '')}&color=fff&size=256`
+            if (!profile.username || profile.username.length < 3) {
+                throw new Error('Username must be at least 3 characters.')
             }
 
+            const profilePictureUrl =
+                profile.avatar === 'custom' && profile.customAvatarUrl
+                    ? profile.customAvatarUrl
+                    : createDefaultAvatarDataUrl({
+                        name: profile.name,
+                        username: profile.username,
+                        color: selectedAvatar.color,
+                    })
+
             const payload = {
-                name: profile.name,
+                username: profile.username,
+                name: profile.name.trim(),
                 gender: profile.gender,
                 bio: profile.bio || 'Just a gentle stranger.',
                 profilePictureUrl,
             }
 
-            const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
             const response = await fetch(`${BACKEND_URL}/api/v1/users/me`, {
                 method: 'PUT',
                 headers: {
@@ -126,11 +212,11 @@ export default function Onboarding({ session, onComplete }) {
                 body: JSON.stringify(payload),
             })
 
-            if (!response.ok) {
-                throw new Error('Failed to save profile')
+            const result = await response.json()
+            if (!response.ok || !result?.success) {
+                throw new Error(result?.error?.message || 'Failed to save profile')
             }
 
-            const result = await response.json()
             onComplete(result.data.user)
         } catch (err) {
             setError(err?.message || 'Could not save profile. Please try again.')
@@ -175,6 +261,7 @@ export default function Onboarding({ session, onComplete }) {
 
                             <div className="onboarding-identity-copy">
                                 <h3>{profile.name || 'Your room name'}</h3>
+                                <p>{handlePreview}</p>
                                 <p>{selectedGender?.label || 'Choose an identity signal'}</p>
                             </div>
                         </div>
@@ -190,7 +277,7 @@ export default function Onboarding({ session, onComplete }) {
 
                         <div className="onboarding-preview-chips">
                             <span>{selectedGender?.mood || 'Identity'}</span>
-                            <span>{profile.avatar === 'custom' ? 'Custom avatar' : 'Curated avatar'}</span>
+                            <span>{profile.avatar === 'custom' ? 'Custom avatar' : 'Default avatar'}</span>
                             <span>{profile.bio ? 'Bio added' : 'Bio optional'}</span>
                         </div>
                     </div>
@@ -234,6 +321,24 @@ export default function Onboarding({ session, onComplete }) {
                                 />
                             </div>
 
+                            <div className="input-field">
+                                <label>Username</label>
+                                <input
+                                    type="text"
+                                    value={profile.username}
+                                    onChange={(e) => setProfile((prev) => ({ ...prev, username: normalizeUsernameInput(e.target.value) }))}
+                                    placeholder="your_handle"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
+                                    maxLength={30}
+                                />
+                                <div className={`onboarding-username-state ${usernameState.available === false ? 'is-error' : ''}`}>
+                                    <span>@{profile.username || 'username'}</span>
+                                    <span>{usernameState.message}</span>
+                                </div>
+                            </div>
+
                             <div className="gender-grid">
                                 {GENDERS.map((gender) => (
                                     <button
@@ -251,10 +356,12 @@ export default function Onboarding({ session, onComplete }) {
                                 ))}
                             </div>
 
+                            {error && <p className="onboarding-error">{error}</p>}
+
                             <button
                                 className="onboarding-cta"
-                                disabled={!profile.name || !profile.gender}
-                                onClick={handleNext}
+                                disabled={!profile.name || !profile.username || profile.username.length < 3 || !profile.gender || usernameState.available === false || usernameState.checking}
+                                onClick={handleIdentityContinue}
                             >
                                 Continue to avatar
                             </button>
@@ -303,6 +410,12 @@ export default function Onboarding({ session, onComplete }) {
                                     )}
                                 </button>
                             </div>
+
+                            <button type="button" className="onboarding-default-avatar-btn" onClick={handleUseDefaultAvatar}>
+                                Use generated default avatar instead of upload
+                            </button>
+
+                            {error && <p className="onboarding-error">{error}</p>}
 
                             <div className="onboarding-actions">
                                 <button type="button" className="onboarding-back" onClick={handlePrev}>Back</button>

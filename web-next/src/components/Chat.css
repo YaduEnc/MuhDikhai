@@ -92,6 +92,18 @@
     border-radius: inherit;
 }
 
+.chat-avatar-fallback {
+    width: 100%;
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
 .chat-partner-info {
     display: flex;
     flex-direction: column;
@@ -137,6 +149,12 @@
 .chat-partner-status.live {
     color: #00ffcc;
     text-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+}
+
+.chat-partner-handle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: rgba(160, 246, 233, 0.92);
 }
 
 .phase-matching .chat-partner-name {

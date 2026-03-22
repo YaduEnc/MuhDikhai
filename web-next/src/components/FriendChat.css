@@ -84,6 +84,18 @@
     object-fit: cover;
 }
 
+.fc-avatar-fallback {
+    width: 100%;
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
 .fc-online-dot {
     position: absolute;
     bottom: 1px;
@@ -119,6 +131,12 @@
     font-weight: 600;
     color: rgba(255, 255, 255, 0.92);
     letter-spacing: -0.01em;
+}
+
+.fc-header-handle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: rgba(142, 241, 225, 0.92);
 }
 
 .fc-header-status {

@@ -75,7 +75,7 @@ export const updateProfileSchema = z.object({
   profilePictureUrl: z
     .union([
       z.string().url('Profile picture URL must be a valid URL'),
-      z.literal('').transform(() => undefined),
+      z.literal('').transform(() => ''),
     ])
     .optional(),
   gender: z

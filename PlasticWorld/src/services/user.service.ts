@@ -62,11 +62,20 @@ export interface UpdateUserData {
 }
 
 class UserService {
+  normalizeUsername(username: string): string {
+    return username.trim().toLowerCase();
+  }
+
   /**
    * Check if username is already taken
    */
-  async isUsernameAvailable(username: string): Promise<boolean> {
-    const result = await database.query('SELECT id FROM users WHERE username = $1', [username]);
+  async isUsernameAvailable(username: string, excludeUserId?: string): Promise<boolean> {
+    const normalizedUsername = this.normalizeUsername(username);
+    const query = excludeUserId
+      ? 'SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND id != $2'
+      : 'SELECT id FROM users WHERE LOWER(username) = LOWER($1)';
+    const params = excludeUserId ? [normalizedUsername, excludeUserId] : [normalizedUsername];
+    const result = await database.query(query, params);
     return result.rows.length === 0;
   }
 
@@ -84,6 +93,8 @@ class UserService {
     if (baseUsername.length > 27) {
       baseUsername = baseUsername.substring(0, 27);
     }
+
+    baseUsername = this.normalizeUsername(baseUsername);
 
     if (await this.isUsernameAvailable(baseUsername)) {
       return baseUsername;
@@ -142,7 +153,7 @@ class UserService {
           created_at as "createdAt", updated_at as "updatedAt",
           rooms_entered as "roomsEntered", is_admin as "isAdmin",
           aura_points as "auraPoints"`,
-        [data.firebaseUid, username, data.email, data.name, defaultAge, data.profilePictureUrl || null, data.gender || 'prefer_not_to_say', 'offline', data.roomsEntered || 0, data.isAdmin || false]
+        [data.firebaseUid, this.normalizeUsername(username), data.email, data.name, defaultAge, data.profilePictureUrl || null, data.gender || 'prefer_not_to_say', 'offline', data.roomsEntered || 0, data.isAdmin || false]
       );
 
       const user = result.rows[0];
@@ -305,6 +316,11 @@ class UserService {
    */
   async updateUser(userId: string, data: UpdateUserData): Promise<User> {
     try {
+      const normalizedData: UpdateUserData = { ...data };
+      if (typeof normalizedData.username === 'string') {
+        normalizedData.username = this.normalizeUsername(normalizedData.username);
+      }
+
       const updates: string[] = [];
       const values: any[] = [];
       let paramIndex = 1;
@@ -326,9 +342,9 @@ class UserService {
       };
 
       for (const field of fields) {
-        if (data[field as keyof UpdateUserData] !== undefined) {
+        if (normalizedData[field as keyof UpdateUserData] !== undefined) {
           updates.push(`${fieldToColumn[field]} = $${paramIndex}`);
-          values.push(data[field as keyof UpdateUserData]);
+          values.push(normalizedData[field as keyof UpdateUserData]);
           paramIndex++;
         }
       }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import DoodleBoard from './DoodleBoard'
+import { getAvatarInitial, getAvatarStyle, getDisplayHandle } from '../utils/avatar'
 
 const GIPHY_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || 'dc6zaTOxFJmzC'
 
@@ -176,7 +177,9 @@ const FriendBubble = memo(function FriendBubble({ m, isMine, showAvatar, friend,
                     {friend.user.profilePictureUrl ? (
                         <img src={friend.user.profilePictureUrl} alt={friend.user.name} />
                     ) : (
-                        friend.user.name[0].toUpperCase()
+                        <span className="fc-avatar-fallback" style={getAvatarStyle(friend.user)}>
+                            {getAvatarInitial(friend.user)}
+                        </span>
                     )}
                 </div>
             )}
@@ -526,12 +529,15 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
                         {friend.user.profilePictureUrl ? (
                             <img src={friend.user.profilePictureUrl} alt={friend.user.name} />
                         ) : (
-                            <span>{friend.user.name?.[0]?.toUpperCase()}</span>
+                            <span className="fc-avatar-fallback" style={getAvatarStyle(friend.user)}>
+                                {getAvatarInitial(friend.user)}
+                            </span>
                         )}
                         <div className="fc-online-dot" />
                     </div>
                     <div className="fc-header-info">
                         <span className="fc-header-name">{friend.user.name}</span>
+                        {getDisplayHandle(friend.user) && <span className="fc-header-handle">{getDisplayHandle(friend.user)}</span>}
                         <span className="fc-header-status">
                             {partnerTyping ? 'typing...' : 'Online'}
                         </span>

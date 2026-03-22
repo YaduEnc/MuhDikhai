@@ -10,6 +10,7 @@ export interface RandomMatch {
     createdAt: Date;
     partner?: {
         id: string;
+        username?: string;
         name: string;
         profilePictureUrl?: string;
         auraPoints?: number;
@@ -49,7 +50,7 @@ class MatchService {
             const result = await database.query(
                 `SELECT * FROM (
                     SELECT DISTINCT ON (u.id) rm.id, rm.user_id_a, rm.user_id_b, rm.room_id, rm.shared_topic, rm.created_at,
-                        u.id as partner_id, u.name as partner_name, u.profile_picture_url as partner_pic, u.aura_points as partner_aura
+                        u.id as partner_id, u.username as partner_username, u.name as partner_name, u.profile_picture_url as partner_pic, u.aura_points as partner_aura
                     FROM random_matches rm
                     JOIN users u ON (u.id = CASE WHEN rm.user_id_a = $1 THEN rm.user_id_b ELSE rm.user_id_a END)
                     WHERE rm.user_id_a = $1 OR rm.user_id_b = $1
@@ -69,6 +70,7 @@ class MatchService {
                 createdAt: row.created_at,
                 partner: {
                     id: row.partner_id,
+                    username: row.partner_username,
                     name: row.partner_name,
                     profilePictureUrl: row.partner_pic,
                     auraPoints: row.partner_aura

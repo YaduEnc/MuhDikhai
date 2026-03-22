@@ -366,6 +366,30 @@
     transform: translateY(-1px);
 }
 
+.onboarding-username-state {
+    margin-top: 0.65rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.76rem;
+    color: rgba(222, 231, 243, 0.8);
+}
+
+.onboarding-username-state span:first-child {
+    font-family: 'JetBrains Mono', monospace;
+    color: rgba(142, 241, 225, 0.95);
+}
+
+.onboarding-username-state.is-error {
+    border-color: rgba(255, 110, 141, 0.35);
+    background: rgba(255, 89, 117, 0.14);
+}
+
 .gender-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -484,6 +508,23 @@
 .upload-icon {
     font-size: 2rem;
     font-weight: 300;
+}
+
+.onboarding-default-avatar-btn {
+    width: 100%;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(225, 235, 246, 0.82);
+    border-radius: 999px;
+    min-height: 2.75rem;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.onboarding-default-avatar-btn:hover {
+    border-color: rgba(158, 247, 235, 0.35);
+    background: rgba(158, 247, 235, 0.1);
 }
 
 .onboarding-actions {

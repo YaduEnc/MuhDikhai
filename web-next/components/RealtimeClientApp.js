@@ -638,18 +638,34 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
         user: {
           ...sessionRef.current.user,
           ...json.data.user,
-          profilePictureUrl: json.data.user.profilePictureUrl || sessionRef.current.user.profilePictureUrl,
-          photoURL: json.data.user.profilePictureUrl || sessionRef.current.user.photoURL,
+          profilePictureUrl: Object.prototype.hasOwnProperty.call(json.data.user, 'profilePictureUrl')
+            ? (json.data.user.profilePictureUrl || null)
+            : (sessionRef.current.user.profilePictureUrl || null),
+          photoURL: Object.prototype.hasOwnProperty.call(json.data.user, 'profilePictureUrl')
+            ? (json.data.user.profilePictureUrl || null)
+            : (sessionRef.current.user.photoURL || null),
         },
       }
       const normalized = normalizeSession(nextSession)
       setSession(normalized)
+      sessionRef.current = normalized
       saveSession(normalized)
     } catch (error) {
       console.error('Profile update failed:', error)
       throw error
     }
   }
+
+  const handleCheckUsernameAvailability = useCallback(async (username) => {
+    const normalized = String(username || '').trim().toLowerCase()
+    if (!normalized) return { available: false }
+    const res = await authedFetch(`${BACKEND_URL}/api/v1/users/username-availability?username=${encodeURIComponent(normalized)}`)
+    const json = await res.json()
+    if (!json?.success) {
+      throw new Error(json?.error?.message || 'Could not check username')
+    }
+    return json.data
+  }, [authedFetch])
 
   const uploadAvatarWithToken = (token, file, onProgress) => new Promise((resolve, reject) => {
     const formData = new FormData()
@@ -943,6 +959,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
             onDeleteAccount={handleDeleteAccount}
             onUpdateProfile={handleUpdateProfile}
             onUploadAvatar={handleUploadAvatar}
+            onCheckUsernameAvailability={handleCheckUsernameAvailability}
             onFetchMatches={handleFetchMatches}
             onAddFriend={handleAddFriend}
             onFetchFriendships={handleFetchFriendships}

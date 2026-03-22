@@ -189,10 +189,11 @@ router.post(
   validateBody(completeProfileSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { username, phoneNumber, age } = req.body;
+    const normalizedUsername = userService.normalizeUsername(username);
     const userId = req.user!.id;
 
     // Check username availability
-    const isUsernameAvailable = await userService.isUsernameAvailable(username);
+    const isUsernameAvailable = await userService.isUsernameAvailable(normalizedUsername, userId);
     if (!isUsernameAvailable) {
       throw new AppError('Username is already taken', 409, 'USERNAME_TAKEN');
     }
@@ -207,14 +208,14 @@ router.post(
 
     // Update user profile
     const updatedUser = await userService.updateUser(userId, {
-      username,
+      username: normalizedUsername,
       phoneNumber,
       age,
     });
 
     logger.info('User profile completed', {
       userId,
-      username,
+      username: normalizedUsername,
     });
 
     const clientUser = await buildClientUser(updatedUser);

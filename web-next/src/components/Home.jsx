@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getSoundEnabled, toggleSound, initAudio } from '../utils/soundEngine'
 import { calculateAuraLevel } from '../utils/aura'
-
-function getAvatarUrl(user) {
-    return user?.profilePictureUrl || user?.photoURL || null
-}
+import {
+    getAvatarUrl,
+    getAvatarInitial,
+    getAvatarStyle,
+    getDisplayHandle,
+    normalizeUsernameInput
+} from '../utils/avatar'
 
 function DeleteConfirmationModal({ onConfirm, onCancel }) {
     const [loading, setLoading] = useState(false);
@@ -52,13 +55,15 @@ function DeleteConfirmationModal({ onConfirm, onCancel }) {
     );
 }
 
-function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
+function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability }) {
     const [isEditing, setIsEditing] = useState(false)
     const [editData, setEditData] = useState({
+        username: session?.user?.username || '',
         name: session?.user?.name || '',
         bio: session?.user?.bio || '',
         gender: session?.user?.gender || 'prefer_not_to_say'
     })
+    const [usernameState, setUsernameState] = useState({ checking: false, available: null, message: '' })
     const [isSaving, setIsSaving] = useState(false)
     const [isAvatarUploading, setIsAvatarUploading] = useState(false)
     const [uploadProgress, setUploadProgress] = useState(0)
@@ -72,6 +77,9 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
     const roomsEntered = session?.user?.roomsEntered || 0
     const friendCount = session?.user?.friendCount || 0
     const avatarUrl = avatarPreviewUrl || getAvatarUrl(session?.user)
+    const profileHandle = getDisplayHandle(session?.user)
+    const profileAvatarStyle = getAvatarStyle(session?.user)
+    const profileInitial = getAvatarInitial(session?.user)
 
     const hasBio = !!(session?.user?.bio && session.user.bio.trim().length > 0)
     const bioText = hasBio
@@ -93,8 +101,8 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
     const handleFileChange = async (e) => {
         const file = e.target.files?.[0]
         if (!file) return
-        if (file.size > 10 * 1024 * 1024) {
-            setError('Photo must be less than 10MB')
+        if (file.size > 5 * 1024 * 1024) {
+            setError('Photo must be less than 5MB')
             return
         }
         if (!file.type.startsWith('image/')) {
@@ -128,16 +136,80 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
         }
     }
 
+    useEffect(() => {
+        if (!isEditing || typeof onCheckUsernameAvailability !== 'function') return undefined
+
+        const normalizedUsername = normalizeUsernameInput(editData.username || '')
+        const currentUsername = normalizeUsernameInput(session?.user?.username || '')
+
+        if (!normalizedUsername) {
+            setUsernameState({ checking: false, available: null, message: 'Username is required.' })
+            return undefined
+        }
+        if (normalizedUsername.length < 3) {
+            setUsernameState({ checking: false, available: null, message: 'At least 3 characters.' })
+            return undefined
+        }
+        if (normalizedUsername === currentUsername) {
+            setUsernameState({ checking: false, available: true, message: 'Current username.' })
+            return undefined
+        }
+
+        setUsernameState((prev) => ({ ...prev, checking: true, message: 'Checking availability...' }))
+        const timer = window.setTimeout(async () => {
+            try {
+                const result = await onCheckUsernameAvailability(normalizedUsername)
+                setUsernameState({
+                    checking: false,
+                    available: Boolean(result?.available),
+                    message: result?.available ? 'Username is available.' : 'Username is already taken.',
+                })
+            } catch {
+                setUsernameState({
+                    checking: false,
+                    available: null,
+                    message: 'Could not check username right now.',
+                })
+            }
+        }, 320)
+
+        return () => window.clearTimeout(timer)
+    }, [isEditing, editData.username, session?.user?.username, onCheckUsernameAvailability])
+
     const handleSave = async () => {
         setIsSaving(true)
         setError('')
         try {
-            await onUpdateProfile(editData)
+            const normalizedUsername = normalizeUsernameInput(editData.username)
+            if (!normalizedUsername || normalizedUsername.length < 3) {
+                throw new Error('Username must be at least 3 characters.')
+            }
+            if (usernameState.available === false) {
+                throw new Error('Username is already taken.')
+            }
+            const payload = {
+                ...editData,
+                username: normalizedUsername,
+            }
+            await onUpdateProfile(payload)
             setIsEditing(false)
         } catch (err) {
             setError(err.message || 'Failed to update profile')
         } finally {
             setIsSaving(false)
+        }
+    }
+
+    const handleUseDefaultAvatar = async () => {
+        if (isAvatarUploading || isSaving) return
+        setError('')
+        setIsAvatarUploading(true)
+        try {
+            await onUpdateProfile({ profilePictureUrl: '' })
+        } catch (err) {
+            setError(err.message || 'Failed to switch to default avatar')
+        } finally {
+            setIsAvatarUploading(false)
         }
     }
 
@@ -159,8 +231,8 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                                             {avatarUrl ? (
                                                 <img src={avatarUrl} alt="avatar" className="profile-avatar-img" />
                                             ) : (
-                                                <span className="profile-avatar-initials">
-                                                    {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
+                                                <span className="profile-avatar-initials" style={profileAvatarStyle}>
+                                                    {profileInitial}
                                                 </span>
                                             )}
                                         </div>
@@ -188,9 +260,18 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                                             <span className="avatar-upload-progress-label">Uploading {uploadProgress}%</span>
                                         </div>
                                     )}
+                                    <button
+                                        type="button"
+                                        className="avatar-reset-btn"
+                                        onClick={handleUseDefaultAvatar}
+                                        disabled={isAvatarUploading || isSaving}
+                                    >
+                                        Use default avatar
+                                    </button>
                                 </div>
                                 <div className="profile-info">
                                     <h2 className="profile-name">{session?.user?.name}</h2>
+                                    {profileHandle && <p className="profile-handle">{profileHandle}</p>}
                                     <p className="profile-email">{session?.user?.email}</p>
                                 </div>
                             </div>
@@ -217,6 +298,10 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                                 </button>
                             </div>
                             <div className="info-rows">
+                                <div className="info-row">
+                                    <span className="info-label">Username</span>
+                                    <p className="info-value">{profileHandle || 'Not set'}</p>
+                                </div>
                                 <div className="info-row info-row--with-action">
                                     <div className="info-row-main">
                                         <span className="info-label">Bio</span>
@@ -325,8 +410,8 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                                         {avatarUrl ? (
                                             <img src={avatarUrl} alt="avatar" className="profile-avatar-img" />
                                         ) : (
-                                            <span className="profile-avatar-initials">
-                                                {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
+                                            <span className="profile-avatar-initials" style={profileAvatarStyle}>
+                                                {profileInitial}
                                             </span>
                                         )}
                                     </div>
@@ -350,10 +435,19 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                                         <span className="avatar-upload-progress-label">Uploading {uploadProgress}%</span>
                                     </div>
                                 )}
+                                <button
+                                    type="button"
+                                    className="avatar-reset-btn"
+                                    onClick={handleUseDefaultAvatar}
+                                    disabled={isAvatarUploading || isSaving}
+                                >
+                                    Use default avatar
+                                </button>
                             </div>
                             <div className="profile-info">
                                 <span className="card-eyebrow">Editing profile</span>
                                 <h2 className="profile-name">{session?.user?.name}</h2>
+                                {profileHandle && <p className="profile-handle">{profileHandle}</p>}
                                 <p className="profile-email">{session?.user?.email}</p>
                             </div>
                         </div>
@@ -373,6 +467,27 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar }) {
                     </div>
 
                     <div className="profile-edit-grid">
+                        <div className="profile-field-group">
+                            <label className="profile-field-label">Username</label>
+                            <input
+                                className="profile-input profile-input--mono"
+                                value={editData.username}
+                                onChange={(e) => setEditData({ ...editData, username: normalizeUsernameInput(e.target.value) })}
+                                placeholder="your_handle"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                maxLength={30}
+                            />
+                            <div className={`profile-field-meta profile-field-meta--username ${usernameState.available === false ? 'is-error' : ''}`}>
+                                <span className="profile-field-hint">
+                                    Lowercase letters, numbers, underscores.
+                                </span>
+                                <span className="profile-field-count">
+                                    {usernameState.message || `${Math.max(0, 3 - (editData.username || '').length)} chars to minimum`}
+                                </span>
+                            </div>
+                        </div>
                         <div className="profile-field-group">
                             <label className="profile-field-label">Name</label>
                             <input
@@ -549,6 +664,9 @@ function FriendRequests({ requests, onRespond }) {
         <div className="friends-list">
             {requests.map((req) => {
                 const avatarUrl = getAvatarUrl(req.user)
+                const avatarStyle = getAvatarStyle(req.user)
+                const avatarInitial = getAvatarInitial(req.user)
+                const handle = getDisplayHandle(req.user)
                 return (
                     <div
                         key={req.id}
@@ -559,7 +677,7 @@ function FriendRequests({ requests, onRespond }) {
                             {avatarUrl ? (
                                 <img src={avatarUrl} alt="avatar" />
                             ) : (
-                                <span className="avatar-placeholder">{req.user?.name?.[0]?.toUpperCase() || 'S'}</span>
+                                <span className="avatar-placeholder" style={avatarStyle}>{avatarInitial}</span>
                             )}
                         </div>
                         <div className="recent-info">
@@ -575,7 +693,9 @@ function FriendRequests({ requests, onRespond }) {
                                     </span>
                                 )}
                             </span>
-                            <span className="recent-topic">Wants to be your friend</span>
+                            <span className="recent-topic">
+                                {handle ? `${handle}  •  Wants to be your friend` : 'Wants to be your friend'}
+                            </span>
                         </div>
                         <div className="friend-actions">
                             <button className="friend-accept-btn" onClick={() => onRespond(req.id, 'accept')}>Accept</button>
@@ -598,6 +718,9 @@ function FriendsList({ friends, onOpenChat, unreadCounts = {} }) {
             {friends.map((friend) => {
                 const unread = unreadCounts[friend.user?.id] || 0
                 const avatarUrl = getAvatarUrl(friend.user)
+                const avatarStyle = getAvatarStyle(friend.user)
+                const avatarInitial = getAvatarInitial(friend.user)
+                const handle = getDisplayHandle(friend.user)
                 return (
                     <div
                         key={friend.id}
@@ -608,7 +731,7 @@ function FriendsList({ friends, onOpenChat, unreadCounts = {} }) {
                             {avatarUrl ? (
                                 <img src={avatarUrl} alt="avatar" />
                             ) : (
-                                <span className="avatar-placeholder">{friend.user?.name?.[0]?.toUpperCase() || 'S'}</span>
+                                <span className="avatar-placeholder" style={avatarStyle}>{avatarInitial}</span>
                             )}
                             {unread > 0 && <span className="unread-dot" />}
                         </div>
@@ -625,7 +748,11 @@ function FriendsList({ friends, onOpenChat, unreadCounts = {} }) {
                                     </span>
                                 )}
                             </span>
-                            <span className="recent-topic">{unread > 0 ? `${unread} new message${unread > 1 ? 's' : ''}` : 'Friend'}</span>
+                            <span className="recent-topic">
+                                {unread > 0
+                                    ? `${unread} new message${unread > 1 ? 's' : ''}`
+                                    : (handle || 'Friend')}
+                            </span>
                         </div>
                         <button className="recent-add-btn" onClick={() => onOpenChat(friend)}>
                             {unread > 0 && <span className="unread-badge">{unread}</span>}
@@ -673,7 +800,7 @@ function HomeTabSkeleton({ variant = 'matches', count = 4 }) {
     )
 }
 
-export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts }) {
+export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts }) {
 
     const [selectedTopics, setSelectedTopics] = useState([])
     const [customTopic, setCustomTopic] = useState('')
@@ -780,6 +907,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                 onBack={() => setView('home')}
                 onUpdateProfile={onUpdateProfile}
                 onUploadAvatar={onUploadAvatar}
+                onCheckUsernameAvailability={onCheckUsernameAvailability}
             />
         )
     }
@@ -952,6 +1080,9 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                                     <div className="recents-list">
                                         {recentMatches.map((match) => {
                                             const avatarUrl = getAvatarUrl(match.partner)
+                                            const avatarStyle = getAvatarStyle(match.partner)
+                                            const avatarInitial = getAvatarInitial(match.partner)
+                                            const handle = getDisplayHandle(match.partner)
                                             return (
                                                 <div
                                                     key={match.id}
@@ -962,7 +1093,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                                                         {avatarUrl ? (
                                                             <img src={avatarUrl} alt="avatar" />
                                                         ) : (
-                                                            <span className="avatar-placeholder">{match.partner?.name?.[0]?.toUpperCase() || 'S'}</span>
+                                                            <span className="avatar-placeholder" style={avatarStyle}>{avatarInitial}</span>
                                                         )}
                                                     </div>
                                                     <div className="recent-info">
@@ -978,7 +1109,11 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                                                                 </span>
                                                             )}
                                                         </span>
-                                                        {match.sharedTopic && <span className="recent-topic">Talked about {match.sharedTopic}</span>}
+                                                        <span className="recent-topic">
+                                                            {handle
+                                                                ? `${handle}${match.sharedTopic ? `  •  Talked about ${match.sharedTopic}` : ''}`
+                                                                : (match.sharedTopic ? `Talked about ${match.sharedTopic}` : 'Recent match')}
+                                                        </span>
                                                     </div>
                                                     <button
                                                         className="recent-add-btn"
@@ -1013,8 +1148,8 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                         {sessionAvatarUrl ? (
                             <img src={sessionAvatarUrl} alt="avatar" className="home-card-avatar" />
                         ) : (
-                            <span className="home-card-avatar-initials">
-                                {(session?.user?.name || session?.user?.email || 'U')[0].toUpperCase()}
+                            <span className="home-card-avatar-initials" style={getAvatarStyle(session?.user)}>
+                                {getAvatarInitial(session?.user)}
                             </span>
                         )}
                     </div>
@@ -1033,6 +1168,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                             )}
                         </span>
                         <span className="home-card-sub">Preferences &amp; identity</span>
+                        {getDisplayHandle(session?.user) && <span className="home-card-sub">{getDisplayHandle(session?.user)}</span>}
                     </div>
                     <span className="home-card-arrow">→</span>
                 </button>

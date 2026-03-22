@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { playIncomingDrop, playOutgoingTick, playRadarPing } from '../utils/soundEngine'
 import { calculateAuraLevel } from '../utils/aura'
+import { getAvatarInitial, getAvatarStyle, getDisplayHandle } from '../utils/avatar'
 import DoodleBoard from './DoodleBoard'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -291,7 +292,13 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
         <li className={`msg-row${isSelf ? ' msg-row--self' : ''}`}>
             {!isSelf && (
                 <div className="msg-avatar clickable" onClick={() => onProfilePeek(msg.fromUserId)}>
-                    {msg.fromProfilePictureUrl ? <img src={msg.fromProfilePictureUrl} alt="" /> : (msg.fromName || 'S')[0].toUpperCase()}
+                    {msg.fromProfilePictureUrl ? (
+                        <img src={msg.fromProfilePictureUrl} alt="" />
+                    ) : (
+                        <span className="chat-avatar-fallback" style={getAvatarStyle({ name: msg.fromName, username: msg.fromUsername, id: msg.fromUserId })}>
+                            {getAvatarInitial({ name: msg.fromName })}
+                        </span>
+                    )}
                 </div>
             )}
             <div className="msg-content">
@@ -357,7 +364,9 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
                     {session?.user?.profilePictureUrl ? (
                         <img src={session.user.profilePictureUrl} alt="You" />
                     ) : (
-                        'You'
+                        <span className="chat-avatar-fallback" style={getAvatarStyle(session?.user)}>
+                            {getAvatarInitial(session?.user)}
+                        </span>
                     )}
                 </div>
             )}
@@ -419,7 +428,9 @@ const ProfileModal = memo(function ProfileModal({ partnerId, session, onClose })
                             {profile.profilePictureUrl ? (
                                 <img src={profile.profilePictureUrl} alt={profile.name} />
                             ) : (
-                                (profile.name || '?')[0].toUpperCase()
+                                <span className="chat-avatar-fallback" style={getAvatarStyle(profile)}>
+                                    {getAvatarInitial(profile)}
+                                </span>
                             )}
                         </div>
                         <h3 className="profile-modal-name">{profile.name || 'Unknown User'}</h3>
@@ -739,7 +750,9 @@ export default function Chat({
                         {room?.partner?.profilePictureUrl ? (
                             <img src={room.partner.profilePictureUrl} alt={room.partner.name} />
                         ) : (
-                            (room?.partner?.name || '?')[0].toUpperCase()
+                            <span className="chat-avatar-fallback" style={getAvatarStyle(room?.partner)}>
+                                {getAvatarInitial(room?.partner)}
+                            </span>
                         )}
                     </div>
                     <div className="chat-partner-info">
@@ -762,6 +775,9 @@ export default function Chat({
                                     ? 'Quantum Link Active'
                                     : 'Circuit broken'}
                         </span>
+                        {isMatched && getDisplayHandle(room?.partner) && (
+                            <span className="chat-partner-handle">{getDisplayHandle(room?.partner)}</span>
+                        )}
                         {isMatched && room?.topic && (
                             <span className="chat-shared-topic">
                                 Shared interest: {room.topic}
