@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
-import { playIncomingDrop, playOutgoingTick } from '../utils/soundEngine'
+import { playIncomingDrop, playOutgoingTick, playRadarPing } from '../utils/soundEngine'
 import { calculateAuraLevel } from '../utils/aura'
 import DoodleBoard from './DoodleBoard'
 
@@ -84,6 +84,32 @@ const GifPicker = memo(function GifPicker({ onSelect, onClose }) {
     )
 })
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
+const MATCHING_FLOW_STAGES = [
+    {
+        label: 'Searching',
+        detail: 'Scanning active signals in your live queue.',
+    },
+    {
+        label: 'Found possible match',
+        detail: 'A nearby profile pulse just synced with your vibe.',
+    },
+    {
+        label: 'Checking vibe fit',
+        detail: 'Balancing intent, pace, and energy to avoid random misses.',
+    },
+    {
+        label: 'Opening room',
+        detail: 'Securing a private channel and warming up the connection.',
+    },
+]
+const QUEUE_HEARTBEAT_MS = 10_000
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
+const formatSeconds = (totalSeconds) => {
+    const safe = Math.max(0, Number(totalSeconds) || 0)
+    const mins = Math.floor(safe / 60)
+    const secs = safe % 60
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
 
 // ─── Emoji Picker ─────────────────────────────────────────────────────────────
 const EMOJI_CATEGORIES = [
@@ -461,6 +487,10 @@ export default function Chat({
     const [vanishMode, setVanishMode] = useState(false)
     const [friendRequested, setFriendRequested] = useState(false)
     const [showDoodle, setShowDoodle] = useState(false)
+    const [matchingElapsedSeconds, setMatchingElapsedSeconds] = useState(0)
+    const [matchingHeartbeatCount, setMatchingHeartbeatCount] = useState(0)
+    const [matchingPulseActive, setMatchingPulseActive] = useState(false)
+    const [matchingSignalTicks, setMatchingSignalTicks] = useState([])
 
     useEffect(() => {
         setFriendRequested(false)
@@ -475,6 +505,54 @@ export default function Chat({
     const isMatched = socketState.phase === 'matched'
     const isMatching = socketState.phase === 'matching'
     const hasLeft = socketState.phase === 'partner-left'
+    const matchingStageIndex = !isMatching
+        ? 0
+        : (matchingHeartbeatCount >= 3 || matchingElapsedSeconds >= 28)
+            ? 3
+            : (matchingHeartbeatCount >= 2 || matchingElapsedSeconds >= 18)
+                ? 2
+                : (matchingHeartbeatCount >= 1 || matchingElapsedSeconds >= 8)
+                    ? 1
+                    : 0
+    const matchingStage = MATCHING_FLOW_STAGES[matchingStageIndex]
+    const matchingProgress = ((matchingStageIndex + 1) / MATCHING_FLOW_STAGES.length) * 100
+    const statsOnline = Number(matchingStats?.online) || 0
+    const statsQueue = Number(matchingStats?.inQueue) || 0
+    const statsBusy = Number(matchingStats?.matched) || 0
+    const queueDepth = Math.max(1, statsQueue)
+    const queuePosition = clamp(
+        Number(matchingStats?.queuePosition) || (1 + (matchingHeartbeatCount % queueDepth)),
+        1,
+        queueDepth
+    )
+    const computedEtaSeconds = Math.max(
+        6,
+        Math.round(((queueDepth - queuePosition + 1) * 5) + Math.max(0, 20 - matchingElapsedSeconds))
+    )
+    const etaSeconds = Math.max(5, Number(matchingStats?.etaSeconds) || computedEtaSeconds)
+    const channelHealth = socketState.status === 'connected'
+        ? 'Stable'
+        : socketState.status === 'connecting'
+            ? 'Syncing'
+            : 'Recovering'
+    const packetsSeen = (matchingElapsedSeconds * 2) + (matchingHeartbeatCount * 9)
+    const fitDiagnostics = [
+        {
+            key: 'intent',
+            label: 'Intent Sync',
+            value: Math.round(clamp(46 + (matchingStageIndex * 12) + Math.sin(matchingElapsedSeconds / 4) * 9, 22, 97)),
+        },
+        {
+            key: 'pace',
+            label: 'Pace Match',
+            value: Math.round(clamp(40 + (matchingStageIndex * 14) + Math.cos(matchingElapsedSeconds / 5) * 8, 18, 98)),
+        },
+        {
+            key: 'energy',
+            label: 'Energy Blend',
+            value: Math.round(clamp(44 + (matchingHeartbeatCount * 8) + Math.sin(matchingElapsedSeconds / 6) * 7, 24, 99)),
+        },
+    ]
 
     // Auto-scroll to latest message and play sound for incoming messages
     useEffect(() => {
@@ -523,6 +601,57 @@ export default function Chat({
         window.addEventListener('keydown', handler)
         return () => window.removeEventListener('keydown', handler)
     }, [])
+
+    // Matching elapsed time ticker for staged progress text
+    useEffect(() => {
+        if (!isMatching) {
+            setMatchingElapsedSeconds(0)
+            return
+        }
+        const startedAt = Date.now()
+        const timerId = window.setInterval(() => {
+            setMatchingElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
+        }, 1000)
+        return () => window.clearInterval(timerId)
+    }, [isMatching])
+
+    // Queue heartbeat micro-feedback loop (pulse + signal tick + optional sound)
+    useEffect(() => {
+        if (!isMatching) {
+            setMatchingHeartbeatCount(0)
+            setMatchingPulseActive(false)
+            setMatchingSignalTicks([])
+            return
+        }
+
+        let pulseResetId = null
+        const triggerHeartbeat = () => {
+            setMatchingHeartbeatCount((prev) => prev + 1)
+            setMatchingPulseActive(true)
+            playRadarPing()
+
+            const stampedAt = new Date().toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            })
+            setMatchingSignalTicks((prev) => [
+                { id: `${Date.now()}-${Math.random()}`, at: stampedAt },
+                ...prev,
+            ].slice(0, 4))
+
+            if (pulseResetId !== null) window.clearTimeout(pulseResetId)
+            pulseResetId = window.setTimeout(() => setMatchingPulseActive(false), 920)
+        }
+
+        triggerHeartbeat()
+        const heartbeatId = window.setInterval(triggerHeartbeat, QUEUE_HEARTBEAT_MS)
+
+        return () => {
+            window.clearInterval(heartbeatId)
+            if (pulseResetId !== null) window.clearTimeout(pulseResetId)
+        }
+    }, [isMatching])
 
     const handleInput = (e) => {
         const val = e.target.value
@@ -700,7 +829,8 @@ export default function Chat({
             <div className="chat-messages-area" ref={messagesAreaRef}>
                 {isMatching && (
                     <div className="chat-waiting">
-                        <div className="radar-container">
+                        <div className={`radar-container ${matchingPulseActive ? 'is-beating' : ''}`}>
+                            <div className="radar-scan-beam" />
                             <div className="radar-circle circle-1" />
                             <div className="radar-circle circle-2" />
                             <div className="radar-circle circle-3" />
@@ -711,25 +841,96 @@ export default function Chat({
                                     <span>{session?.user?.name?.[0]?.toUpperCase() || 'Y'}</span>
                                 )}
                             </div>
+                            <span className="radar-core-dot" aria-hidden="true" />
                         </div>
 
                         <div className="matching-insight">
-                            <h3 className="matching-insight-title">Searching the mist...</h3>
+                            <span className="matching-heartbeat-chip">
+                                Queue heartbeat · every 10s
+                            </span>
+                            <h3 className="matching-insight-title">{matchingStage.label}</h3>
                             <p className="chat-waiting-text">
-                                We&apos;re looking for a partner who matches your vibe.
+                                {matchingStage.detail}
                             </p>
+                            <div className="matching-telemetry-grid">
+                                <div className="telemetry-cell">
+                                    <span className="telemetry-label">Elapsed</span>
+                                    <span className="telemetry-value mono">{formatSeconds(matchingElapsedSeconds)}</span>
+                                </div>
+                                <div className="telemetry-cell">
+                                    <span className="telemetry-label">Queue Position</span>
+                                    <span className="telemetry-value">#{queuePosition}</span>
+                                </div>
+                                <div className="telemetry-cell">
+                                    <span className="telemetry-label">ETA</span>
+                                    <span className="telemetry-value mono">{formatSeconds(etaSeconds)}</span>
+                                </div>
+                                <div className="telemetry-cell">
+                                    <span className="telemetry-label">Channel Health</span>
+                                    <span className={`telemetry-value ${channelHealth === 'Stable' ? 'good' : ''}`}>{channelHealth}</span>
+                                </div>
+                            </div>
+                            <div className="matching-stage-progress">
+                                <span
+                                    className="matching-stage-progress-fill"
+                                    style={{ width: `${matchingProgress}%` }}
+                                />
+                            </div>
+                            <ol className="matching-stage-list">
+                                {MATCHING_FLOW_STAGES.map((stage, index) => (
+                                    <li
+                                        key={stage.label}
+                                        className={`matching-stage-item${index === matchingStageIndex ? ' active' : ''}${index < matchingStageIndex ? ' done' : ''}`}
+                                    >
+                                        <span className="stage-point" aria-hidden="true">
+                                            {index < matchingStageIndex ? '✓' : index + 1}
+                                        </span>
+                                        <div className="stage-copy">
+                                            <span className="stage-label">{stage.label}</span>
+                                            <span className="stage-detail">{stage.detail}</span>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ol>
+
+                            <div className="signal-tick-stream" aria-live="polite">
+                                {matchingSignalTicks.map((tick) => (
+                                    <span key={tick.id} className="signal-tick-pill">
+                                        Signal received · {tick.at}
+                                    </span>
+                                ))}
+                            </div>
+                            <div className="matching-fit-panel">
+                                <div className="fit-panel-header">
+                                    <span className="fit-title">Compatibility diagnostics</span>
+                                    <span className="fit-meta">{packetsSeen} packets analyzed</span>
+                                </div>
+                                <div className="fit-meter-list">
+                                    {fitDiagnostics.map((metric) => (
+                                        <div className="fit-meter-row" key={metric.key}>
+                                            <div className="fit-meter-topline">
+                                                <span>{metric.label}</span>
+                                                <span className="mono">{metric.value}%</span>
+                                            </div>
+                                            <div className="fit-meter-track">
+                                                <span className="fit-meter-fill" style={{ width: `${metric.value}%` }} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
 
                             <div className="matching-stats-grid">
                                 <div className="stat-card">
-                                    <span className="stat-value">{matchingStats?.online || 0}</span>
+                                    <span className="stat-value">{statsOnline}</span>
                                     <span className="stat-label">Present</span>
                                 </div>
                                 <div className="stat-card highlight">
-                                    <span className="stat-value">{matchingStats?.inQueue || 0}</span>
+                                    <span className="stat-value">{statsQueue}</span>
                                     <span className="stat-label">In Queue</span>
                                 </div>
                                 <div className="stat-card">
-                                    <span className="stat-value">{matchingStats?.matched || 0}</span>
+                                    <span className="stat-value">{statsBusy}</span>
                                     <span className="stat-label">Busy</span>
                                 </div>
                             </div>

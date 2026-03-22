@@ -28,7 +28,6 @@ import {
   playMatchThump,
   playOutgoingTick,
   playQueueEnterChirp,
-  playRadarPing,
   playReadAck,
   startIncomingCallRingtone,
   stopIncomingCallRingtone,
@@ -185,26 +184,6 @@ function App({ routeMode = 'app' }) {
       socketRef.current?.emit('random:ping')
     }, 10_000)
     return () => clearInterval(interval)
-  }, [socketState.phase])
-
-  useEffect(() => {
-    if (socketState.phase !== 'matching') return
-
-    let timeoutId = null
-    const schedulePing = () => {
-      const delay = 6000 + Math.floor(Math.random() * 2001)
-      timeoutId = window.setTimeout(() => {
-        playRadarPing()
-        schedulePing()
-      }, delay)
-    }
-
-    schedulePing()
-    return () => {
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId)
-      }
-    }
   }, [socketState.phase])
 
   useEffect(() => {
