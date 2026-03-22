@@ -625,16 +625,22 @@ async function finalizeMatch(
  * This consumer reads from the stream and retries matching them.
  * Multiple server instances can each run a consumer — Redis handles load balancing.
  */
-async function streamSweepConsumer(io: SocketIOServer, pub: any): Promise<void> {
+async function streamSweepConsumer(
+  io: SocketIOServer,
+  pub: any,
+  options?: { blockMs?: number; count?: number }
+): Promise<void> {
   const streamKey = 'matchq:stream';
   const groupName = 'matchmaker';
   const consumerName = `worker-${process.pid}`;
+  const blockMs = options?.blockMs ?? 1000;
+  const count = options?.count ?? 10;
 
   try {
     // Read up to 10 pending match requests, block for 1s if none available
     const results = await pub.xreadgroup(
       'GROUP', groupName, consumerName,
-      'COUNT', 10, 'BLOCK', 1000,
+      'COUNT', count, 'BLOCK', blockMs,
       'STREAMS', streamKey, '>'
     );
 
@@ -894,6 +900,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
      */
     socket.on('random:join', async (payload?: { topics?: string[]; preference?: 'male' | 'female' | 'everyone' }) => {
       let lockMeAcquired = false;
+      let queuedForDeferredMatch = false;
       const pub = redisClient.getClient();
       try {
         const freshUser = await userService.getUserById(userId);
@@ -941,10 +948,12 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
 
         const lockMe = await acquireMatchLock(pub, userId, 8, 120);
         if (!lockMe) {
-          socket.emit('random:waiting');
-          return;
+          // Don't silently drop join requests just because lock contention happened.
+          // We proceed in degraded mode and rely on downstream validation/atomic Lua.
+          logger.warn('random:join lock timeout, proceeding without self-lock', { userId });
+        } else {
+          lockMeAcquired = true;
         }
-        lockMeAcquired = true;
 
         // 2. Check if already queued (heartbeat exists) — prevent double-queue
         const alreadyQueued = await pub.get(`matchq:heartbeat:${userId}`);
@@ -983,6 +992,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
             'matchq:stream', 'MAXLEN', '~', '2000', '*',
             'userData', JSON.stringify(me)
           );
+          queuedForDeferredMatch = true;
           socket.emit('random:waiting');
           emitMatchingStats(io);
         }
@@ -997,6 +1007,11 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
       } finally {
         if (lockMeAcquired) {
           await pub.del(`matchq:lock:${userId}`);
+        }
+        if (queuedForDeferredMatch) {
+          // Kick one quick non-blocking sweep right after lock release to reduce
+          // "stuck in queue until rejoin" scenarios under lock contention.
+          void streamSweepConsumer(io, pub, { blockMs: 1, count: 20 });
         }
       }
     });
