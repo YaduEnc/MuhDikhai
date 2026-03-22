@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import DoodleBoard from './DoodleBoard'
-import { getAvatarInitial, getAvatarStyle, getDisplayHandle } from '../utils/avatar'
+import { getAvatarInitial, getAvatarStyle, getAvatarUrl, getDisplayHandle } from '../utils/avatar'
 
 const GIPHY_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || 'dc6zaTOxFJmzC'
 
@@ -169,13 +169,14 @@ const FriendBubble = memo(function FriendBubble({ m, isMine, showAvatar, friend,
     const [menuOpen, setMenuOpen] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
     const [editValue, setEditValue] = useState('')
+    const friendAvatarUrl = getAvatarUrl(friend.user)
 
     return (
         <div className={`fc-bubble-row ${isMine ? 'mine' : 'theirs'}`}>
             {showAvatar && (
                 <div className="fc-bubble-avatar">
-                    {friend.user.profilePictureUrl ? (
-                        <img src={friend.user.profilePictureUrl} alt={friend.user.name} />
+                    {friendAvatarUrl ? (
+                        <img src={friendAvatarUrl} alt={friend.user.name} />
                     ) : (
                         <span className="fc-avatar-fallback" style={getAvatarStyle(friend.user)}>
                             {getAvatarInitial(friend.user)}
@@ -526,8 +527,8 @@ export default function FriendChat({ session, friend, onBack, socket, authedFetc
 
                 <div className="fc-header-user">
                     <div className="fc-avatar">
-                        {friend.user.profilePictureUrl ? (
-                            <img src={friend.user.profilePictureUrl} alt={friend.user.name} />
+                        {getAvatarUrl(friend.user) ? (
+                            <img src={getAvatarUrl(friend.user)} alt={friend.user.name} />
                         ) : (
                             <span className="fc-avatar-fallback" style={getAvatarStyle(friend.user)}>
                                 {getAvatarInitial(friend.user)}

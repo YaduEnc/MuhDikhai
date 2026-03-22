@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { createDefaultAvatarDataUrl, normalizeUsernameInput } from '../utils/avatar'
+import { getDicebearAvatarUrl, normalizeUsernameInput } from '../utils/avatar'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
 
@@ -65,6 +65,21 @@ export default function Onboarding({ session, onComplete }) {
     const selectedGender = useMemo(() => GENDERS.find((gender) => gender.id === profile.gender), [profile.gender])
     const completion = `${Math.round((step / STEP_META.length) * 100)}%`
     const handlePreview = profile.username ? `@${profile.username}` : '@username'
+    const generatedDefaultAvatarUrl = useMemo(
+        () => getDicebearAvatarUrl(
+            {
+                id: session?.user?.id,
+                username: profile.username,
+                name: profile.name,
+                email: session?.user?.email,
+            },
+            {
+                size: 256,
+                backgroundColor: selectedAvatar.color,
+            }
+        ),
+        [session?.user?.id, session?.user?.email, profile.username, profile.name, selectedAvatar.color]
+    )
 
     useEffect(() => {
         if (step !== 1) return undefined
@@ -189,11 +204,7 @@ export default function Onboarding({ session, onComplete }) {
             const profilePictureUrl =
                 profile.avatar === 'custom' && profile.customAvatarUrl
                     ? profile.customAvatarUrl
-                    : createDefaultAvatarDataUrl({
-                        name: profile.name,
-                        username: profile.username,
-                        color: selectedAvatar.color,
-                    })
+                    : generatedDefaultAvatarUrl
 
             const payload = {
                 username: profile.username,
@@ -255,7 +266,7 @@ export default function Onboarding({ session, onComplete }) {
                                 {profile.avatar === 'custom' && profile.customAvatarUrl ? (
                                     <img src={profile.customAvatarUrl} alt="Selected avatar" className="avatar-upload-preview" />
                                 ) : (
-                                    <span>{selectedAvatar.icon}</span>
+                                    <img src={generatedDefaultAvatarUrl} alt="Default DiceBear avatar" className="avatar-upload-preview" />
                                 )}
                             </div>
 

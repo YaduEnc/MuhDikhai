@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useWebRTC } from '../hooks/useWebRTC'
 import { playIncomingDrop, playOutgoingTick } from '../utils/soundEngine'
 import { calculateAuraLevel } from '../utils/aura'
+import { getAvatarUrl } from '../utils/avatar'
 
 export default function CallOverlay({
     socket,
@@ -88,8 +89,8 @@ export default function CallOverlay({
                 {callState.status === 'incoming' && (
                     <div className="call-incoming-view">
                         <div className="call-partner-avatar large">
-                            {partner?.profilePictureUrl ? (
-                                <img src={partner.profilePictureUrl} alt={partner.name} />
+                            {getAvatarUrl(partner) ? (
+                                <img src={getAvatarUrl(partner)} alt={partner?.name} />
                             ) : (
                                 <span>{partner?.name?.[0]}</span>
                             )}
@@ -118,8 +119,8 @@ export default function CallOverlay({
                 {callState.status === 'requesting' && (
                     <div className="call-requesting-view">
                         <div className="call-partner-avatar large pulse">
-                            {partner?.profilePictureUrl ? (
-                                <img src={partner.profilePictureUrl} alt={partner.name} />
+                            {getAvatarUrl(partner) ? (
+                                <img src={getAvatarUrl(partner)} alt={partner?.name} />
                             ) : (
                                 <span>{partner?.name?.[0]}</span>
                             )}

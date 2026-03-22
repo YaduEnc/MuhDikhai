@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { playIncomingDrop, playOutgoingTick, playRadarPing } from '../utils/soundEngine'
 import { calculateAuraLevel } from '../utils/aura'
-import { getAvatarInitial, getAvatarStyle, getDisplayHandle } from '../utils/avatar'
+import { getAvatarInitial, getAvatarStyle, getAvatarUrl, getDisplayHandle } from '../utils/avatar'
 import DoodleBoard from './DoodleBoard'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -277,6 +277,13 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
     const [showMenu, setShowMenu] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
     const [editValue, setEditValue] = useState(msg.content)
+    const fromAvatarUrl = getAvatarUrl({
+        id: msg.fromUserId,
+        username: msg.fromUsername,
+        name: msg.fromName,
+        profilePictureUrl: msg.fromProfilePictureUrl
+    })
+    const selfAvatarUrl = getAvatarUrl(session?.user)
 
     const isImage = msg.type === 'image' || msg.content?.startsWith('__GIF__') || /^https?:\/\/.+\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i.test(msg.content) || msg.content?.includes('giphy.com')
     const isVideo = msg.type === 'video' || msg.content?.match(/\.(mp4|webm|mov)(\?.*)?$/i)
@@ -292,8 +299,8 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
         <li className={`msg-row${isSelf ? ' msg-row--self' : ''}`}>
             {!isSelf && (
                 <div className="msg-avatar clickable" onClick={() => onProfilePeek(msg.fromUserId)}>
-                    {msg.fromProfilePictureUrl ? (
-                        <img src={msg.fromProfilePictureUrl} alt="" />
+                    {fromAvatarUrl ? (
+                        <img src={fromAvatarUrl} alt="" />
                     ) : (
                         <span className="chat-avatar-fallback" style={getAvatarStyle({ name: msg.fromName, username: msg.fromUsername, id: msg.fromUserId })}>
                             {getAvatarInitial({ name: msg.fromName })}
@@ -361,8 +368,8 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
             </div>
             {isSelf && (
                 <div className="msg-avatar msg-avatar--self">
-                    {session?.user?.profilePictureUrl ? (
-                        <img src={session.user.profilePictureUrl} alt="You" />
+                    {selfAvatarUrl ? (
+                        <img src={selfAvatarUrl} alt="You" />
                     ) : (
                         <span className="chat-avatar-fallback" style={getAvatarStyle(session?.user)}>
                             {getAvatarInitial(session?.user)}
@@ -378,6 +385,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isSelf, session, onProf
 const ProfileModal = memo(function ProfileModal({ partnerId, session, onClose }) {
     const [profile, setProfile] = useState(null)
     const [loading, setLoading] = useState(true)
+    const profileAvatarUrl = getAvatarUrl(profile)
 
     useEffect(() => {
         const handleEsc = (event) => {
@@ -425,8 +433,8 @@ const ProfileModal = memo(function ProfileModal({ partnerId, session, onClose })
                 ) : profile ? (
                     <div className="profile-modal-content">
                         <div className="profile-modal-avatar">
-                            {profile.profilePictureUrl ? (
-                                <img src={profile.profilePictureUrl} alt={profile.name} />
+                            {profileAvatarUrl ? (
+                                <img src={profileAvatarUrl} alt={profile.name} />
                             ) : (
                                 <span className="chat-avatar-fallback" style={getAvatarStyle(profile)}>
                                     {getAvatarInitial(profile)}
@@ -747,8 +755,8 @@ export default function Chat({
             <div className="chat-header-v2">
                 <div className={`chat-header-left${isMatched ? ' clickable' : ''}`} onClick={() => isMatched && setShowProfile(room?.partner?.id)}>
                     <div className="chat-partner-avatar">
-                        {room?.partner?.profilePictureUrl ? (
-                            <img src={room.partner.profilePictureUrl} alt={room.partner.name} />
+                        {getAvatarUrl(room?.partner) ? (
+                            <img src={getAvatarUrl(room?.partner)} alt={room?.partner?.name} />
                         ) : (
                             <span className="chat-avatar-fallback" style={getAvatarStyle(room?.partner)}>
                                 {getAvatarInitial(room?.partner)}
@@ -851,8 +859,8 @@ export default function Chat({
                             <div className="radar-circle circle-2" />
                             <div className="radar-circle circle-3" />
                             <div className="radar-avatar">
-                                {session?.user?.profilePictureUrl ? (
-                                    <img src={session.user.profilePictureUrl} alt="You" />
+                                {getAvatarUrl(session?.user) ? (
+                                    <img src={getAvatarUrl(session?.user)} alt="You" />
                                 ) : (
                                     <span>{session?.user?.name?.[0]?.toUpperCase() || 'Y'}</span>
                                 )}

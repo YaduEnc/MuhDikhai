@@ -25,8 +25,41 @@ export function getDisplayHandle(user) {
   return `@${String(user.username).trim().toLowerCase()}`
 }
 
-export function getAvatarUrl(user) {
-  return user?.profilePictureUrl || user?.photoURL || null
+function normalizeColor(value = '') {
+  const normalized = String(value).trim().replace('#', '').toLowerCase()
+  return /^[0-9a-f]{6}$/.test(normalized) ? normalized : null
+}
+
+function resolveAvatarSeed(input) {
+  if (typeof input === 'string' && input.trim()) return input.trim()
+  if (!input || typeof input !== 'object') return 'guest'
+
+  return (
+    String(input.id || '').trim()
+    || String(input.username || '').trim()
+    || String(input.email || '').trim()
+    || String(input.name || '').trim()
+    || 'guest'
+  )
+}
+
+export function getDicebearAvatarUrl(input, options = {}) {
+  const params = new URLSearchParams()
+  params.set('seed', options.seed || resolveAvatarSeed(input))
+  params.set('size', String(options.size || 256))
+  params.set('radius', String(options.radius ?? 50))
+  params.set('backgroundType', options.backgroundType || 'gradientLinear')
+
+  const color = normalizeColor(options.backgroundColor)
+  if (color) {
+    params.set('backgroundColor', color)
+  }
+
+  return `https://api.dicebear.com/9.x/avataaars/svg?${params.toString()}`
+}
+
+export function getAvatarUrl(user, options = {}) {
+  return user?.profilePictureUrl || user?.photoURL || getDicebearAvatarUrl(user, options)
 }
 
 export function getAvatarInitial(user) {
@@ -45,34 +78,4 @@ export function getAvatarStyle(user) {
     background: `linear-gradient(145deg, hsl(${hueA} 72% 50%), hsl(${hueB} 68% 38%), hsl(${hueC} 82% 56%))`,
     color: 'rgba(255,255,255,0.98)',
   }
-}
-
-function escapeXml(value = '') {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
-}
-
-export function createDefaultAvatarDataUrl({ name, username, color = '#7c3aed' }) {
-  const initial = ((name || username || 'S').trim()[0] || 'S').toUpperCase()
-  const safeInitial = escapeXml(initial)
-  const safeColor = /^#[0-9a-f]{6}$/i.test(color) ? color : '#7c3aed'
-
-  const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="${safeColor}" />
-      <stop offset="100%" stop-color="#0b1220" />
-    </linearGradient>
-  </defs>
-  <rect width="256" height="256" fill="url(#bg)" rx="48" />
-  <circle cx="74" cy="68" r="52" fill="rgba(255,255,255,0.16)" />
-  <text x="128" y="148" text-anchor="middle" fill="#ffffff" font-family="Sora, Arial, sans-serif" font-size="112" font-weight="700">${safeInitial}</text>
-</svg>`
-
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
