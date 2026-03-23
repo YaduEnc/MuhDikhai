@@ -1,297 +1,295 @@
 .floating-bug-btn {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: rgba(15, 15, 20, 0.8);
-  border: 1px solid rgba(255, 0, 85, 0.4);
-  color: white;
-  font-size: 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+  right: 16px;
+  bottom: 16px;
   z-index: 9999;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 10px rgba(255, 0, 85, 0.2);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(10px);
+  min-width: 82px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(14, 18, 30, 0.95);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
 }
 
 .floating-bug-btn:hover {
-  transform: translateY(-5px) scale(1.05);
-  border-color: rgba(0, 255, 204, 0.8);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 255, 204, 0.4);
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(20, 24, 38, 0.98);
 }
 
 .bug-reporter-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(10px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  inset: 0;
   z-index: 10000;
-  animation: fadeIn 0.3s ease-out;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 7, 14, 0.78);
+  padding: 16px;
 }
 
 .bug-reporter-modal {
-  background: linear-gradient(145deg, rgba(20, 20, 25, 0.95), rgba(10, 10, 15, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
+  width: min(760px, 100%);
+  max-height: min(92vh, 820px);
+  overflow: auto;
   box-sizing: border-box;
-  overflow-y: auto;
-  padding: 2rem;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
-  animation: slideUp 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-  display: flex;
-  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #0d1220;
+  padding: 18px;
 }
 
 .bug-reporter-modal::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
-.bug-reporter-modal::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-  margin: 1rem 0;
-}
+
 .bug-reporter-modal::-webkit-scrollbar-thumb {
-  background: rgba(0, 255, 204, 0.3);
-  border-radius: 10px;
-}
-.bug-reporter-modal::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 255, 204, 0.5);
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
 }
 
 .modal-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding-bottom: 1rem;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .modal-header h2 {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 800;
-  background: linear-gradient(90deg, #fff, #00ffcc);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #f2f5ff;
 }
 
 .close-btn {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 2rem;
-  cursor: pointer;
-  transition: color 0.2s;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1.45rem;
   line-height: 1;
+  cursor: pointer;
 }
 
 .close-btn:hover {
-  color: #ff2d55;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .bug-form .form-group {
-  margin-bottom: 1.5rem;
-  display: flex;
-  flex-direction: column;
+  margin-bottom: 12px;
 }
 
 .bug-form label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 0.5rem;
+  display: block;
+  margin-bottom: 6px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .bug-form input,
 .bug-form textarea {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 1rem;
-  color: #fff;
-  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.02);
+  color: #f4f6ff;
   font-size: 0.95rem;
-  transition: border-color 0.2s;
+  font-family: inherit;
+  padding: 11px 12px;
+}
+
+.bug-form textarea {
+  min-height: 140px;
+  resize: vertical;
 }
 
 .bug-form input:focus,
 .bug-form textarea:focus {
   outline: none;
-  border-color: #00ffcc;
-  background: rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.34);
 }
 
 .screenshot-section {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 1rem;
-  margin-bottom: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 14px;
+  background: rgba(255, 255, 255, 0.01);
 }
 
 .screenshot-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .capture-btn {
-  background: rgba(0, 255, 204, 0.1);
-  color: #00ffcc;
-  border: 1px solid rgba(0, 255, 204, 0.3);
-  padding: 0.5rem 1rem;
+  height: 34px;
+  padding: 0 12px;
   border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
 }
 
 .capture-btn:hover:not(:disabled) {
-  background: rgba(0, 255, 204, 0.2);
-  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.capture-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .screenshot-preview {
   position: relative;
-  border-radius: 8px;
   overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .screenshot-preview img {
-  width: 100%;
-  height: auto;
-  max-height: 250px;
-  object-fit: contain;
-  background: rgba(0, 0, 0, 0.4);
   display: block;
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  background: #080d1b;
 }
 
 .remove-screenshot {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  background: rgba(255, 0, 85, 0.8);
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(8, 13, 27, 0.88);
+  color: #fff;
+  font-size: 1rem;
   cursor: pointer;
-  font-size: 1.2rem;
-  backdrop-filter: blur(4px);
 }
 
 .screenshot-placeholder {
+  padding: 22px 10px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.3);
-  padding: 2rem 0;
+  color: rgba(255, 255, 255, 0.52);
   font-size: 0.9rem;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
 }
 
 .status-message {
-  padding: 1rem;
+  margin-bottom: 12px;
+  padding: 10px 12px;
   border-radius: 8px;
-  margin-bottom: 1.5rem;
-  font-size: 0.9rem;
-  text-align: center;
+  font-size: 0.88rem;
+  border: 1px solid;
 }
 
 .status-message.success {
-  background: rgba(0, 255, 204, 0.1);
-  color: #00ffcc;
-  border: 1px solid rgba(0, 255, 204, 0.2);
+  color: #c3f8dd;
+  background: rgba(42, 133, 88, 0.24);
+  border-color: rgba(134, 234, 187, 0.32);
 }
 
 .status-message.error {
-  background: rgba(255, 0, 85, 0.1);
-  color: #ff2d55;
-  border: 1px solid rgba(255, 0, 85, 0.2);
+  color: #ffd4d4;
+  background: rgba(161, 44, 62, 0.24);
+  border-color: rgba(255, 146, 161, 0.32);
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 1rem;
+  gap: 10px;
 }
 
 .btn-cancel,
 .btn-submit {
-  padding: 0.8rem 1.5rem;
-  border-radius: 12px;
-  font-weight: 700;
-  font-size: 0.95rem;
+  height: 38px;
+  border-radius: 9px;
+  padding: 0 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
-  border: none;
-  transition: all 0.2s;
 }
 
 .btn-cancel {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .btn-cancel:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #fff;
 }
 
 .btn-submit {
-  background: linear-gradient(90deg, #ff0055, #00ffcc);
-  color: white;
-  box-shadow: 0 4px 15px rgba(0, 255, 204, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: #edf2ff;
+  color: #101426;
 }
 
 .btn-submit:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 255, 204, 0.4);
+  background: #ffffff;
 }
 
 .btn-submit:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
-  transform: none;
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(40px) scale(0.95); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @media (max-width: 768px) {
+  .floating-bug-btn {
+    right: 12px;
+    bottom: 12px;
+    min-width: 74px;
+    height: 34px;
+    font-size: 0.78rem;
+  }
+
+  .bug-reporter-overlay {
+    padding: 10px;
+  }
+
   .bug-reporter-modal {
-    padding: 1.5rem;
-    width: 95%;
-    max-height: 95vh;
+    width: 100%;
+    max-height: 94vh;
+    padding: 14px;
+    border-radius: 12px;
   }
-  .modal-header {
-    margin-bottom: 1rem;
-    padding-bottom: 0.8rem;
+
+  .modal-header h2 {
+    font-size: 1.2rem;
   }
-  .screenshot-section {
-    padding: 0.8rem;
-    margin-bottom: 1rem;
+
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .btn-cancel,
+  .btn-submit {
+    width: 100%;
   }
 }

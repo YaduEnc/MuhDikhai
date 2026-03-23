@@ -107,7 +107,7 @@ const BugReporter = () => {
         onClick={() => setIsOpen(true)}
         title="Report a Bug"
       >
-        🐛
+        Report
       </button>
     );
   }

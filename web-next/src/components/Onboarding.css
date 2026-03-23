@@ -3,15 +3,19 @@
     inset: 0;
     z-index: 9999;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    padding: 1.25rem;
+    padding:
+        max(0.9rem, env(safe-area-inset-top))
+        1.25rem
+        max(0.9rem, env(safe-area-inset-bottom));
     background:
         radial-gradient(circle at top left, rgba(255, 0, 85, 0.18), transparent 28%),
         radial-gradient(circle at 80% 18%, rgba(88, 210, 255, 0.14), transparent 24%),
         linear-gradient(180deg, rgba(4, 8, 20, 0.96), rgba(5, 8, 18, 0.98));
     backdrop-filter: blur(24px);
     overflow-y: auto;
+    overscroll-behavior-y: contain;
 }
 
 .onboarding-ambient-orb {
@@ -46,6 +50,8 @@
     grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.05fr);
     gap: 1rem;
     align-items: stretch;
+    margin: 0 auto;
+    max-height: calc(100dvh - 2rem);
 }
 
 .onboarding-preview-panel,
@@ -66,6 +72,8 @@
     flex-direction: column;
     gap: 1.35rem;
     padding: 1.6rem;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
 }
 
 .onboarding-preview-top {
@@ -293,7 +301,9 @@
 
 .onboarding-card {
     padding: 2rem;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
 }
 
 .onboarding-progress {
@@ -598,10 +608,16 @@
 @media (max-width: 920px) {
     .onboarding-shell {
         grid-template-columns: 1fr;
+        max-height: none;
     }
 
     .onboarding-preview-panel {
         order: 2;
+        overflow: visible;
+    }
+
+    .onboarding-card {
+        overflow: visible;
     }
 }
 

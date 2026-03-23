@@ -655,6 +655,16 @@ function SettingsView({ session, onBack, onSignOut, onDeleteRequest }) {
 
 const PREDEFINED_TOPICS = ['Deep talk', 'Music', 'Coding', 'Movies', 'Vent', 'Silence']
 
+function formatGenderLabel(gender) {
+    if (!gender) return 'Not specified'
+    return gender
+        .replace(/_/g, ' ')
+        .split(' ')
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ')
+}
+
 function FriendRequests({ requests, onRespond }) {
     if (!requests || requests.length === 0) {
         return <div className="friends-empty">No pending requests</div>
@@ -704,6 +714,97 @@ function FriendRequests({ requests, onRespond }) {
                     </div>
                 )
             })}
+        </div>
+    )
+}
+
+function ProfilePeekModal({ userId, session, onClose }) {
+    const [profile, setProfile] = useState(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState('')
+
+    useEffect(() => {
+        const handleEsc = (event) => {
+            if (event.key === 'Escape') onClose()
+        }
+        window.addEventListener('keydown', handleEsc)
+        return () => window.removeEventListener('keydown', handleEsc)
+    }, [onClose])
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                setLoading(true)
+                setError('')
+                const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
+                const res = await fetch(`${BACKEND_URL}/api/v1/users/${userId}`, {
+                    headers: { Authorization: `Bearer ${session.accessToken}` },
+                })
+                const json = await res.json()
+                if (json.success) {
+                    setProfile(json.data.user)
+                } else {
+                    setError(json.message || 'Could not load profile')
+                }
+            } catch (err) {
+                console.error('Failed to fetch profile', err)
+                setError('Could not load profile')
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchProfile()
+    }, [userId, session.accessToken])
+
+    const profileAvatarUrl = getAvatarUrl(profile)
+    const aura = calculateAuraLevel(profile?.auraPoints || 0)
+
+    return (
+        <div className="home-profile-modal-overlay" onClick={onClose}>
+            <div className="home-profile-modal-card" onClick={(event) => event.stopPropagation()}>
+                <button className="home-profile-modal-close" type="button" onClick={onClose} aria-label="Close profile">✕</button>
+                {loading ? (
+                    <div className="home-profile-modal-state">Loading profile...</div>
+                ) : error ? (
+                    <div className="home-profile-modal-state home-profile-modal-state--error">{error}</div>
+                ) : (
+                    <>
+                        <div className="home-profile-modal-head">
+                            <div className="home-profile-modal-avatar">
+                                {profileAvatarUrl ? (
+                                    <img src={profileAvatarUrl} alt={profile?.name || 'User avatar'} />
+                                ) : (
+                                    <span className="avatar-placeholder" style={getAvatarStyle(profile)}>
+                                        {getAvatarInitial(profile)}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="home-profile-modal-identity">
+                                <h3>{profile?.name || 'Unknown user'}</h3>
+                                <p>{profile?.username ? `@${profile.username}` : 'No username set'}</p>
+                            </div>
+                        </div>
+
+                        <div className="home-profile-modal-meta">
+                            <div className="home-profile-modal-meta-item">
+                                <span>Gender</span>
+                                <strong>{formatGenderLabel(profile?.gender)}</strong>
+                            </div>
+                            <div className="home-profile-modal-meta-item">
+                                <span>Aura</span>
+                                <strong style={{ color: aura.color }}>
+                                    {profile?.auraPoints || 0} • {aura.name}
+                                </strong>
+                            </div>
+                        </div>
+
+                        <div className="home-profile-modal-bio">
+                            <span>Bio</span>
+                            <p>{profile?.bio?.trim() || 'No bio added yet.'}</p>
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     )
 }
@@ -817,6 +918,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
     const [friendships, setFriendships] = useState([])
     const [friendRequests, setFriendRequests] = useState([])
     const [loadingHome, setLoadingHome] = useState(false)
+    const [selectedProfileId, setSelectedProfileId] = useState(null)
 
     const refreshHomeData = useCallback(async () => {
         setLoadingHome(true);
@@ -1099,11 +1201,20 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                                             const avatarStyle = getAvatarStyle(match.partner)
                                             const avatarInitial = getAvatarInitial(match.partner)
                                             const handle = getDisplayHandle(match.partner)
+                                            const canOpenProfile = Boolean(match.partner?.id)
                                             return (
                                                 <div
                                                     key={match.id}
-                                                    className="recent-match-card"
-                                                    style={{ '--aura-color': match.partner?.auraPoints !== undefined ? calculateAuraLevel(match.partner.auraPoints).color : 'var(--stroke)' }}
+                                                    className={`recent-match-card ${canOpenProfile ? 'recent-match-card--clickable' : ''}`}
+                                                    role={canOpenProfile ? 'button' : undefined}
+                                                    tabIndex={canOpenProfile ? 0 : undefined}
+                                                    onClick={canOpenProfile ? () => setSelectedProfileId(match.partner.id) : undefined}
+                                                    onKeyDown={canOpenProfile ? (event) => {
+                                                        if (event.key === 'Enter' || event.key === ' ') {
+                                                            event.preventDefault()
+                                                            setSelectedProfileId(match.partner.id)
+                                                        }
+                                                    } : undefined}
                                                 >
                                                     <div className="recent-avatar">
                                                         {avatarUrl ? (
@@ -1133,8 +1244,12 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                                                     </div>
                                                     <button
                                                         className="recent-add-btn"
+                                                        type="button"
                                                         title="Send Friend Request"
-                                                        onClick={() => handleRecentAddFriend(match.partner.id)}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation()
+                                                            handleRecentAddFriend(match.partner.id)
+                                                        }}
                                                     >
                                                         + Friend
                                                     </button>
@@ -1231,6 +1346,13 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
             <p className="home-hint">
                 Tap <strong>Start a gentle match</strong> when you&apos;re ready. You can leave any room with a single key — no pressure, no history.
             </p>
+            {selectedProfileId && (
+                <ProfilePeekModal
+                    userId={selectedProfileId}
+                    session={session}
+                    onClose={() => setSelectedProfileId(null)}
+                />
+            )}
         </div>
     )
 }

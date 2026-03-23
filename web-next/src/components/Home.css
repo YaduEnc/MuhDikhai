@@ -2022,37 +2022,42 @@
 }
 
 .recent-match-card {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--stroke);
-  border-radius: var(--radius-xl);
-  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 0.95rem 1rem;
   display: flex;
   align-items: center;
-  gap: 1.25rem;
-  transition: all 0.4s var(--ease-out);
+  gap: 0.85rem;
+  transition: background 160ms ease, border-color 160ms ease;
   position: relative;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .recent-match-card:hover {
-  transform: translateY(-5px) scale(1.02);
-  border-color: var(--aura-color);
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: 0 10px 40px -10px var(--aura-color);
-  z-index: 10;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .recent-match-card:hover .recent-avatar {
-  border-color: var(--aura-color);
-  box-shadow: 0 0 15px var(--aura-color);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: none;
+}
+
+.recent-match-card--clickable {
+  cursor: pointer;
+}
+
+.recent-match-card--clickable:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
 }
 
 .recent-avatar {
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  padding: 3px;
+  padding: 2px;
   background: var(--bg-deep);
   display: flex;
   align-items: center;
@@ -2095,7 +2100,7 @@
   font-family: 'Sora', sans-serif;
   font-weight: 700;
   color: #fff;
-  font-size: 1.1rem;
+  font-size: 1rem;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -2108,32 +2113,29 @@
 
 .recent-topic {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
 }
 
 .recent-add-btn {
-  padding: 0.6rem 1.2rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--stroke);
+  padding: 0.48rem 0.9rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #fff;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.75rem;
-  font-weight: 800;
+  font-size: 0.7rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s var(--ease-out);
+  transition: background 150ms ease, border-color 150ms ease;
   flex-shrink: 0;
 }
 
 .recent-add-btn:hover {
-  background: var(--neon-pink);
-  border-color: var(--neon-pink);
-  color: #000;
-  transform: scale(1.05);
-  box-shadow: 0 0 20px rgba(255, 0, 85, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 @media (max-width: 640px) {
@@ -2367,8 +2369,8 @@
 
 /* ── Unread Badge Styles ──────────────────────────────── */
 .recent-match-card.has-unread {
-  border-color: rgba(251, 191, 119, 0.25);
-  background: rgba(251, 191, 119, 0.04);
+  border-color: rgba(251, 191, 119, 0.35);
+  background: rgba(251, 191, 119, 0.06);
 }
 
 .recent-avatar {
@@ -2384,19 +2386,6 @@
   background: #f87171;
   border-radius: 50%;
   border: 2px solid rgba(7, 9, 26, 0.95);
-  animation: unread-pulse 2s infinite;
-}
-
-@keyframes unread-pulse {
-
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.5);
-  }
-
-  50% {
-    box-shadow: 0 0 0 5px rgba(248, 113, 113, 0);
-  }
 }
 
 .unread-badge {
@@ -2409,12 +2398,145 @@
   min-width: 18px;
   text-align: center;
   margin-right: 0.4rem;
-  animation: unread-pulse 2s infinite;
 }
 
 .recent-match-card.has-unread .recent-topic {
   color: #fbbf77;
   font-weight: 500;
+}
+
+/* ── Minimal Profile Modal ─────────────────────────────── */
+.home-profile-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(6, 8, 20, 0.76);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.home-profile-modal-card {
+  width: min(440px, 100%);
+  background: #0f1426;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 1rem;
+  position: relative;
+}
+
+.home-profile-modal-close {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  cursor: pointer;
+}
+
+.home-profile-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding-right: 2rem;
+}
+
+.home-profile-modal-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  flex-shrink: 0;
+}
+
+.home-profile-modal-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.home-profile-modal-identity h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.home-profile-modal-identity p {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.66);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.home-profile-modal-meta {
+  margin-top: 0.95rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.home-profile-modal-meta-item {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.home-profile-modal-meta-item span {
+  display: block;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.home-profile-modal-meta-item strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.86rem;
+  color: #fff;
+}
+
+.home-profile-modal-bio {
+  margin-top: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.home-profile-modal-bio span {
+  display: block;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.home-profile-modal-bio p {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.home-profile-modal-state {
+  padding: 1.2rem 0.2rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.9rem;
+}
+
+.home-profile-modal-state--error {
+  color: #fca5a5;
 }
 
 /* ── Aura Effects ───────────────────────────────────────── */
