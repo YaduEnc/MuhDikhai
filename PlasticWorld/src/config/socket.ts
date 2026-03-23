@@ -278,6 +278,36 @@ async function cleanupRandomRoomState(pub: any, roomId: string, primaryUserId: s
   };
 }
 
+async function resolveOtherUserIdForRoom(
+  pub: any,
+  io: SocketIOServer,
+  roomId: string,
+  currentUserId: string
+): Promise<string | undefined> {
+  try {
+    const roomRaw = await pub.hget('random:rooms', roomId);
+    if (roomRaw) {
+      const parsed = JSON.parse(roomRaw) as { users?: string[] };
+      if (Array.isArray(parsed.users)) {
+        const otherUserId = parsed.users.find((id) => id !== currentUserId);
+        if (otherUserId) return otherUserId;
+      }
+    }
+  } catch {
+    // fall through to socket-room lookup
+  }
+
+  const socketsInRoom = await io.in(roomId).fetchSockets();
+  for (const s of socketsInRoom) {
+    const roomUserId = (s.data as { userId?: string } | undefined)?.userId;
+    if (roomUserId && roomUserId !== currentUserId) {
+      return roomUserId;
+    }
+  }
+
+  return undefined;
+}
+
 // ─── Atomic Lua Script for Match-or-Enqueue ─────────────────────────
 // This script atomically: checks inverse queues for a valid partner,
 // validates heartbeat, acquires lock, and either matches or enqueues.
@@ -814,6 +844,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     }
 
     const { userId, name } = socket.user;
+    socket.data.userId = userId;
 
     logger.info('Socket connected', { userId, socketId: socket.id });
 
@@ -1236,13 +1267,14 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           return;
         }
 
-        const roomStr = await pub.hget('random:rooms', roomId);
-        let otherUserId: string | undefined;
-        if (roomStr) {
-          const room = JSON.parse(roomStr);
-          otherUserId = room.users.find((id: string) => id !== userId);
-
-          io.to(roomId).emit('random:left', { roomId, userId });
+        const otherUserId = await resolveOtherUserIdForRoom(pub, io, roomId, userId);
+        io.to(roomId).emit('random:left', { roomId, userId, reason: 'leave' });
+        if (otherUserId) {
+          io.to(`user:${otherUserId}`).emit('random:ended', {
+            roomId,
+            reason: 'partner_left',
+            userId,
+          });
         }
 
         const cleanup = await cleanupRandomRoomState(pub, roomId, userId, otherUserId);
@@ -1699,6 +1731,13 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         const userSockets = activeUsers.get(userId);
         if (userSockets) {
           userSockets.delete(socket.id);
+          // Best effort stale-socket sweep. If a socket id no longer exists in
+          // the adapter map, drop it so cleanup can run reliably.
+          for (const trackedSocketId of [...userSockets]) {
+            if (!io.sockets.sockets.has(trackedSocketId)) {
+              userSockets.delete(trackedSocketId);
+            }
+          }
           if (userSockets.size === 0) {
             activeUsers.delete(userId);
             // Last socket closed - mark globally offline
@@ -1729,15 +1768,16 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
                 // Clean up random room
                 const roomId = await pub.hget('random:user_rooms', userId);
                 if (roomId) {
-                  const roomStr = await pub.hget('random:rooms', roomId);
-                  let otherUserId: string | undefined;
-                  if (roomStr) {
-                    const room = JSON.parse(roomStr);
-                    otherUserId = room.users.find((id: string) => id !== userId);
-
-                    // Notify the room that somebody left/disconnected
-                    io.to(roomId).emit('random:left', {
+                  const otherUserId = await resolveOtherUserIdForRoom(pub, io, roomId, userId);
+                  io.to(roomId).emit('random:left', {
+                    roomId,
+                    userId,
+                    reason: 'disconnect',
+                  });
+                  if (otherUserId) {
+                    io.to(`user:${otherUserId}`).emit('random:ended', {
                       roomId,
+                      reason: 'partner_disconnected',
                       userId,
                     });
                   }
