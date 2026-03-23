@@ -338,14 +338,4 @@ The software and its associated documentation files are proprietary. Unauthorize
   <i>Stay Safe. Stay Loud. Stay Pure.</i><br>
   Built with ❤️ in India.
 </p>
-That's the **iframe embed code** from star-history.com. However, **iframes don't work in GitHub READMEs** — GitHub strips them for security reasons.
 
-Use the **Markdown image link** version instead:
-
-```markdown
-## ⭐ Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=YaduEnc/MuhDikhai&type=date)](https://star-history.com/#YaduEnc/MuhDikhai&date)
-```
-
-Just paste this into your `README.md` and it will render as a live, auto-updating star graph. ✅
