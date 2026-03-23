@@ -338,3 +338,4 @@ The software and its associated documentation files are proprietary. Unauthorize
   <i>Stay Safe. Stay Loud. Stay Pure.</i><br>
   Built with ❤️ in India.
 </p>
+<iframe style="width:100%;height:auto;min-width:600px;min-height:400px;" src="https://www.star-history.com/?repos=YaduEnc%2FMuhDikhai.git&type=date&legend=top-left" frameBorder="0"></iframe>
