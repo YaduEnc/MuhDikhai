@@ -1,31 +1,3 @@
-<h1 align="center">MUHDIKHAI</h1>
-<p align="center">
-  <strong>Real People. Pure Chaos. Total Privacy.</strong><br>
-  <i>A premium, Indian-Maximalist random chat experience built for the bold.</i>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Security-E2EE-ff0055?style=for-the-badge" alt="Security E2EE">
-  <img src="https://img.shields.io/badge/Tech-Node.js-green?style=for-the-badge" alt="Tech Node">
-  <img src="https://img.shields.io/badge/Real--time-Socket.io-blue?style=for-the-badge" alt="Real-time Sockets">
-  <img src="https://img.shields.io/badge/UI-Vibrant%20Chaos-orange?style=for-the-badge" alt="UI Chaos">
-</p>
-
----
-
-## 🎭 The Philosophy: "Gayi Bhains Paani Mein"
-Muhdikhai (unveiling) is designed with the philosophy that once a conversation is over, it should be truly *gone*. No long-term logs for strangers, no snooping, just raw interaction. We combine the thrill of random encounters with the security of high-end encryption.
-
-### 🌟 Core Highlights
-- **💨 Ephemeral Random Chat:** Zero storage for stranger interactions. Shredded on room exit.
-- **🔐 Friend Crypt:** End-to-End Encrypted (E2EE) messaging for your close circle.
-- **✨ Vanish Mode:** Messages that self-destruct in 10 seconds.
-- **🧿 Aura System:** Community-driven reputation (Vibe Checks) to isolate toxicity.
-- **🎥 WebRTC Video:** Crystal clear P2P video calls without server-side recording.
-- **🎨 Scratch Pad:** Collaborative doodle boards to let the chaos flow.
-
----
-
 # <p align="center"> <img src="./documentation/header.png" alt="Muhdikhai Header" width="800"> </p>
 
 <h1 align="center">MUHDIKHAI</h1>
