@@ -8,6 +8,7 @@ import sessionService from '../services/session.service';
 import userService from '../services/user.service';
 import messageService from '../services/message.service';
 import matchService from '../services/match.service';
+import haveliService from '../services/haveli.service';
 import logger from '../utils/logger';
 import { createAdapter } from '@socket.io/redis-adapter';
 import redisClient from './redis';
@@ -1826,7 +1827,220 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         });
       }
     });
+
+    // ─── HAVELI (Group Rooms) Events ──────────────────────────────────
+
+    /**
+     * Haveli: Join a room and start receiving messages
+     */
+    socket.on('haveli:join', async (data: { haveliId: string }) => {
+      try {
+        if (!data?.haveliId) return;
+        const membership = await haveliService.isMember(data.haveliId, userId);
+        if (!membership.isMember) {
+          socket.emit('haveli:error', { error: 'You are not a member of this Haveli' });
+          return;
+        }
+
+        socket.join(`haveli:${data.haveliId}`);
+        socket.data.currentHaveliId = data.haveliId;
+
+        // Notify others in the room
+        socket.to(`haveli:${data.haveliId}`).emit('haveli:member:online', {
+          haveliId: data.haveliId,
+          userId,
+          name: socket.user?.name,
+          profilePictureUrl: socket.user?.profilePictureUrl,
+        });
+
+        logger.info('User joined Haveli room', { userId, haveliId: data.haveliId });
+      } catch (error) {
+        logger.error('haveli:join error', { error, userId, haveliId: data?.haveliId });
+      }
+    });
+
+    /**
+     * Haveli: Leave a room
+     */
+    socket.on('haveli:leave', async (data: { haveliId: string }) => {
+      try {
+        if (!data?.haveliId) return;
+        socket.leave(`haveli:${data.haveliId}`);
+        if (socket.data.currentHaveliId === data.haveliId) {
+          socket.data.currentHaveliId = undefined;
+        }
+
+        socket.to(`haveli:${data.haveliId}`).emit('haveli:member:offline', {
+          haveliId: data.haveliId,
+          userId,
+        });
+      } catch (error) {
+        logger.error('haveli:leave error', { error, userId });
+      }
+    });
+
+    /**
+     * Haveli: Send a message
+     */
+    socket.on('haveli:message', async (data: { haveliId: string; content: string }) => {
+      try {
+        if (!data?.haveliId || !data?.content) return;
+
+        const trimmed = data.content.trim();
+        if (!trimmed || trimmed.length > 2000) return;
+
+        const membership = await haveliService.isMember(data.haveliId, userId);
+        if (!membership.isMember) return;
+
+        // Detect message type
+        let messageType = 'text';
+        if ((trimmed.startsWith('http') && trimmed.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i)) || trimmed.includes('giphy.com')) {
+          messageType = 'image';
+        }
+
+        // Store in DB
+        const stored = await haveliService.storeMessage(data.haveliId, userId, trimmed, messageType);
+
+        // Broadcast to room
+        io.to(`haveli:${data.haveliId}`).emit('haveli:message', {
+          id: stored.id,
+          haveliId: data.haveliId,
+          senderId: userId,
+          content: trimmed,
+          messageType,
+          isSystem: false,
+          createdAt: stored.createdAt,
+          sender: {
+            id: userId,
+            name: socket.user?.name,
+            username: socket.user?.username,
+            profilePictureUrl: socket.user?.profilePictureUrl,
+          },
+        });
+      } catch (error) {
+        logger.error('haveli:message error', { error, userId, haveliId: data?.haveliId });
+      }
+    });
+
+    /**
+     * Haveli: Typing indicator
+     */
+    socket.on('haveli:typing:start', (data: { haveliId: string }) => {
+      if (!data?.haveliId) return;
+      socket.to(`haveli:${data.haveliId}`).emit('haveli:typing:start', {
+        haveliId: data.haveliId,
+        userId,
+        name: socket.user?.name,
+      });
+    });
+
+    socket.on('haveli:typing:stop', (data: { haveliId: string }) => {
+      if (!data?.haveliId) return;
+      socket.to(`haveli:${data.haveliId}`).emit('haveli:typing:stop', {
+        haveliId: data.haveliId,
+        userId,
+      });
+    });
+
+    /**
+     * Haveli: Admin kick member
+     */
+    socket.on('haveli:kick', async (data: { haveliId: string; targetUserId: string }) => {
+      try {
+        if (!data?.haveliId || !data?.targetUserId) return;
+
+        const result = await haveliService.kickMember(data.haveliId, userId, data.targetUserId);
+        if (!result.success) {
+          socket.emit('haveli:error', { error: result.error });
+          return;
+        }
+
+        // Notify kicked user
+        io.to(`user:${data.targetUserId}`).emit('haveli:kicked', {
+          haveliId: data.haveliId,
+        });
+
+        // Remove from socket room
+        io.in(`user:${data.targetUserId}`).socketsLeave(`haveli:${data.haveliId}`);
+
+        // System message
+        const targetUser = await userService.getUserById(data.targetUserId);
+        await haveliService.addSystemMessage(data.haveliId, `${targetUser?.name || 'A user'} was removed from the Haveli.`);
+
+        // Notify room
+        io.to(`haveli:${data.haveliId}`).emit('haveli:member:kicked', {
+          haveliId: data.haveliId,
+          targetUserId: data.targetUserId,
+          kickedByName: socket.user?.name,
+        });
+      } catch (error) {
+        logger.error('haveli:kick error', { error, userId });
+      }
+    });
+
+    /**
+     * Haveli: Admin update settings (theme, privacy, lock, name, etc.)
+     */
+    socket.on('haveli:settings:update', async (data: {
+      haveliId: string;
+      updates: { name?: string; description?: string; themeId?: string; privacyType?: 'public' | 'invite'; isLocked?: boolean; pinnedMessage?: string | null };
+    }) => {
+      try {
+        if (!data?.haveliId || !data?.updates) return;
+
+        const result = await haveliService.updateHaveli(data.haveliId, userId, data.updates);
+        if (!result.success) {
+          socket.emit('haveli:error', { error: result.error });
+          return;
+        }
+
+        // Broadcast updated settings to everyone in room
+        io.to(`haveli:${data.haveliId}`).emit('haveli:settings:updated', {
+          haveliId: data.haveliId,
+          haveli: result.haveli,
+        });
+
+        // System messages for noteworthy changes
+        if (data.updates.themeId) {
+          await haveliService.addSystemMessage(data.haveliId, `${socket.user?.name} changed the room theme.`);
+        }
+        if (data.updates.isLocked !== undefined) {
+          await haveliService.addSystemMessage(
+            data.haveliId,
+            data.updates.isLocked ? '🔒 Room locked — no new members can join.' : '🔓 Room unlocked — new members can join.'
+          );
+        }
+      } catch (error) {
+        logger.error('haveli:settings:update error', { error, userId });
+      }
+    });
+
+    /**
+     * Haveli: Admin delete room
+     */
+    socket.on('haveli:delete', async (data: { haveliId: string }) => {
+      try {
+        if (!data?.haveliId) return;
+
+        const result = await haveliService.deleteHaveli(data.haveliId, userId);
+        if (!result.success) {
+          socket.emit('haveli:error', { error: result.error });
+          return;
+        }
+
+        // Notify everyone in the room
+        io.to(`haveli:${data.haveliId}`).emit('haveli:deleted', {
+          haveliId: data.haveliId,
+        });
+
+        // Force everyone to leave the socket room
+        io.in(`haveli:${data.haveliId}`).socketsLeave(`haveli:${data.haveliId}`);
+      } catch (error) {
+        logger.error('haveli:delete error', { error, userId });
+      }
+    });
   });
+
 
   return io;
 }

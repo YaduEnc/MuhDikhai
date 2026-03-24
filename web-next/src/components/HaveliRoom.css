@@ -1,0 +1,612 @@
+/* ═══════════════════════════════════════════════════════════════════
+   HAVELI ROOM — Premium Group Chat Interface
+   ═══════════════════════════════════════════════════════════════════ */
+
+.haveli-room {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+  background: #060609;
+  animation: haveliRoomIn 0.35s ease-out;
+}
+
+@keyframes haveliRoomIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.haveli-room-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--theme-color, #0f0c29) 0%, #060609 60%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.haveli-room-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 10%, var(--theme-accent, rgba(139,92,246,0.1)) 0%, transparent 65%);
+}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+.haveli-room-header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.8rem 1rem;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.haveli-room-back {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 0.3rem;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.haveli-room-back:hover { background: rgba(255,255,255,0.08); }
+
+.haveli-room-header-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 10px;
+  transition: background 0.2s;
+  min-width: 0;
+}
+
+.haveli-room-header-info:hover { background: rgba(255,255,255,0.04); }
+
+.haveli-room-header-emoji { font-size: 1.4rem; flex-shrink: 0; }
+
+.haveli-room-header-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.haveli-lock-badge { font-size: 0.75rem; }
+
+.haveli-room-header-meta {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.4);
+  display: block;
+}
+
+.haveli-room-header-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.haveli-room-action-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: #fff;
+  font-size: 1rem;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.haveli-room-action-btn:hover { background: rgba(255,255,255,0.1); }
+.haveli-room-action-btn.active { background: rgba(139,92,246,0.2); border-color: rgba(139,92,246,0.3); }
+
+/* ── Pinned ──────────────────────────────────────────────────────── */
+.haveli-pinned {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(139,92,246,0.08);
+  border-bottom: 1px solid rgba(139,92,246,0.15);
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.7);
+}
+
+.haveli-pinned-icon { flex-shrink: 0; }
+.haveli-pinned-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Messages ────────────────────────────────────────────────────── */
+.haveli-room-messages {
+  position: relative;
+  z-index: 5;
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  scroll-behavior: smooth;
+}
+
+.haveli-room-messages::-webkit-scrollbar { width: 4px; }
+.haveli-room-messages::-webkit-scrollbar-track { background: transparent; }
+.haveli-room-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+.haveli-room-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.3);
+  font-size: 0.88rem;
+  gap: 0.5rem;
+}
+
+.haveli-room-empty span { font-size: 2.5rem; }
+
+/* ── Message Rows ────────────────────────────────────────────────── */
+.haveli-msg {
+  display: flex;
+  gap: 0.6rem;
+  max-width: 80%;
+  animation: haveliMsgIn 0.15s ease-out;
+}
+
+@keyframes haveliMsgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.haveli-msg--mine {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.haveli-msg--head { margin-top: 0.6rem; }
+
+.haveli-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.haveli-msg-avatar img,
+.haveli-msg-avatar span {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  border-radius: 50%;
+}
+
+.haveli-msg:not(.haveli-msg--head) { padding-left: 40px; }
+.haveli-msg--mine:not(.haveli-msg--head) { padding-right: 0; padding-left: 0; }
+
+.haveli-msg-body { min-width: 0; }
+
+.haveli-msg-sender {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.15rem;
+}
+
+.haveli-msg-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--theme-accent, #c4b5fd);
+}
+
+.haveli-msg-aura { font-size: 0.65rem; }
+
+.haveli-msg-content {
+  background: rgba(255,255,255,0.06);
+  padding: 0.5rem 0.8rem;
+  border-radius: 14px 14px 14px 4px;
+  position: relative;
+}
+
+.haveli-msg--mine .haveli-msg-content {
+  background: var(--theme-accent, rgba(139,92,246,0.25));
+  border-radius: 14px 14px 4px 14px;
+}
+
+.haveli-msg-content p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #fff;
+  line-height: 1.45;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.haveli-msg-image {
+  max-width: 240px;
+  max-height: 200px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.haveli-msg-time {
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.25);
+  display: block;
+  margin-top: 0.2rem;
+  text-align: right;
+}
+
+/* ── System Message ──────────────────────────────────────────────── */
+.haveli-msg-system {
+  text-align: center;
+  padding: 0.4rem 0;
+  margin: 0.4rem 0;
+}
+
+.haveli-msg-system span {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.03);
+  padding: 0.25rem 0.8rem;
+  border-radius: 20px;
+}
+
+/* ── Typing Bar ──────────────────────────────────────────────────── */
+.haveli-typing-bar {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 1rem;
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.4);
+}
+
+.haveli-typing-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.haveli-typing-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--theme-accent, #8b5cf6);
+  animation: typingBounce 1.2s infinite;
+}
+
+.haveli-typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+.haveli-typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-4px); }
+}
+
+/* ── Input Bar ────────────────────────────────────────────────────── */
+.haveli-room-input-bar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.haveli-room-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 0.6rem 1rem;
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
+  resize: none;
+  max-height: 120px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.haveli-room-input:focus { border-color: var(--theme-accent, rgba(139,92,246,0.4)); }
+
+.haveli-room-input::placeholder { color: rgba(255,255,255,0.25); }
+
+.haveli-send-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--theme-accent, #8b5cf6);
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.haveli-send-btn:hover:not(:disabled) { opacity: 0.85; transform: scale(1.05); }
+.haveli-send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Sidebar ──────────────────────────────────────────────────────── */
+.haveli-sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 20;
+  width: 300px;
+  max-width: 85vw;
+  height: 100%;
+  background: rgba(14,14,22,0.97);
+  border-left: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  animation: haveliSlideIn 0.25s ease-out;
+}
+
+@keyframes haveliSlideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+.haveli-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.haveli-sidebar-header h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.haveli-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+/* ── Member Row ───────────────────────────────────────────────────── */
+.haveli-member-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.5rem;
+  border-radius: 10px;
+  transition: background 0.15s;
+}
+
+.haveli-member-row:hover { background: rgba(255,255,255,0.04); }
+
+.haveli-member-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.haveli-member-avatar.online::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  background: #22c55e;
+  border-radius: 50%;
+  border: 2px solid #0e0e16;
+}
+
+.haveli-member-avatar img,
+.haveli-member-avatar span {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  border-radius: 50%;
+}
+
+.haveli-member-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.haveli-member-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #fff;
+}
+
+.haveli-admin-badge {
+  font-size: 0.6rem;
+  background: rgba(139,92,246,0.2);
+  color: #c4b5fd;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.haveli-member-aura {
+  font-size: 0.68rem;
+  display: block;
+}
+
+.haveli-kick-btn {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.15);
+  color: #ef4444;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.haveli-kick-btn:hover { background: rgba(239,68,68,0.2); }
+
+/* ── Settings Panel ────────────────────────────────────────────────── */
+.haveli-settings-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.haveli-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.haveli-settings-header h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.haveli-settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.haveli-settings-info-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.haveli-settings-info-row span { font-size: 0.75rem; color: rgba(255,255,255,0.4); min-width: 70px; }
+.haveli-settings-info-row strong { font-size: 0.85rem; color: #fff; flex: 1; }
+
+.haveli-code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  letter-spacing: 0.1em;
+  background: rgba(255,255,255,0.06);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+}
+
+.haveli-copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
+  font-size: 0.85rem;
+  transition: transform 0.15s;
+}
+
+.haveli-copy-btn:hover { transform: scale(1.15); }
+
+.haveli-danger-zone {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(239,68,68,0.1);
+}
+
+.haveli-delete-confirm {
+  text-align: center;
+}
+
+.haveli-delete-confirm p {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.5);
+  margin: 0 0 0.6rem;
+}
+
+.haveli-delete-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.haveli-delete-actions button { flex: 1; }
+
+/* ── Overlay Message (Kicked/Deleted) ────────────────────────────── */
+.haveli-overlay-msg {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  text-align: center;
+  padding: 2rem;
+  animation: haveliOverlayIn 0.3s ease;
+}
+
+.haveli-overlay-icon { font-size: 3.5rem; margin-bottom: 1rem; }
+.haveli-overlay-msg h2 { font-size: 1.3rem; font-weight: 600; color: #fff; margin: 0 0 0.5rem; }
+.haveli-overlay-msg p { font-size: 0.88rem; color: rgba(255,255,255,0.5); margin: 0 0 1.5rem; }
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .haveli-msg { max-width: 90%; }
+  .haveli-sidebar { width: 100%; max-width: 100%; }
+  .haveli-room-header-meta { display: none; }
+}

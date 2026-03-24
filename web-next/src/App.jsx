@@ -9,6 +9,8 @@ import AdminDashboard from './admin/AdminDashboard'
 import FriendChat from './components/FriendChat'
 import CallOverlay from './components/CallOverlay'
 import VibeCheckModal from './components/VibeCheckModal'
+import HaveliBazaar from './components/HaveliBazaar'
+import HaveliRoom from './components/HaveliRoom'
 import LegalPages from './components/LegalPages'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
 import BugReporter from './components/BugReporter'
@@ -120,6 +122,7 @@ function App({ routeMode = 'app' }) {
   })
 
   const [legalView, setLegalView] = useState(null) // null | 'privacy' | 'terms' | 'safety'
+  const [activeHaveli, setActiveHaveli] = useState(null) // Active Haveli room object
 
   const socketRef = useRef(null)
   const sessionRef = useRef(session)
@@ -873,7 +876,7 @@ function App({ routeMode = 'app' }) {
   }
 
   const isSignedIn = Boolean(session?.user)
-  const isAnyChat = Boolean(showChat || socketState.phase === 'friend-chat')
+  const isAnyChat = Boolean(showChat || socketState.phase === 'friend-chat' || activeHaveli)
   const isHome = Boolean(isSignedIn && !isAnyChat && session.user.gender)
   const isInChat = Boolean(showChat && isSignedIn && session.user.gender)
   const needsOnboarding = Boolean(isSignedIn && !session.user.gender)
@@ -890,7 +893,7 @@ function App({ routeMode = 'app' }) {
             </div>
             <div className="nav-title">
               <span className="brand-word">Muhdikhai</span>
-              <span className="brand-sub">
+              <span className="brand-sub" suppressHydrationWarning>
                 {socketState.phase === 'friend-chat' ? 'Friend Room' : isInChat ? 'Inside the madness' : isHome ? 'Vibe Check' : 'Real people. Pure chaos.'}
               </span>
             </div>
@@ -937,6 +940,17 @@ function App({ routeMode = 'app' }) {
             onRespondToFriendRequest={handleRespondToFriendRequest}
             onOpenChat={handleOpenFriendChat}
             unreadCounts={unreadCounts}
+            authedFetch={authedFetch}
+            onOpenHaveli={(haveli) => { setActiveHaveli(haveli); setSocketPhase('haveli-room'); }}
+          />
+        )}
+        {socketState.phase === 'haveli-room' && activeHaveli && (
+          <HaveliRoom
+            haveli={activeHaveli}
+            session={session}
+            socket={socketRef.current}
+            authedFetch={authedFetch}
+            onBack={() => { setActiveHaveli(null); setSocketPhase('idle'); }}
           />
         )}
         {needsOnboarding && (

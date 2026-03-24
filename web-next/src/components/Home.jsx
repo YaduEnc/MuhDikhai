@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getSoundEnabled, toggleSound, initAudio } from '../utils/soundEngine'
 import { calculateAuraLevel } from '../utils/aura'
+import HaveliBazaar from './HaveliBazaar'
 import {
     getAvatarUrl,
     getAvatarInitial,
@@ -901,7 +902,7 @@ function HomeTabSkeleton({ variant = 'matches', count = 4 }) {
     )
 }
 
-export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts }) {
+export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts, onOpenHaveli, authedFetch }) {
 
     const [selectedTopics, setSelectedTopics] = useState([])
     const [customTopic, setCustomTopic] = useState('')
@@ -911,7 +912,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
 
 
 
-    const [view, setView] = useState('home') // 'home' | 'profile' | 'settings'
+    const [view, setView] = useState('home') // 'home' | 'profile' | 'settings' | 'haveli'
     const [homeTab, setHomeTab] = useState('matches') // 'matches' | 'friends' | 'requests'
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [recentMatches, setRecentMatches] = useState([])
@@ -1038,6 +1039,19 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                     />
                 )}
             </>
+        )
+    }
+
+    if (view === 'haveli') {
+        return (
+            <HaveliBazaar
+                session={session}
+                authedFetch={authedFetch}
+                onEnterHaveli={(haveli) => {
+                    if (onOpenHaveli) onOpenHaveli(haveli)
+                }}
+                onBack={() => setView('home')}
+            />
         )
     }
 
@@ -1305,6 +1319,19 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                 </button>
 
 
+
+                {/* Haveli — Group Rooms */}
+                <button className="home-card" type="button" onClick={() => setView('haveli')}>
+                    <div className="home-card-icon-wrap" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(109,40,217,0.1))' }}>
+                        <span className="home-card-icon-glyph" style={{ fontSize: '1.4rem' }}>🏛️</span>
+                    </div>
+                    <div className="home-card-body">
+                        <span className="home-card-label">Group Rooms</span>
+                        <span className="home-card-title">The Haveli</span>
+                        <span className="home-card-sub">Create rooms, invite friends, vibe together</span>
+                    </div>
+                    <span className="home-card-arrow">→</span>
+                </button>
 
                 {/* Settings */}
                 <button className="home-card" type="button" onClick={() => setView('settings')}>

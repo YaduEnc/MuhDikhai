@@ -1,0 +1,561 @@
+/* ═══════════════════════════════════════════════════════════════════
+   HAVELI BAZAAR — Premium Glassmorphism Discovery Page
+   ═══════════════════════════════════════════════════════════════════ */
+
+.haveli-bazaar {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  animation: haveliSlideUp 0.4s ease-out;
+}
+
+@keyframes haveliSlideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+.haveli-bazaar-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.haveli-bazaar-header .back-btn {
+  flex-shrink: 0;
+}
+
+.haveli-bazaar-title {
+  flex: 1;
+  min-width: 180px;
+}
+
+.haveli-bazaar-title h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.haveli-bazaar-title p {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.5);
+  margin: 0.2rem 0 0;
+}
+
+.haveli-bazaar-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────── */
+.haveli-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding-bottom: 0.5rem;
+}
+
+.haveli-tab {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.45);
+  font-size: 0.88rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.haveli-tab:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.04); }
+.haveli-tab.active { color: #fff; background: rgba(255,255,255,0.08); }
+
+.haveli-tab-count {
+  background: rgba(139,92,246,0.3);
+  color: #c4b5fd;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* ── Grid ─────────────────────────────────────────────────────────── */
+.haveli-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+/* ── Card ─────────────────────────────────────────────────────────── */
+.haveli-card {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(12px);
+  transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+}
+
+.haveli-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  border-color: var(--theme-accent, rgba(139,92,246,0.3));
+}
+
+.haveli-card-top {
+  position: relative;
+  padding: 1.2rem;
+  min-height: 100px;
+}
+
+.haveli-card-theme-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--theme-color, #0f0c29) 0%, transparent 80%);
+  opacity: 0.6;
+  z-index: 0;
+}
+
+.haveli-card-info {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.haveli-card-emoji {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));
+}
+
+.haveli-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.haveli-card-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.haveli-card-locked { font-size: 0.85rem; }
+
+.haveli-card-desc {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.5);
+  margin: 0.3rem 0 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.haveli-card-bottom {
+  padding: 0.8rem 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.15);
+}
+
+.haveli-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.haveli-card-creator {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  color: rgba(255,255,255,0.45);
+}
+
+.haveli-card-creator-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.haveli-card-creator-avatar img,
+.haveli-card-creator-avatar span {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.haveli-card-members {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.76rem;
+  color: rgba(255,255,255,0.45);
+}
+
+.haveli-card-btn {
+  padding: 0.4rem 1rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.haveli-card-btn--enter {
+  background: var(--theme-accent, #8b5cf6);
+  color: #fff;
+}
+
+.haveli-card-btn--enter:hover { opacity: 0.85; transform: scale(1.03); }
+
+.haveli-card-btn--join {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.haveli-card-btn--join:hover { background: rgba(255,255,255,0.14); }
+
+.haveli-card-btn--locked {
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.3);
+  cursor: not-allowed;
+}
+
+/* ── Empty ────────────────────────────────────────────────────────── */
+.haveli-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem 1rem;
+  color: rgba(255,255,255,0.5);
+}
+
+.haveli-empty-icon { font-size: 3rem; display: block; margin-bottom: 1rem; }
+.haveli-empty h3 { color: #fff; margin: 0 0 0.5rem; }
+.haveli-empty p { margin: 0 0 1.2rem; font-size: 0.88rem; }
+
+/* ── Loading ──────────────────────────────────────────────────────── */
+.haveli-loading {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem;
+  color: rgba(255,255,255,0.5);
+}
+
+.haveli-loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-top-color: #8b5cf6;
+  border-radius: 50%;
+  margin: 0 auto 1rem;
+  animation: haveliSpin 0.8s linear infinite;
+}
+
+@keyframes haveliSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.haveli-btn-primary {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  color: #fff;
+  border: none;
+  padding: 0.55rem 1.2rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.haveli-btn-primary:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(139,92,246,0.3); }
+.haveli-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.haveli-btn-secondary {
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 0.55rem 1.2rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.haveli-btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+.haveli-btn-ghost {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: color 0.2s;
+}
+
+.haveli-btn-ghost:hover { color: #fff; }
+
+.haveli-btn-danger {
+  background: rgba(239,68,68,0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239,68,68,0.2);
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+}
+
+.haveli-btn-danger:hover { background: rgba(239,68,68,0.25); }
+
+/* ── Modal ────────────────────────────────────────────────────────── */
+.haveli-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: haveliOverlayIn 0.2s ease;
+}
+
+@keyframes haveliOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.haveli-modal {
+  background: rgba(22,22,30,0.95);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: haveliModalIn 0.3s ease-out;
+}
+
+.haveli-modal--sm { max-width: 380px; }
+
+@keyframes haveliModalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.haveli-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2rem 1.5rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.haveli-modal-header h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.haveli-modal-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.3rem;
+  transition: color 0.2s;
+}
+
+.haveli-modal-close:hover { color: #fff; }
+
+.haveli-modal-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.haveli-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ── Fields ───────────────────────────────────────────────────────── */
+.haveli-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.haveli-field label {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.6);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.haveli-optional { text-transform: none; letter-spacing: 0; color: rgba(255,255,255,0.3); }
+
+.haveli-field input,
+.haveli-field textarea {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+  resize: none;
+  font-family: inherit;
+}
+
+.haveli-field input:focus,
+.haveli-field textarea:focus {
+  border-color: rgba(139,92,246,0.4);
+}
+
+.haveli-field-meta {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.3);
+  text-align: right;
+}
+
+/* ── Theme Grid ───────────────────────────────────────────────────── */
+.haveli-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.haveli-theme-grid--sm {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.haveli-theme-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.6rem 0.3rem;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: var(--theme-color, #111);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.haveli-theme-option:hover { border-color: rgba(255,255,255,0.1); }
+.haveli-theme-option.active { border-color: var(--theme-accent, #8b5cf6); box-shadow: 0 0 12px var(--theme-accent, rgba(139,92,246,0.3)); }
+
+.haveli-theme-emoji { font-size: 1.3rem; }
+.haveli-theme-name { font-size: 0.62rem; color: rgba(255,255,255,0.5); text-align: center; line-height: 1.2; }
+
+/* ── Privacy Options ──────────────────────────────────────────────── */
+.haveli-privacy-options {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.haveli-privacy-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.8rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.haveli-privacy-btn--sm { padding: 0.5rem 0.8rem; gap: 0.4rem; font-size: 0.82rem; }
+
+.haveli-privacy-btn:hover { background: rgba(255,255,255,0.06); }
+.haveli-privacy-btn.active { border-color: rgba(139,92,246,0.4); background: rgba(139,92,246,0.1); }
+
+.haveli-privacy-icon { font-size: 1.3rem; flex-shrink: 0; }
+.haveli-privacy-title { display: block; font-size: 0.85rem; font-weight: 600; color: #fff; }
+.haveli-privacy-desc { display: block; font-size: 0.72rem; color: rgba(255,255,255,0.4); margin-top: 0.15rem; }
+
+/* ── Preview ──────────────────────────────────────────────────────── */
+.haveli-preview {
+  border-radius: 12px;
+  padding: 1rem;
+  background: var(--theme-color, #111);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.haveli-preview-content {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.haveli-preview-emoji { font-size: 2rem; }
+.haveli-preview-name { display: block; font-size: 0.95rem; font-weight: 600; color: #fff; }
+.haveli-preview-desc { display: block; font-size: 0.76rem; color: rgba(255,255,255,0.45); margin-top: 0.15rem; }
+
+/* ── Error ────────────────────────────────────────────────────────── */
+.haveli-error {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.2);
+  color: #fca5a5;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .haveli-bazaar { padding: 1rem 0.5rem; }
+  .haveli-bazaar-title h1 { font-size: 1.3rem; }
+  .haveli-bazaar-actions { flex-direction: column; width: 100%; }
+  .haveli-bazaar-actions button { width: 100%; }
+  .haveli-grid { grid-template-columns: 1fr; }
+  .haveli-theme-grid { grid-template-columns: repeat(4, 1fr); }
+  .haveli-privacy-options { flex-direction: column; }
+}
