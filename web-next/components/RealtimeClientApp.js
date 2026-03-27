@@ -5,6 +5,7 @@ import ExperienceBackground from '@/src/components/ExperienceBackground'
 import { io } from 'socket.io-client'
 import Home from '@/src/components/Home'
 import Chat from '@/src/components/Chat'
+import HaveliRoom from '@/src/components/HaveliRoom'
 import Onboarding from '@/src/components/Onboarding'
 import Landing from '@/src/components/Landing'
 import AdminDashboard from '@/src/admin/AdminDashboard'
@@ -105,6 +106,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
   })
   const [chatMessages, setChatMessages] = useState([])
   const [activeFriend, setActiveFriend] = useState(null)
+  const [activeHaveli, setActiveHaveli] = useState(null)
   const [partnerTyping, setPartnerTyping] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState('')
@@ -595,6 +597,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
     setShowChat(false)
     setIsTransitioning(false)
     setRoom(null)
+    setActiveHaveli(null)
     setChatMessages([])
     socketPhaseRef.current = 'idle'
     setSocketState({ status: 'disconnected', phase: 'idle', socket: null })
@@ -896,7 +899,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
 
   const isSignedIn = Boolean(session?.user)
   const isProfileComplete = hasCompleteProfile(session?.user)
-  const isAnyChat = Boolean(showChat || socketState.phase === 'friend-chat')
+  const isAnyChat = Boolean(showChat || socketState.phase === 'friend-chat' || socketState.phase === 'haveli-room' || activeHaveli)
   const appBooting = isInitializing || !sessionBootstrapped
   const isHome = Boolean(isSignedIn && !isAnyChat && isProfileComplete)
   const isInChat = Boolean(showChat && isSignedIn && isProfileComplete)
@@ -1017,6 +1020,23 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
             onOpenChat={handleOpenFriendChat}
             unreadCounts={unreadCounts}
             authedFetch={authedFetch}
+            onOpenHaveli={(haveli) => {
+              setActiveHaveli(haveli)
+              setShowChat(false)
+              setSocketPhase('haveli-room')
+            }}
+          />
+        )}
+        {socketState.phase === 'haveli-room' && activeHaveli && (
+          <HaveliRoom
+            haveli={activeHaveli}
+            session={session}
+            socket={socketRef.current}
+            authedFetch={authedFetch}
+            onBack={() => {
+              setActiveHaveli(null)
+              setSocketPhase('idle')
+            }}
           />
         )}
         {needsOnboarding && (

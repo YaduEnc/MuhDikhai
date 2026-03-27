@@ -196,9 +196,22 @@ function HaveliCard({ haveli, onEnter, onJoin, isMember }) {
   const creatorUrl = getAvatarUrl(haveli.creator)
   const creatorInitial = getAvatarInitial(haveli.creator)
   const creatorStyle = getAvatarStyle(haveli.creator)
+  const handleEnter = () => onEnter(haveli)
 
   return (
-    <div className="haveli-card" style={{ '--theme-color': theme.color, '--theme-accent': theme.accent }}>
+    <div
+      className={`haveli-card ${isMember ? 'haveli-card--enterable' : ''}`}
+      style={{ '--theme-color': theme.color, '--theme-accent': theme.accent }}
+      role={isMember ? 'button' : undefined}
+      tabIndex={isMember ? 0 : undefined}
+      onClick={isMember ? handleEnter : undefined}
+      onKeyDown={isMember ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          handleEnter()
+        }
+      } : undefined}
+    >
       <div className="haveli-card-top">
         <div className="haveli-card-theme-bg" />
         <div className="haveli-card-info">
@@ -230,15 +243,22 @@ function HaveliCard({ haveli, onEnter, onJoin, isMember }) {
         </div>
 
         {isMember ? (
-          <button className="haveli-card-btn haveli-card-btn--enter" onClick={() => onEnter(haveli)}>
-            Enter
+          <button
+            className="haveli-card-btn haveli-card-btn--enter"
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              handleEnter()
+            }}
+          >
+            Enter Room
           </button>
         ) : haveli.isLocked ? (
-          <button className="haveli-card-btn haveli-card-btn--locked" disabled>
+          <button className="haveli-card-btn haveli-card-btn--locked" type="button" disabled>
             Locked
           </button>
         ) : (
-          <button className="haveli-card-btn haveli-card-btn--join" onClick={() => onJoin(haveli.id)}>
+          <button className="haveli-card-btn haveli-card-btn--join" type="button" onClick={() => onJoin(haveli.id)}>
             Join
           </button>
         )}

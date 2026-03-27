@@ -107,6 +107,15 @@
   transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
 }
 
+.haveli-card--enterable {
+  cursor: pointer;
+}
+
+.haveli-card--enterable:focus-visible {
+  outline: 2px solid rgba(255,255,255,0.45);
+  outline-offset: 2px;
+}
+
 .haveli-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 40px rgba(0,0,0,0.35);
