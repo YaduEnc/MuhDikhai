@@ -42,7 +42,8 @@ function hasCompleteProfile(user) {
 
 export default function AuthGatewayApp() {
   const router = useRouter()
-  const [session, setSession] = useState(() => normalizeSession(getSession()))
+  const [session, setSession] = useState(null)
+  const [sessionBootstrapped, setSessionBootstrapped] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState('')
   const [isInitializing, setIsInitializing] = useState(true)
@@ -52,6 +53,15 @@ export default function AuthGatewayApp() {
   useEffect(() => {
     sessionRef.current = session
   }, [session])
+
+  useEffect(() => {
+    const stored = normalizeSession(getSession())
+    if (stored) {
+      setSession(stored)
+      sessionRef.current = stored
+    }
+    setSessionBootstrapped(true)
+  }, [])
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -105,7 +115,7 @@ export default function AuthGatewayApp() {
     }
   }
 
-  if (isInitializing) {
+  if (isInitializing || !sessionBootstrapped) {
     return (
       <div className="admin-loading">
         <div className="loading-spinner" />

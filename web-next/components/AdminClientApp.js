@@ -32,7 +32,8 @@ function normalizeSession(rawSession) {
 }
 
 export default function AdminClientApp() {
-  const [session, setSession] = useState(() => normalizeSession(getSession()))
+  const [session, setSession] = useState(null)
+  const [sessionBootstrapped, setSessionBootstrapped] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState('')
@@ -41,6 +42,15 @@ export default function AdminClientApp() {
   useEffect(() => {
     sessionRef.current = session
   }, [session])
+
+  useEffect(() => {
+    const stored = normalizeSession(getSession())
+    if (stored) {
+      setSession(stored)
+      sessionRef.current = stored
+    }
+    setSessionBootstrapped(true)
+  }, [])
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -111,7 +121,7 @@ export default function AdminClientApp() {
     return res
   }, [])
 
-  if (isInitializing) {
+  if (isInitializing || !sessionBootstrapped) {
     return (
       <div className="admin-loading">
         <div className="loading-spinner" />

@@ -14,9 +14,24 @@ interface Migration {
  * Get all migration files in order
  */
 function getMigrations(): Migration[] {
-  const migrationsDir = path.join(__dirname);
+  const candidateDirs = [
+    path.join(__dirname),
+    path.resolve(process.cwd(), 'src', 'migrations'),
+    path.resolve(process.cwd(), 'dist', 'migrations'),
+  ];
+
+  const migrationsDir = candidateDirs.find((dir) => {
+    if (!fs.existsSync(dir)) return false;
+    const filesInDir = fs.readdirSync(dir);
+    return filesInDir.some((file) => file.endsWith('.sql') && file.startsWith('0'));
+  });
+
+  if (!migrationsDir) {
+    throw new Error(`No SQL migrations found. Checked: ${candidateDirs.join(', ')}`);
+  }
+
   const files = fs.readdirSync(migrationsDir)
-    .filter(file => file.endsWith('.sql') && file.startsWith('0'))
+    .filter((file) => file.endsWith('.sql') && file.startsWith('0'))
     .sort();
 
   return files.map(file => {

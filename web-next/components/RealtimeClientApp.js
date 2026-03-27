@@ -92,7 +92,8 @@ async function getValidSession(session) {
 }
 
 function RealtimeClientApp({ autoMatchOnMount = false }) {
-  const [session, setSession] = useState(() => normalizeSession(getSession()))
+  const [session, setSession] = useState(null)
+  const [sessionBootstrapped, setSessionBootstrapped] = useState(false)
   const [onlineCount, setOnlineCount] = useState(0)
   const [showChat, setShowChat] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -149,6 +150,15 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
   useEffect(() => {
     sessionRef.current = session
   }, [session])
+
+  useEffect(() => {
+    const stored = normalizeSession(getSession())
+    if (stored) {
+      setSession(stored)
+      sessionRef.current = stored
+    }
+    setSessionBootstrapped(true)
+  }, [])
 
   useEffect(() => {
     chatMessagesRef.current = chatMessages
@@ -887,6 +897,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
   const isSignedIn = Boolean(session?.user)
   const isProfileComplete = hasCompleteProfile(session?.user)
   const isAnyChat = Boolean(showChat || socketState.phase === 'friend-chat')
+  const appBooting = isInitializing || !sessionBootstrapped
   const isHome = Boolean(isSignedIn && !isAnyChat && isProfileComplete)
   const isInChat = Boolean(showChat && isSignedIn && isProfileComplete)
   const needsOnboarding = Boolean(isSignedIn && !isProfileComplete)
@@ -1018,7 +1029,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
             }}
           />
         )}
-        {!isSignedIn && !isInitializing && (
+        {!isSignedIn && !appBooting && (
           <Landing
             onStartMatch={handleAuth}
             authLoading={authLoading}
@@ -1026,7 +1037,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
             onlineCount={onlineCount}
           />
         )}
-        {isInitializing && (
+        {appBooting && (
           <div className="auth-initializer">
             <div className="auth-spinner" />
             <p>Restoring session...</p>
