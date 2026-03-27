@@ -1005,6 +1005,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
             onRespondToFriendRequest={handleRespondToFriendRequest}
             onOpenChat={handleOpenFriendChat}
             unreadCounts={unreadCounts}
+            authedFetch={authedFetch}
           />
         )}
         {needsOnboarding && (

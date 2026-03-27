@@ -920,6 +920,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
     const [friendRequests, setFriendRequests] = useState([])
     const [loadingHome, setLoadingHome] = useState(false)
     const [selectedProfileId, setSelectedProfileId] = useState(null)
+    const [clientHour, setClientHour] = useState(null)
 
     const refreshHomeData = useCallback(async () => {
         setLoadingHome(true);
@@ -968,9 +969,14 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
         }
     };
 
-    const hour = new Date().getHours()
+    useEffect(() => {
+        setClientHour(new Date().getHours())
+    }, [])
+
     const greeting =
-        hour < 5 ? 'Still awake?' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 21 ? 'Good evening' : 'Good night'
+        clientHour === null
+            ? 'Welcome'
+            : clientHour < 5 ? 'Still awake?' : clientHour < 12 ? 'Good morning' : clientHour < 17 ? 'Good afternoon' : clientHour < 21 ? 'Good evening' : 'Good night'
 
     const name = session?.user?.name?.split(' ')[0] || 'you'
     const sessionAvatarUrl = getAvatarUrl(session?.user)
