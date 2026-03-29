@@ -20,6 +20,12 @@ const FEATURE_PILLS = [
     'Doodles, GIFs, reactions, calls',
 ]
 
+const PREMIUM_PROFILE_FEATURES = [
+    'Verified badge on your profile and chat header',
+    'Priority visibility in friend requests and Haveli cards',
+    'Premium profile theme with cleaner identity card',
+]
+
 const FOOTER_COLUMNS = [
     {
         title: 'Experience',
@@ -285,6 +291,52 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                                     <strong>Short profile, cleaner rooms</strong>
                                     <p>Enough identity to feel human, not enough to feel heavy.</p>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section className="premium-profile reveal-on-scroll" id="premium-verified">
+                <div className="premium-profile-shell">
+                    <div className="premium-profile-copy">
+                        <span className="premium-profile-eyebrow">Paid Feature • Muhdikhai Plus</span>
+                        <h2>Advanced Profile with Verified Badge</h2>
+                        <p>
+                            Give serious users a stronger presence. The verified badge builds trust faster in first conversations and helps authentic profiles stand out.
+                        </p>
+
+                        <ul className="premium-profile-list">
+                            {PREMIUM_PROFILE_FEATURES.map((item) => (
+                                <li key={item}>{item}</li>
+                            ))}
+                        </ul>
+
+                        <div className="premium-profile-note">
+                            Planned launch: Plus tier with monthly billing.
+                        </div>
+                    </div>
+
+                    <div className="premium-profile-preview">
+                        <div className="premium-profile-card">
+                            <span className="premium-profile-chip">Profile Preview</span>
+                            <div className="premium-profile-head">
+                                <div className="premium-profile-avatar">YS</div>
+                                <div className="premium-profile-meta">
+                                    <div className="premium-profile-name-row">
+                                        <strong>Yaduraj Singh</strong>
+                                        <span className="premium-verified-badge" aria-label="Verified profile">✔ Verified</span>
+                                    </div>
+                                    <span>@yadurajsingham</span>
+                                </div>
+                            </div>
+                            <p className="premium-profile-bio">
+                                Calm energy, clear intent, and no timepass chats.
+                            </p>
+                            <div className="premium-profile-signals">
+                                <span>Trust Boost</span>
+                                <span>Premium Identity</span>
+                                <span>Higher Response Rate</span>
                             </div>
                         </div>
                     </div>
