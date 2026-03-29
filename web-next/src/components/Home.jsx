@@ -56,7 +56,7 @@ function DeleteConfirmationModal({ onConfirm, onCancel }) {
     );
 }
 
-function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability }) {
+function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability, onUpgradeToPlus }) {
     const [isEditing, setIsEditing] = useState(false)
     const [editData, setEditData] = useState({
         username: session?.user?.username || '',
@@ -70,6 +70,8 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
     const [uploadProgress, setUploadProgress] = useState(0)
     const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(null)
     const [error, setError] = useState('')
+    const [upgradeError, setUpgradeError] = useState('')
+    const [isUpgradeLoading, setIsUpgradeLoading] = useState(false)
     const fileInputRef = useRef(null)
 
     const auraPoints = session?.user?.auraPoints || 0
@@ -87,6 +89,14 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
         ? session.user.bio
         : 'Add a short line about yourself so others know who is on the other side.'
     const hasGender = !!(session?.user?.gender && session.user.gender !== 'prefer_not_to_say')
+    const premiumTier = session?.user?.premiumTier || 'free'
+    const premiumStatus = session?.user?.premiumStatus || 'inactive'
+    const verifiedBadgeEnabled = Boolean(session?.user?.verifiedBadgeEnabled)
+    const premiumExpiresAt = session?.user?.premiumExpiresAt ? new Date(session.user.premiumExpiresAt) : null
+    const isPremiumActive = premiumTier === 'plus' && premiumStatus === 'active'
+    const expiryText = premiumExpiresAt && !Number.isNaN(premiumExpiresAt.getTime())
+        ? premiumExpiresAt.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+        : null
 
     useEffect(() => () => {
         if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl)
@@ -214,6 +224,19 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
         }
     }
 
+    const handleUpgrade = async () => {
+        if (typeof onUpgradeToPlus !== 'function') return
+        setUpgradeError('')
+        setIsUpgradeLoading(true)
+        try {
+            await onUpgradeToPlus()
+        } catch (err) {
+            setUpgradeError(err?.message || 'Could not start checkout right now.')
+        } finally {
+            setIsUpgradeLoading(false)
+        }
+    }
+
     if (!isEditing) {
         return (
             <div className="inner-view">
@@ -271,7 +294,10 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
                                     </button>
                                 </div>
                                 <div className="profile-info">
-                                    <h2 className="profile-name">{session?.user?.name}</h2>
+                                    <h2 className="profile-name">
+                                        {session?.user?.name}
+                                        {verifiedBadgeEnabled && <span className="verified-pill">Verified</span>}
+                                    </h2>
                                     {profileHandle && <p className="profile-handle">{profileHandle}</p>}
                                     <p className="profile-email">{session?.user?.email}</p>
                                 </div>
@@ -382,6 +408,39 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
                                 </div>
                             </div>
                         </div>
+
+                        <div className="profile-card premium-status-card">
+                            <div className="card-section-header">
+                                <div className="card-section-heading">
+                                    <span className="card-eyebrow">Muhdikhai Plus</span>
+                                    <h3 className="card-title">Verified badge & advanced profile</h3>
+                                </div>
+                            </div>
+                            <p className="premium-status-copy">
+                                {verifiedBadgeEnabled
+                                    ? 'Your verified badge is active across profile and chat.'
+                                    : 'Unlock verified badge, cleaner profile identity, and premium visibility.'}
+                            </p>
+                            <div className="premium-status-meta">
+                                <span className={`premium-status-pill ${isPremiumActive ? 'active' : ''}`}>
+                                    {isPremiumActive ? 'Plus Active' : 'Free Plan'}
+                                </span>
+                                {isPremiumActive && expiryText && (
+                                    <span className="premium-status-expiry">Renews visibility till {expiryText}</span>
+                                )}
+                            </div>
+                            {upgradeError && <div className="modal-error modal-error--inline">{upgradeError}</div>}
+                            <div className="premium-status-actions">
+                                <button
+                                    type="button"
+                                    className="btn-primary"
+                                    onClick={handleUpgrade}
+                                    disabled={isUpgradeLoading}
+                                >
+                                    {isUpgradeLoading ? 'Opening checkout...' : (isPremiumActive ? 'Extend Plus' : 'Upgrade to Plus')}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -447,7 +506,10 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
                             </div>
                             <div className="profile-info">
                                 <span className="card-eyebrow">Editing profile</span>
-                                <h2 className="profile-name">{session?.user?.name}</h2>
+                                <h2 className="profile-name">
+                                    {session?.user?.name}
+                                    {verifiedBadgeEnabled && <span className="verified-pill">Verified</span>}
+                                </h2>
                                 {profileHandle && <p className="profile-handle">{profileHandle}</p>}
                                 <p className="profile-email">{session?.user?.email}</p>
                             </div>
@@ -902,7 +964,7 @@ function HomeTabSkeleton({ variant = 'matches', count = 4 }) {
     )
 }
 
-export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts, onOpenHaveli, authedFetch }) {
+export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts, onOpenHaveli, authedFetch, onUpgradeToPlus }) {
 
     const [selectedTopics, setSelectedTopics] = useState([])
     const [customTopic, setCustomTopic] = useState('')
@@ -1025,6 +1087,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                 onUpdateProfile={onUpdateProfile}
                 onUploadAvatar={onUploadAvatar}
                 onCheckUsernameAvailability={onCheckUsernameAvailability}
+                onUpgradeToPlus={onUpgradeToPlus}
             />
         )
     }

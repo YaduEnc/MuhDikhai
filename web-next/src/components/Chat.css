@@ -118,6 +118,28 @@
     gap: 0.4rem;
 }
 
+.chat-verified-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.3rem;
+    padding: 0 0.5rem;
+    border-radius: 999px;
+    border: 1px solid rgba(76, 222, 128, 0.45);
+    background: rgba(8, 53, 34, 0.46);
+    color: #8dffbf;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.chat-verified-pill--inline {
+    min-height: 1rem;
+    padding: 0 0.4rem;
+    font-size: 0.52rem;
+}
+
 .partner-aura-badge {
     font-size: 1.1rem;
     line-height: 1;
@@ -2410,6 +2432,11 @@
     letter-spacing: -0.02em;
     color: #f6fbff;
     text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
 }
 
 .profile-modal-username {

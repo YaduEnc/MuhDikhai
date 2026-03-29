@@ -441,7 +441,10 @@ const ProfileModal = memo(function ProfileModal({ partnerId, session, onClose })
                                 </span>
                             )}
                         </div>
-                        <h3 className="profile-modal-name">{profile.name || 'Unknown User'}</h3>
+                        <h3 className="profile-modal-name">
+                            {profile.name || 'Unknown User'}
+                            {profile.verifiedBadgeEnabled && <span className="chat-verified-pill">Verified</span>}
+                        </h3>
                         {profile.username && <p className="profile-modal-username">@{profile.username}</p>}
 
                         <div className="profile-modal-details">
@@ -766,6 +769,9 @@ export default function Chat({
                     <div className="chat-partner-info">
                         <span className="chat-partner-name">
                             {isMatching ? 'SYNCING IDENTITY...' : (room?.partner?.name || 'Stranger')}
+                            {isMatched && room?.partner?.verifiedBadgeEnabled && (
+                                <span className="chat-verified-pill chat-verified-pill--inline">Verified</span>
+                            )}
                             {isMatched && room?.partner?.auraPoints !== undefined && (
                                 <span
                                     className="partner-aura-badge"

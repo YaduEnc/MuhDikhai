@@ -72,7 +72,7 @@ function CinematicDivider({ label, title, copy, align = 'left', drift = 0 }) {
     )
 }
 
-export default function Landing({ onStartMatch, authLoading, authError, onlineCount }) {
+export default function Landing({ onStartMatch, onUpgradeToPlus, authLoading, premiumLoading, authError, onlineCount }) {
     const [scrolled, setScrolled] = useState(0)
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
 
@@ -315,6 +315,14 @@ export default function Landing({ onStartMatch, authLoading, authError, onlineCo
                         <div className="premium-profile-note">
                             Planned launch: Plus tier with monthly billing.
                         </div>
+                        <button
+                            type="button"
+                            className="premium-profile-cta"
+                            onClick={onUpgradeToPlus || onStartMatch}
+                            disabled={authLoading || premiumLoading}
+                        >
+                            {authLoading || premiumLoading ? 'Opening checkout...' : 'Get Plus & Verified Badge'}
+                        </button>
                     </div>
 
                     <div className="premium-profile-preview">

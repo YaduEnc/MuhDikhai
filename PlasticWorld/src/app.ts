@@ -80,7 +80,12 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 // Serve uploaded files with cross-origin resource policy so
@@ -170,6 +175,7 @@ import reportRoutes from './routes/report.routes';
 import adminRoutes from './routes/admin.routes';
 import bugRoutes from './routes/bug.routes';
 import haveliRoutes from './routes/haveli.routes';
+import paymentRoutes from './routes/payment.routes';
 
 // Mount routes
 app.use(`/api/${apiVersion}/auth`, authRoutes);
@@ -181,6 +187,7 @@ app.use(`/api/${apiVersion}/reports`, reportRoutes);
 app.use(`/api/${apiVersion}/admin`, adminRoutes);
 app.use(`/api/${apiVersion}/bugs`, bugRoutes);
 app.use(`/api/${apiVersion}/havelis`, haveliRoutes);
+app.use(`/api/${apiVersion}/payments`, paymentRoutes);
 
 // API root endpoint
 app.get(`/api/${apiVersion}`, (_req: Request, res: Response) => {
@@ -199,6 +206,7 @@ app.get(`/api/${apiVersion}`, (_req: Request, res: Response) => {
       admin: `/api/${apiVersion}/admin`,
       bugs: `/api/${apiVersion}/bugs`,
       havelis: `/api/${apiVersion}/havelis`,
+      payments: `/api/${apiVersion}/payments`,
     },
   });
 });

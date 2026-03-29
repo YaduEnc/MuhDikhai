@@ -18,6 +18,11 @@ export interface User {
   isAdmin: boolean;
   isActive: boolean;
   auraPoints: number;
+  premiumTier: 'free' | 'plus';
+  premiumStatus: 'inactive' | 'active' | 'expired' | 'cancelled' | 'pending';
+  premiumStartedAt?: Date | null;
+  premiumExpiresAt?: Date | null;
+  verifiedBadgeEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +65,21 @@ export interface UpdateUserData {
   gender?: 'male' | 'female' | 'non-binary' | 'other' | 'prefer_not_to_say';
   roomsEntered?: number;
 }
+
+const USER_SELECT_COLUMNS = `
+  id, firebase_uid as "firebaseUid", username, email,
+  phone_number as "phoneNumber", name, age,
+  profile_picture_url as "profilePictureUrl", bio, gender,
+  status, last_seen as "lastSeen", is_active as "isActive",
+  created_at as "createdAt", updated_at as "updatedAt",
+  rooms_entered as "roomsEntered", is_admin as "isAdmin",
+  aura_points as "auraPoints",
+  premium_tier as "premiumTier",
+  premium_status as "premiumStatus",
+  premium_started_at as "premiumStartedAt",
+  premium_expires_at as "premiumExpiresAt",
+  verified_badge_enabled as "verifiedBadgeEnabled"
+`;
 
 class UserService {
   normalizeUsername(username: string): string {
@@ -145,14 +165,7 @@ class UserService {
         `INSERT INTO users (
           firebase_uid, username, email, name, age, profile_picture_url, gender, status, rooms_entered, is_admin
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        RETURNING 
-          id, firebase_uid as "firebaseUid", username, email,
-          phone_number as "phoneNumber", name, age,
-          profile_picture_url as "profilePictureUrl", bio, gender,
-          status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt",
-          rooms_entered as "roomsEntered", is_admin as "isAdmin",
-          aura_points as "auraPoints"`,
+        RETURNING ${USER_SELECT_COLUMNS}`,
         [data.firebaseUid, this.normalizeUsername(username), data.email, data.name, defaultAge, data.profilePictureUrl || null, data.gender || 'prefer_not_to_say', 'offline', data.roomsEntered || 0, data.isAdmin || false]
       );
 
@@ -175,13 +188,8 @@ class UserService {
         : '(firebase_uid = $1 OR email = $2) AND is_active = true';
 
       const result = await database.query<User>(
-        `SELECT 
-          id, firebase_uid as "firebaseUid", username, email,
-          phone_number as "phoneNumber", name, age,
-          profile_picture_url as "profilePictureUrl", bio, gender,
-          status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", rooms_entered as "roomsEntered", is_admin as "isAdmin",
-          aura_points as "auraPoints"
+        `SELECT
+          ${USER_SELECT_COLUMNS}
         FROM users
         WHERE ${whereClause}
         LIMIT 1`,
@@ -204,13 +212,8 @@ class UserService {
         : 'firebase_uid = $1 AND is_active = true';
 
       const result = await database.query<User>(
-        `SELECT 
-          id, firebase_uid as "firebaseUid", username, email,
-          phone_number as "phoneNumber", name, age,
-          profile_picture_url as "profilePictureUrl", bio, gender,
-          status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", rooms_entered as "roomsEntered", is_admin as "isAdmin",
-          aura_points as "auraPoints"
+        `SELECT
+          ${USER_SELECT_COLUMNS}
         FROM users
         WHERE ${whereClause}
         LIMIT 1`,
@@ -229,13 +232,8 @@ class UserService {
   async getUserById(userId: string): Promise<User | null> {
     try {
       const result = await database.query<User>(
-        `SELECT 
-          id, firebase_uid as "firebaseUid", username, email,
-          phone_number as "phoneNumber", name, age,
-          profile_picture_url as "profilePictureUrl", bio, gender,
-          status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", rooms_entered as "roomsEntered", is_admin as "isAdmin",
-          aura_points as "auraPoints"
+        `SELECT
+          ${USER_SELECT_COLUMNS}
         FROM users
         WHERE id = $1 AND is_active = true
         LIMIT 1`,
@@ -255,13 +253,8 @@ class UserService {
     try {
       const whereClause = includeInactive ? 'email = $1' : 'email = $1 AND is_active = true';
       const result = await database.query<User>(
-        `SELECT 
-          id, firebase_uid as "firebaseUid", username, email,
-          phone_number as "phoneNumber", name, age,
-          profile_picture_url as "profilePictureUrl", bio, gender,
-          status, last_seen as "lastSeen", is_active as "isActive",
-          created_at as "createdAt", updated_at as "updatedAt", is_admin as "isAdmin",
-          aura_points as "auraPoints"
+        `SELECT
+          ${USER_SELECT_COLUMNS}
         FROM users
         WHERE ${whereClause}
         LIMIT 1`,
@@ -282,13 +275,7 @@ class UserService {
       const result = await database.query<User>(
         `UPDATE users SET is_active = true, updated_at = CURRENT_TIMESTAMP
          WHERE id = $1
-         RETURNING 
-           id, firebase_uid as "firebaseUid", username, email,
-           phone_number as "phoneNumber", name, age,
-           profile_picture_url as "profilePictureUrl", bio, gender,
-           status, last_seen as "lastSeen", is_active as "isActive",
-           created_at as "createdAt", updated_at as "updatedAt", rooms_entered as "roomsEntered", is_admin as "isAdmin",
-           aura_points as "auraPoints"`,
+         RETURNING ${USER_SELECT_COLUMNS}`,
         [userId]
       );
 
@@ -357,13 +344,7 @@ class UserService {
       const result = await database.query<User>(
         `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
          WHERE id = $${paramIndex} AND is_active = true
-         RETURNING 
-           id, firebase_uid as "firebaseUid", username, email,
-           phone_number as "phoneNumber", name, age,
-           profile_picture_url as "profilePictureUrl", bio, gender,
-           status, last_seen as "lastSeen", is_active as "isActive",
-           created_at as "createdAt", updated_at as "updatedAt", rooms_entered as "roomsEntered", is_admin as "isAdmin",
-           aura_points as "auraPoints"`,
+         RETURNING ${USER_SELECT_COLUMNS}`,
         values
       );
 
@@ -381,7 +362,10 @@ class UserService {
   async getPublicUserProfile(userId: string): Promise<Omit<User, 'email' | 'phoneNumber' | 'firebaseUid'> | null> {
     try {
       const result = await database.query<Omit<User, 'email' | 'phoneNumber' | 'firebaseUid'>>(
-        `SELECT id, username, name, age, profile_picture_url as "profilePictureUrl", bio, gender, status, last_seen as "lastSeen", is_active as "isActive", aura_points as "auraPoints"
+        `SELECT id, username, name, age, profile_picture_url as "profilePictureUrl", bio, gender, status, last_seen as "lastSeen",
+                is_active as "isActive", aura_points as "auraPoints", premium_tier as "premiumTier",
+                premium_status as "premiumStatus", premium_expires_at as "premiumExpiresAt",
+                verified_badge_enabled as "verifiedBadgeEnabled"
          FROM users WHERE id = $1 AND is_active = true LIMIT 1`,
         [userId]
       );
@@ -483,7 +467,7 @@ class UserService {
       const total = parseInt(countResult.rows[0].count);
 
       const usersResult = await database.query(
-        `SELECT id, username, name, profile_picture_url as "profilePictureUrl", bio, status 
+        `SELECT id, username, name, profile_picture_url as "profilePictureUrl", bio, status, verified_badge_enabled as "verifiedBadgeEnabled"
          FROM users WHERE ${where} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
         [...params, limit, offset]
       );

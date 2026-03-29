@@ -18,6 +18,7 @@ declare global {
         isAdmin: boolean;
       };
       deviceId?: string;
+      rawBody?: string;
     }
   }
 }
@@ -139,4 +140,3 @@ export const isAdmin = async (
   }
   next();
 };
-

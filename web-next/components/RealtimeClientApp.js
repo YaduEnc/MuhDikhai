@@ -39,6 +39,7 @@ import {
   playHangupTone,
   playPartnerLeftDissolve,
 } from '@/src/utils/soundEngine'
+import { openCashfreeCheckout } from '@/src/utils/cashfree'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
 const BETA_WELCOME_NOTICE_VERSION = 'college-launch-v1'
@@ -110,6 +111,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
   const [partnerTyping, setPartnerTyping] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState('')
+  const [premiumLoading, setPremiumLoading] = useState(false)
   const [socketVersion, setSocketVersion] = useState(0)
   const isAdminView = false
   const [unreadCounts, setUnreadCounts] = useState({})
@@ -144,6 +146,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
   const socketPhaseRef = useRef(socketState.phase)
   const callOverlayStateRef = useRef(callOverlayState)
   const refreshingRef = useRef(false)
+  const syncedOrderRef = useRef(null)
   const setSocketPhase = useCallback((phase) => {
     socketPhaseRef.current = phase
     setSocketState((prev) => ({ ...prev, phase }))
@@ -646,6 +649,111 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
     return res
   }, [])
 
+  const refreshCurrentUser = useCallback(async () => {
+    const res = await authedFetch(`${BACKEND_URL}/api/v1/users/me`)
+    const json = await res.json()
+    if (!json?.success || !json?.data?.user) {
+      throw new Error(json?.error?.message || 'Failed to refresh user')
+    }
+    const nextSession = normalizeSession({
+      ...sessionRef.current,
+      user: {
+        ...sessionRef.current?.user,
+        ...json.data.user,
+        profilePictureUrl: Object.prototype.hasOwnProperty.call(json.data.user, 'profilePictureUrl')
+          ? (json.data.user.profilePictureUrl || null)
+          : (sessionRef.current?.user?.profilePictureUrl || null),
+        photoURL: Object.prototype.hasOwnProperty.call(json.data.user, 'profilePictureUrl')
+          ? (json.data.user.profilePictureUrl || null)
+          : (sessionRef.current?.user?.photoURL || null),
+      },
+    })
+    sessionRef.current = nextSession
+    setSession(nextSession)
+    saveSession(nextSession)
+    return nextSession
+  }, [authedFetch])
+
+  const handleUpgradeToPlus = async () => {
+    const cur = sessionRef.current
+    if (!cur?.accessToken) {
+      await handleAuth()
+      return
+    }
+
+    setPremiumLoading(true)
+    try {
+      const returnUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/app`
+        : undefined
+
+      const createRes = await authedFetch(`${BACKEND_URL}/api/v1/payments/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planCode: 'plus_monthly',
+          returnUrl,
+        }),
+      })
+      const createJson = await createRes.json()
+      if (!createJson?.success || !createJson?.data?.paymentSessionId) {
+        throw new Error(createJson?.error?.message || 'Could not create payment order')
+      }
+
+      const orderId = createJson.data.orderId
+      await openCashfreeCheckout({
+        paymentSessionId: createJson.data.paymentSessionId,
+        returnUrl: returnUrl ? `${returnUrl}?payment_order_id=${encodeURIComponent(orderId)}` : undefined,
+      })
+
+      if (orderId) {
+        const syncRes = await authedFetch(`${BACKEND_URL}/api/v1/payments/sync-order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        })
+        const syncJson = await syncRes.json()
+        if (!syncJson?.success) {
+          throw new Error(syncJson?.error?.message || 'Payment sync failed')
+        }
+      }
+
+      await refreshCurrentUser()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Payment failed'
+      alert(message)
+    } finally {
+      setPremiumLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!session?.accessToken || typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const orderId = params.get('payment_order_id') || params.get('order_id')
+    if (!orderId || syncedOrderRef.current === orderId) return
+
+    syncedOrderRef.current = orderId
+    ;(async () => {
+      try {
+        await authedFetch(`${BACKEND_URL}/api/v1/payments/sync-order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId }),
+        })
+        await refreshCurrentUser()
+      } catch (error) {
+        console.warn('Payment sync after redirect failed', error)
+      } finally {
+        params.delete('payment_order_id')
+        params.delete('order_id')
+        const next = params.toString()
+        const basePath = window.location.pathname
+        window.history.replaceState({}, '', next ? `${basePath}?${next}` : basePath)
+      }
+    })()
+  }, [session?.accessToken, authedFetch, refreshCurrentUser])
+
   const handleUpdateProfile = async (data) => {
     try {
       const res = await authedFetch(`${BACKEND_URL}/api/v1/users/me`, {
@@ -1025,6 +1133,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
               setShowChat(false)
               setSocketPhase('haveli-room')
             }}
+            onUpgradeToPlus={handleUpgradeToPlus}
           />
         )}
         {socketState.phase === 'haveli-room' && activeHaveli && (
@@ -1052,7 +1161,9 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
         {!isSignedIn && !appBooting && (
           <Landing
             onStartMatch={handleAuth}
+            onUpgradeToPlus={handleUpgradeToPlus}
             authLoading={authLoading}
+            premiumLoading={premiumLoading}
             authError={authError}
             onlineCount={onlineCount}
           />

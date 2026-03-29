@@ -128,7 +128,9 @@ export default function AuthGatewayApp() {
     return (
       <Landing
         onStartMatch={handleAuth}
+        onUpgradeToPlus={handleAuth}
         authLoading={authLoading}
+        premiumLoading={authLoading}
         authError={authError}
         onlineCount={onlineCount}
       />
