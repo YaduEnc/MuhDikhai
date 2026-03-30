@@ -294,9 +294,9 @@ class PaymentService {
              payment_session_id = COALESCE($2, payment_session_id),
              order_status = COALESCE($3, order_status),
              payment_status = $4,
-             paid_at = CASE WHEN $4 = 'SUCCESS' THEN COALESCE(paid_at, CURRENT_TIMESTAMP) ELSE paid_at END
+             paid_at = CASE WHEN $6 THEN COALESCE(paid_at, CURRENT_TIMESTAMP) ELSE paid_at END
          WHERE order_id = $5`,
-        [order.cf_order_id || null, order.payment_session_id || null, order.order_status || null, paymentStatus, orderId]
+        [order.cf_order_id || null, order.payment_session_id || null, order.order_status || null, paymentStatus, orderId, isPaid]
       );
 
       if (isPaid) {
