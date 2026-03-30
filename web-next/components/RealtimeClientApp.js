@@ -163,6 +163,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
   const callOverlayStateRef = useRef(callOverlayState)
   const refreshingRef = useRef(false)
   const syncedOrderRef = useRef(null)
+  const premiumReconcileKeyRef = useRef(null)
   const setSocketPhase = useCallback((phase) => {
     socketPhaseRef.current = phase
     setSocketState((prev) => ({ ...prev, phase }))
@@ -814,6 +815,46 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
       }
     })()
   }, [session?.accessToken, authedFetch, refreshCurrentUser])
+
+  useEffect(() => {
+    if (!session?.accessToken || !session?.user?.id) return
+
+    const reconcileKey = `${session.user.id}:${session.user.premiumTier || 'free'}:${session.user.premiumStatus || 'inactive'}`
+    if (premiumReconcileKeyRef.current === reconcileKey) return
+    premiumReconcileKeyRef.current = reconcileKey
+
+    ;(async () => {
+      try {
+        const summaryRes = await authedFetch(`${BACKEND_URL}/api/v1/payments/me`)
+        const summaryJson = await summaryRes.json()
+        if (!summaryJson?.success) return
+
+        const recentOrders = Array.isArray(summaryJson?.data?.recentOrders) ? summaryJson.data.recentOrders : []
+        const latestPendingOrder = recentOrders.find((order) => order?.paymentStatus !== 'SUCCESS' && order?.orderId)
+
+        if (latestPendingOrder?.orderId) {
+          await authedFetch(`${BACKEND_URL}/api/v1/payments/sync-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: latestPendingOrder.orderId }),
+          })
+          await refreshCurrentUser()
+          return
+        }
+
+        const premiumSummary = summaryJson?.data?.premium
+        const localUser = sessionRef.current?.user
+        const isServerActive = premiumSummary?.tier === 'plus' && premiumSummary?.status === 'active'
+        const isLocalActive = localUser?.premiumTier === 'plus' && localUser?.premiumStatus === 'active'
+
+        if (isServerActive && !isLocalActive) {
+          await refreshCurrentUser()
+        }
+      } catch (error) {
+        console.warn('Premium reconciliation failed', error)
+      }
+    })()
+  }, [session?.accessToken, session?.user?.id, session?.user?.premiumTier, session?.user?.premiumStatus, authedFetch, refreshCurrentUser])
 
   const handleUpdateProfile = async (data) => {
     try {

@@ -96,6 +96,7 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
     const verifiedBadgeEnabled = Boolean(session?.user?.verifiedBadgeEnabled)
     const premiumExpiresAt = session?.user?.premiumExpiresAt ? new Date(session.user.premiumExpiresAt) : null
     const isPremiumActive = premiumTier === 'plus' && premiumStatus === 'active'
+    const isPremiumPending = premiumTier === 'plus' && premiumStatus === 'pending'
     const expiryText = premiumExpiresAt && !Number.isNaN(premiumExpiresAt.getTime())
         ? premiumExpiresAt.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
         : null
@@ -432,7 +433,9 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
                                 </div>
                             </div>
                                 <p className="premium-status-copy">
-                                    {verifiedBadgeEnabled
+                                    {isPremiumActive
+                                        ? 'You are a Plus subscriber. Your verified badge and premium visibility are active.'
+                                        : verifiedBadgeEnabled
                                         ? 'Your verified badge is active across profile and chat.'
                                         : 'Unlock verified badge, cleaner profile identity, and premium visibility at just ₹5/month.'}
                                 </p>
@@ -443,18 +446,31 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
                                 {isPremiumActive && expiryText && (
                                     <span className="premium-status-expiry">Renews visibility till {expiryText}</span>
                                 )}
+                                {isPremiumPending && (
+                                    <span className="premium-status-expiry">Payment is being confirmed. Please wait a moment.</span>
+                                )}
                             </div>
                             {upgradeError && <div className="modal-error modal-error--inline">{upgradeError}</div>}
                             {invoiceError && <div className="modal-error modal-error--inline">{invoiceError}</div>}
                             <div className="premium-status-actions">
-                                <button
-                                    type="button"
-                                    className="btn-primary"
-                                    onClick={handleUpgrade}
-                                    disabled={isUpgradeLoading}
-                                >
-                                    {isUpgradeLoading ? 'Opening checkout...' : (isPremiumActive ? 'Extend Plus (₹5)' : 'Upgrade to Plus (₹5)')}
-                                </button>
+                                {isPremiumActive ? (
+                                    <button
+                                        type="button"
+                                        className="btn-primary premium-subscriber-btn"
+                                        disabled
+                                    >
+                                        You Are a Subscriber
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        className="btn-primary"
+                                        onClick={handleUpgrade}
+                                        disabled={isUpgradeLoading}
+                                    >
+                                        {isUpgradeLoading ? 'Opening checkout...' : 'Upgrade to Plus (₹5)'}
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     className="btn-secondary invoice-export-btn"
