@@ -56,7 +56,7 @@ function DeleteConfirmationModal({ onConfirm, onCancel }) {
     );
 }
 
-function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability, onUpgradeToPlus }) {
+function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability, onUpgradeToPlus, onExportLatestInvoice }) {
     const [isEditing, setIsEditing] = useState(false)
     const [editData, setEditData] = useState({
         username: session?.user?.username || '',
@@ -72,6 +72,8 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
     const [error, setError] = useState('')
     const [upgradeError, setUpgradeError] = useState('')
     const [isUpgradeLoading, setIsUpgradeLoading] = useState(false)
+    const [invoiceError, setInvoiceError] = useState('')
+    const [isInvoiceLoading, setIsInvoiceLoading] = useState(false)
     const fileInputRef = useRef(null)
 
     const auraPoints = session?.user?.auraPoints || 0
@@ -234,6 +236,19 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
             setUpgradeError(err?.message || 'Could not start checkout right now.')
         } finally {
             setIsUpgradeLoading(false)
+        }
+    }
+
+    const handleInvoiceExport = async () => {
+        if (typeof onExportLatestInvoice !== 'function') return
+        setInvoiceError('')
+        setIsInvoiceLoading(true)
+        try {
+            await onExportLatestInvoice()
+        } catch (err) {
+            setInvoiceError(err?.message || 'Could not export invoice right now.')
+        } finally {
+            setIsInvoiceLoading(false)
         }
     }
 
@@ -416,20 +431,21 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
                                     <h3 className="card-title">Verified badge & advanced profile</h3>
                                 </div>
                             </div>
-                            <p className="premium-status-copy">
-                                {verifiedBadgeEnabled
-                                    ? 'Your verified badge is active across profile and chat.'
-                                    : 'Unlock verified badge, cleaner profile identity, and premium visibility.'}
-                            </p>
+                                <p className="premium-status-copy">
+                                    {verifiedBadgeEnabled
+                                        ? 'Your verified badge is active across profile and chat.'
+                                        : 'Unlock verified badge, cleaner profile identity, and premium visibility at just ₹5/month.'}
+                                </p>
                             <div className="premium-status-meta">
                                 <span className={`premium-status-pill ${isPremiumActive ? 'active' : ''}`}>
-                                    {isPremiumActive ? 'Plus Active' : 'Free Plan'}
+                                    {isPremiumActive ? 'Plus Active' : 'Free Plan • ₹5/month'}
                                 </span>
                                 {isPremiumActive && expiryText && (
                                     <span className="premium-status-expiry">Renews visibility till {expiryText}</span>
                                 )}
                             </div>
                             {upgradeError && <div className="modal-error modal-error--inline">{upgradeError}</div>}
+                            {invoiceError && <div className="modal-error modal-error--inline">{invoiceError}</div>}
                             <div className="premium-status-actions">
                                 <button
                                     type="button"
@@ -437,7 +453,15 @@ function ProfileView({ session, onBack, onUpdateProfile, onUploadAvatar, onCheck
                                     onClick={handleUpgrade}
                                     disabled={isUpgradeLoading}
                                 >
-                                    {isUpgradeLoading ? 'Opening checkout...' : (isPremiumActive ? 'Extend Plus' : 'Upgrade to Plus')}
+                                    {isUpgradeLoading ? 'Opening checkout...' : (isPremiumActive ? 'Extend Plus (₹5)' : 'Upgrade to Plus (₹5)')}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn-secondary invoice-export-btn"
+                                    onClick={handleInvoiceExport}
+                                    disabled={isInvoiceLoading}
+                                >
+                                    {isInvoiceLoading ? 'Preparing PDF...' : 'Export Invoice PDF'}
                                 </button>
                             </div>
                         </div>
@@ -964,7 +988,7 @@ function HomeTabSkeleton({ variant = 'matches', count = 4 }) {
     )
 }
 
-export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts, onOpenHaveli, authedFetch, onUpgradeToPlus }) {
+export default function Home({ session, onlineCount, isTransitioning, onStartMatch, onSignOut, onDeleteAccount, onUpdateProfile, onUploadAvatar, onCheckUsernameAvailability, onFetchMatches, onAddFriend, onFetchFriendships, onRespondToFriendRequest, onOpenChat, unreadCounts, onOpenHaveli, authedFetch, onUpgradeToPlus, onExportLatestInvoice }) {
 
     const [selectedTopics, setSelectedTopics] = useState([])
     const [customTopic, setCustomTopic] = useState('')
@@ -1088,6 +1112,7 @@ export default function Home({ session, onlineCount, isTransitioning, onStartMat
                 onUploadAvatar={onUploadAvatar}
                 onCheckUsernameAvailability={onCheckUsernameAvailability}
                 onUpgradeToPlus={onUpgradeToPlus}
+                onExportLatestInvoice={onExportLatestInvoice}
             />
         )
     }

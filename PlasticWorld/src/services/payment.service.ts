@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import axios from 'axios';
+import PDFDocument from 'pdfkit';
 import database from '../config/database';
 import logger from '../utils/logger';
 import { AppError } from '../middleware/errorHandler';
@@ -68,11 +69,26 @@ interface PaymentOrderRow {
   updatedAt: Date;
 }
 
+interface InvoiceSourceRow {
+  orderId: string;
+  cfOrderId: string | null;
+  planCode: string;
+  amount: string;
+  currency: string;
+  paymentStatus: string;
+  paidAt: Date | null;
+  createdAt: Date;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userPhone: string | null;
+}
+
 const PLAN_CONFIGS: Record<string, PlanConfig> = {
   plus_monthly: {
     code: 'plus_monthly',
-    name: 'Muhdikhai Plus (Monthly)',
-    amount: 99,
+    name: 'Muhdikhai Plus (Monthly Intro)',
+    amount: 5,
     currency: 'INR',
     validityDays: 30,
     premiumTier: 'plus',
@@ -377,6 +393,191 @@ class PaymentService {
         verifiedBadgeEnabled: user.verifiedBadgeEnabled,
       },
       recentOrders: orderResult.rows,
+    };
+  }
+
+  private formatCurrency(amount: number, currency: string): string {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  }
+
+  private buildInvoiceFileName(orderId: string): string {
+    const compact = orderId.replace(/[^a-zA-Z0-9]/g, '').slice(-10).toUpperCase();
+    return `muhdikhai-invoice-${compact}.pdf`;
+  }
+
+  private async getInvoiceSource(userId: string, orderId?: string): Promise<InvoiceSourceRow> {
+    const query = orderId
+      ? `SELECT
+           po.order_id as "orderId",
+           po.cf_order_id as "cfOrderId",
+           po.plan_code as "planCode",
+           po.amount::text as amount,
+           po.currency,
+           po.payment_status as "paymentStatus",
+           po.paid_at as "paidAt",
+           po.created_at as "createdAt",
+           u.id as "userId",
+           u.name as "userName",
+           u.email as "userEmail",
+           u.phone_number as "userPhone"
+         FROM payment_orders po
+         INNER JOIN users u ON u.id = po.user_id
+         WHERE po.user_id = $1
+           AND po.order_id = $2
+           AND po.payment_status = 'SUCCESS'
+         LIMIT 1`
+      : `SELECT
+           po.order_id as "orderId",
+           po.cf_order_id as "cfOrderId",
+           po.plan_code as "planCode",
+           po.amount::text as amount,
+           po.currency,
+           po.payment_status as "paymentStatus",
+           po.paid_at as "paidAt",
+           po.created_at as "createdAt",
+           u.id as "userId",
+           u.name as "userName",
+           u.email as "userEmail",
+           u.phone_number as "userPhone"
+         FROM payment_orders po
+         INNER JOIN users u ON u.id = po.user_id
+         WHERE po.user_id = $1
+           AND po.payment_status = 'SUCCESS'
+         ORDER BY COALESCE(po.paid_at, po.created_at) DESC
+         LIMIT 1`;
+
+    const params = orderId ? [userId, orderId] : [userId];
+    const result = await database.query<InvoiceSourceRow>(query, params);
+    const row = result.rows[0];
+
+    if (!row) {
+      throw new AppError(
+        orderId
+          ? 'Paid order not found for invoice generation'
+          : 'No successful payment found for invoice export',
+        404,
+        'INVOICE_SOURCE_NOT_FOUND'
+      );
+    }
+
+    return row;
+  }
+
+  private async renderInvoicePdf(row: InvoiceSourceRow): Promise<Buffer> {
+    const plan = PLAN_CONFIGS[row.planCode];
+    const amount = Number(row.amount);
+    const subtotal = Number.isFinite(amount) ? amount : 0;
+    const tax = 0;
+    const total = subtotal + tax;
+    const paidAt = row.paidAt || row.createdAt;
+    const invoiceDate = paidAt.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+    const invoiceId = `INV-${row.orderId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}`;
+
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 42,
+      info: {
+        Title: `Muhdikhai Invoice ${invoiceId}`,
+        Author: 'Muhdikhai Billing',
+      },
+    });
+
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+
+    doc.rect(0, 0, doc.page.width, 120).fill('#0B1329');
+    doc.fillColor('#9BE6FF').font('Helvetica-Bold').fontSize(12).text('MUHDIKHAI', 42, 30);
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(28).text('INVOICE', 42, 48);
+    doc.fillColor('#9CB4D8').font('Helvetica').fontSize(10).text('Random chat platform billing receipt', 42, 82);
+
+    doc.fillColor('#D6E4FA').font('Helvetica-Bold').fontSize(11).text('Invoice ID', 42, 138);
+    doc.fillColor('#F8FBFF').font('Helvetica').fontSize(11).text(invoiceId, 42, 154);
+
+    doc.fillColor('#D6E4FA').font('Helvetica-Bold').fontSize(11).text('Date', 220, 138);
+    doc.fillColor('#F8FBFF').font('Helvetica').fontSize(11).text(invoiceDate, 220, 154);
+
+    doc.fillColor('#D6E4FA').font('Helvetica-Bold').fontSize(11).text('Order ID', 360, 138);
+    doc.fillColor('#F8FBFF').font('Helvetica').fontSize(11).text(row.orderId, 360, 154, { width: 190 });
+
+    doc.fillColor('#D6E4FA').font('Helvetica-Bold').fontSize(11).text('Billed To', 42, 196);
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(12).text(row.userName, 42, 214);
+    doc.fillColor('#C2D1EA').font('Helvetica').fontSize(10).text(row.userEmail, 42, 232);
+    if (row.userPhone) {
+      doc.fillColor('#C2D1EA').font('Helvetica').fontSize(10).text(row.userPhone, 42, 246);
+    }
+
+    doc.fillColor('#D6E4FA').font('Helvetica-Bold').fontSize(11).text('From', 360, 196);
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(12).text('Muhdikhai', 360, 214);
+    doc.fillColor('#C2D1EA').font('Helvetica').fontSize(10).text('support@muhdikhai.in', 360, 232);
+
+    const tableTop = 292;
+    doc.roundedRect(42, tableTop, 512, 28, 6).fill('#101C3C');
+    doc.fillColor('#B8CAE7').font('Helvetica-Bold').fontSize(10);
+    doc.text('Description', 54, tableTop + 9);
+    doc.text('Qty', 335, tableTop + 9);
+    doc.text('Unit Price', 390, tableTop + 9);
+    doc.text('Amount', 485, tableTop + 9);
+
+    const rowTop = tableTop + 32;
+    doc.roundedRect(42, rowTop, 512, 42, 6).strokeColor('#22365F').lineWidth(1).stroke();
+    doc.fillColor('#F1F7FF').font('Helvetica').fontSize(10);
+    doc.text(plan?.name || row.planCode, 54, rowTop + 15, { width: 260 });
+    doc.text('1', 340, rowTop + 15);
+    doc.text(this.formatCurrency(subtotal, row.currency), 390, rowTop + 15);
+    doc.text(this.formatCurrency(subtotal, row.currency), 485, rowTop + 15);
+
+    const summaryTop = rowTop + 66;
+    doc.fillColor('#D6E4FA').font('Helvetica').fontSize(10).text('Subtotal', 390, summaryTop);
+    doc.fillColor('#FFFFFF').font('Helvetica').fontSize(10).text(this.formatCurrency(subtotal, row.currency), 485, summaryTop);
+
+    doc.fillColor('#D6E4FA').font('Helvetica').fontSize(10).text('Tax', 390, summaryTop + 18);
+    doc.fillColor('#FFFFFF').font('Helvetica').fontSize(10).text(this.formatCurrency(tax, row.currency), 485, summaryTop + 18);
+
+    doc.moveTo(390, summaryTop + 38).lineTo(554, summaryTop + 38).strokeColor('#2A4370').stroke();
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(12).text('Total Paid', 390, summaryTop + 46);
+    doc.fillColor('#9BE6FF').font('Helvetica-Bold').fontSize(12).text(this.formatCurrency(total, row.currency), 485, summaryTop + 46);
+
+    doc.roundedRect(42, 660, 512, 74, 8).fill('#0B1329');
+    doc.fillColor('#C8D8F0').font('Helvetica-Bold').fontSize(10).text('Payment Details', 54, 676);
+    doc.fillColor('#9DB2D6').font('Helvetica').fontSize(9)
+      .text(`Status: ${row.paymentStatus}`, 54, 694)
+      .text(`Cashfree Order ID: ${row.cfOrderId || 'N/A'}`, 54, 708);
+    doc.fillColor('#9DB2D6').font('Helvetica').fontSize(9)
+      .text('Thank you for supporting Muhdikhai Plus.', 54, 722);
+
+    const bufferPromise = new Promise<Buffer>((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+    });
+
+    doc.end();
+    return bufferPromise;
+  }
+
+  async generateInvoicePdfForOrder(userId: string, orderId: string): Promise<{ fileName: string; buffer: Buffer }> {
+    const source = await this.getInvoiceSource(userId, orderId);
+    const buffer = await this.renderInvoicePdf(source);
+    return {
+      fileName: this.buildInvoiceFileName(source.orderId),
+      buffer,
+    };
+  }
+
+  async generateLatestInvoicePdf(userId: string): Promise<{ fileName: string; buffer: Buffer }> {
+    const source = await this.getInvoiceSource(userId);
+    const buffer = await this.renderInvoicePdf(source);
+    return {
+      fileName: this.buildInvoiceFileName(source.orderId),
+      buffer,
     };
   }
 

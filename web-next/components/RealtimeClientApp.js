@@ -44,6 +44,22 @@ import { openCashfreeCheckout } from '@/src/utils/cashfree'
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
 const BETA_WELCOME_NOTICE_VERSION = 'college-launch-v1'
 
+function extractDownloadFileName(contentDisposition) {
+  if (!contentDisposition) return null
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1])
+    } catch {
+      return utf8Match[1]
+    }
+  }
+
+  const plainMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+  return plainMatch?.[1] || null
+}
+
 function normalizeUser(user) {
   if (!user) return user
   const avatarUrl = user.profilePictureUrl || user.photoURL || null
@@ -727,6 +743,51 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
     }
   }
 
+  const handleExportLatestInvoice = async () => {
+    const cur = sessionRef.current
+    if (!cur?.accessToken) {
+      await handleAuth()
+      return
+    }
+
+    const res = await authedFetch(`${BACKEND_URL}/api/v1/payments/invoice/latest/pdf`, {
+      method: 'GET',
+    })
+
+    if (!res.ok) {
+      let message = `Could not export invoice (${res.status})`
+      const responseType = res.headers.get('content-type') || ''
+
+      if (responseType.includes('application/json')) {
+        try {
+          const payload = await res.json()
+          message = payload?.error?.message || message
+        } catch {
+          // Keep fallback message if body parsing fails.
+        }
+      }
+
+      throw new Error(message)
+    }
+
+    const blob = await res.blob()
+    if (!blob || blob.size === 0) {
+      throw new Error('Received an empty PDF file from server')
+    }
+
+    const suggestedName =
+      extractDownloadFileName(res.headers.get('content-disposition')) || 'muhdikhai-invoice.pdf'
+
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = downloadUrl
+    anchor.download = suggestedName
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    window.URL.revokeObjectURL(downloadUrl)
+  }
+
   useEffect(() => {
     if (!session?.accessToken || typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
@@ -1134,6 +1195,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
               setSocketPhase('haveli-room')
             }}
             onUpgradeToPlus={handleUpgradeToPlus}
+            onExportLatestInvoice={handleExportLatestInvoice}
           />
         )}
         {socketState.phase === 'haveli-room' && activeHaveli && (

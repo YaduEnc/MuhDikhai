@@ -99,6 +99,45 @@ router.post(
 );
 
 /**
+ * GET /api/v1/payments/invoice/latest/pdf
+ * Download invoice PDF for latest successful payment
+ */
+router.get(
+  '/invoice/latest/pdf',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const invoice = await paymentService.generateLatestInvoicePdf(req.user!.id);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${invoice.fileName}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).send(invoice.buffer);
+  })
+);
+
+/**
+ * GET /api/v1/payments/invoice/:orderId/pdf
+ * Download invoice PDF for a specific successful order
+ */
+router.get(
+  '/invoice/:orderId/pdf',
+  authenticate,
+  asyncHandler(async (req: Request, res: Response) => {
+    const orderId = req.params.orderId;
+    if (!orderId) {
+      throw new AppError('orderId is required', 400, 'ORDER_ID_REQUIRED');
+    }
+
+    const invoice = await paymentService.generateInvoicePdfForOrder(req.user!.id, orderId);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${invoice.fileName}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).send(invoice.buffer);
+  })
+);
+
+/**
  * POST /api/v1/payments/webhook/cashfree
  * Cashfree webhook endpoint
  */

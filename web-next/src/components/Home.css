@@ -1104,6 +1104,14 @@
 .premium-status-actions {
   display: flex;
   justify-content: flex-start;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.invoice-export-btn {
+  border-style: solid;
+  font-size: 0.78rem;
+  padding: 0.72rem 1rem;
 }
 
 .aura-card-header {
