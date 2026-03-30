@@ -24,6 +24,7 @@ const PREMIUM_PROFILE_FEATURES = [
     'Verified badge on your profile and chat header',
     'Priority visibility in friend requests and Haveli cards',
     'Premium profile theme with cleaner identity card',
+    'Intro pricing: just ₹5 per month',
 ]
 
 const FOOTER_COLUMNS = [
@@ -38,6 +39,7 @@ const FOOTER_COLUMNS = [
     {
         title: 'Trust',
         links: [
+            { label: 'Pricing', href: '/pricing' },
             { label: 'Privacy', href: '/privacy' },
             { label: 'Safety', href: '/safety' },
             { label: 'Terms', href: '/terms' },
@@ -306,6 +308,10 @@ export default function Landing({ onStartMatch, onUpgradeToPlus, authLoading, pr
                             Give serious users a stronger presence. The verified badge builds trust faster in first conversations and helps authentic profiles stand out.
                         </p>
 
+                        <div className="premium-price-tag" aria-label="Pricing">
+                            ₹5/month intro plan
+                        </div>
+
                         <ul className="premium-profile-list">
                             {PREMIUM_PROFILE_FEATURES.map((item) => (
                                 <li key={item}>{item}</li>
@@ -313,16 +319,21 @@ export default function Landing({ onStartMatch, onUpgradeToPlus, authLoading, pr
                         </ul>
 
                         <div className="premium-profile-note">
-                            Planned launch: Plus tier with monthly billing.
+                            Live now: Plus tier at ₹5/month.
                         </div>
-                        <button
-                            type="button"
-                            className="premium-profile-cta"
-                            onClick={onUpgradeToPlus || onStartMatch}
-                            disabled={authLoading || premiumLoading}
-                        >
-                            {authLoading || premiumLoading ? 'Opening checkout...' : 'Get Plus & Verified Badge'}
-                        </button>
+                        <div className="premium-profile-actions">
+                            <button
+                                type="button"
+                                className="premium-profile-cta"
+                                onClick={onUpgradeToPlus || onStartMatch}
+                                disabled={authLoading || premiumLoading}
+                            >
+                                {authLoading || premiumLoading ? 'Opening checkout...' : 'Get Plus for ₹5'}
+                            </button>
+                            <a href="/pricing" className="premium-profile-link">
+                                View full pricing
+                            </a>
+                        </div>
                     </div>
 
                     <div className="premium-profile-preview">

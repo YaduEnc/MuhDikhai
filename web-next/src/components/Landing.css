@@ -511,6 +511,28 @@
     letter-spacing: 0.03em;
 }
 
+.premium-price-tag {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    min-height: 2.1rem;
+    padding: 0 0.95rem;
+    border-radius: 999px;
+    border: 1px solid rgba(88, 237, 255, 0.4);
+    background: rgba(9, 44, 62, 0.46);
+    color: rgba(188, 247, 255, 0.97);
+    font-size: 0.84rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.premium-profile-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
 .premium-profile-cta {
     margin-top: 0.4rem;
     width: fit-content;
@@ -535,6 +557,18 @@
 .premium-profile-cta:disabled {
     opacity: 0.65;
     cursor: not-allowed;
+}
+
+.premium-profile-link {
+    color: rgba(188, 222, 255, 0.92);
+    font-size: 0.82rem;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: rgba(188, 222, 255, 0.42);
+}
+
+.premium-profile-link:hover {
+    color: #dff2ff;
 }
 
 .premium-profile-preview {
