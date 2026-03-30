@@ -480,7 +480,20 @@ class PaymentService {
       month: 'short',
       year: 'numeric',
     });
+    const invoiceDateTime = paidAt.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
     const invoiceId = `INV-${row.orderId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}`;
+    const planDescription = plan
+      ? `${plan.name} - ${plan.validityDays} days`
+      : `${row.planCode} subscription`;
+    const paymentStatusLabel = row.paymentStatus === 'SUCCESS' ? 'PAID' : row.paymentStatus;
+    const totalPaidText = this.formatCurrency(total, row.currency);
 
     const doc = new PDFDocument({
       size: 'A4',
@@ -494,65 +507,97 @@ class PaymentService {
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
 
-    doc.rect(0, 0, doc.page.width, 120).fill('#0B1329');
-    doc.fillColor('#9BE6FF').font('Helvetica-Bold').fontSize(12).text('MUHDIKHAI', 42, 30);
-    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(28).text('INVOICE', 42, 48);
-    doc.fillColor('#9CB4D8').font('Helvetica').fontSize(10).text('Random chat platform billing receipt', 42, 82);
+    doc.rect(0, 0, doc.page.width, doc.page.height).fill('#FFFFFF');
 
-    doc.fillColor('#D6E4FA').font('Helvetica-Bold').fontSize(11).text('Invoice ID', 42, 138);
-    doc.fillColor('#F8FBFF').font('Helvetica').fontSize(11).text(invoiceId, 42, 154);
+    doc.rect(0, 0, doc.page.width, 124).fill('#0F1C3E');
+    doc.rect(0, 120, doc.page.width, 4).fill('#1FB6FF');
 
-    doc.fillColor('#D6E4FA').font('Helvetica-Bold').fontSize(11).text('Date', 220, 138);
-    doc.fillColor('#F8FBFF').font('Helvetica').fontSize(11).text(invoiceDate, 220, 154);
+    doc.fillColor('#A8C8FF').font('Helvetica-Bold').fontSize(11).text('MUHDIKHAI', 42, 28);
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(30).text('TAX INVOICE', 42, 46);
+    doc
+      .fillColor('#D9E6FF')
+      .font('Helvetica')
+      .fontSize(10)
+      .text('Premium subscription billing statement', 42, 88);
 
-    doc.fillColor('#D6E4FA').font('Helvetica-Bold').fontSize(11).text('Order ID', 360, 138);
-    doc.fillColor('#F8FBFF').font('Helvetica').fontSize(11).text(row.orderId, 360, 154, { width: 190 });
+    doc.roundedRect(390, 28, 164, 78, 10).fill('#1A2E60');
+    doc.fillColor('#A9C9FF').font('Helvetica-Bold').fontSize(9).text('PAYMENT STATUS', 402, 42);
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(16).text(paymentStatusLabel, 402, 56);
+    doc.fillColor('#8FE4FF').font('Helvetica-Bold').fontSize(14).text(totalPaidText, 402, 80);
 
-    doc.fillColor('#D6E4FA').font('Helvetica-Bold').fontSize(11).text('Billed To', 42, 196);
-    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(12).text(row.userName, 42, 214);
-    doc.fillColor('#C2D1EA').font('Helvetica').fontSize(10).text(row.userEmail, 42, 232);
+    const drawMetaCard = (x: number, title: string, value: string) => {
+      doc.roundedRect(x, 144, 160, 64, 8).fillAndStroke('#F4F8FF', '#D6E2F4');
+      doc.fillColor('#5A6A87').font('Helvetica-Bold').fontSize(9).text(title, x + 12, 157);
+      doc.fillColor('#182642').font('Helvetica-Bold').fontSize(11).text(value, x + 12, 174, { width: 136 });
+    };
+
+    drawMetaCard(42, 'Invoice No.', invoiceId);
+    drawMetaCard(218, 'Invoice Date', invoiceDate);
+    drawMetaCard(394, 'Order ID', row.orderId);
+
+    doc.roundedRect(42, 226, 248, 130, 10).fillAndStroke('#FFFFFF', '#D7E3F5');
+    doc.fillColor('#4F6285').font('Helvetica-Bold').fontSize(10).text('Billed To', 56, 242);
+    doc.fillColor('#101E37').font('Helvetica-Bold').fontSize(12).text(row.userName, 56, 262);
+    doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text(row.userEmail, 56, 280, { width: 220 });
     if (row.userPhone) {
-      doc.fillColor('#C2D1EA').font('Helvetica').fontSize(10).text(row.userPhone, 42, 246);
+      doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text(`Phone: ${row.userPhone}`, 56, 296, { width: 220 });
     }
+    doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text(`Customer ID: ${row.userId}`, 56, 314, { width: 220 });
 
-    doc.fillColor('#D6E4FA').font('Helvetica-Bold').fontSize(11).text('From', 360, 196);
-    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(12).text('Muhdikhai', 360, 214);
-    doc.fillColor('#C2D1EA').font('Helvetica').fontSize(10).text('support@muhdikhai.in', 360, 232);
+    doc.roundedRect(306, 226, 248, 130, 10).fillAndStroke('#FFFFFF', '#D7E3F5');
+    doc.fillColor('#4F6285').font('Helvetica-Bold').fontSize(10).text('Issued By', 320, 242);
+    doc.fillColor('#101E37').font('Helvetica-Bold').fontSize(12).text('Muhdikhai', 320, 262);
+    doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text('support@muhdikhai.in', 320, 280, { width: 220 });
+    doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text('batchit.yaduraj.me', 320, 296, { width: 220 });
+    doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text('CEO: Yaduraj Singh', 320, 314, { width: 220 });
 
-    const tableTop = 292;
-    doc.roundedRect(42, tableTop, 512, 28, 6).fill('#101C3C');
-    doc.fillColor('#B8CAE7').font('Helvetica-Bold').fontSize(10);
-    doc.text('Description', 54, tableTop + 9);
-    doc.text('Qty', 335, tableTop + 9);
-    doc.text('Unit Price', 390, tableTop + 9);
-    doc.text('Amount', 485, tableTop + 9);
+    const tableY = 382;
+    doc.roundedRect(42, tableY, 512, 30, 8).fill('#EEF4FF');
+    doc.fillColor('#273C60').font('Helvetica-Bold').fontSize(10);
+    doc.text('Description', 56, tableY + 10);
+    doc.text('Qty', 372, tableY + 10);
+    doc.text('Unit Price', 412, tableY + 10);
+    doc.text('Amount', 493, tableY + 10);
 
-    const rowTop = tableTop + 32;
-    doc.roundedRect(42, rowTop, 512, 42, 6).strokeColor('#22365F').lineWidth(1).stroke();
-    doc.fillColor('#F1F7FF').font('Helvetica').fontSize(10);
-    doc.text(plan?.name || row.planCode, 54, rowTop + 15, { width: 260 });
-    doc.text('1', 340, rowTop + 15);
-    doc.text(this.formatCurrency(subtotal, row.currency), 390, rowTop + 15);
-    doc.text(this.formatCurrency(subtotal, row.currency), 485, rowTop + 15);
+    doc.roundedRect(42, tableY + 34, 512, 52, 8).fillAndStroke('#FFFFFF', '#D7E3F5');
+    doc.fillColor('#162644').font('Helvetica').fontSize(10).text(planDescription, 56, tableY + 52, { width: 300 });
+    doc.text('1', 378, tableY + 52);
+    doc.text(this.formatCurrency(subtotal, row.currency), 412, tableY + 52);
+    doc.text(this.formatCurrency(subtotal, row.currency), 493, tableY + 52);
 
-    const summaryTop = rowTop + 66;
-    doc.fillColor('#D6E4FA').font('Helvetica').fontSize(10).text('Subtotal', 390, summaryTop);
-    doc.fillColor('#FFFFFF').font('Helvetica').fontSize(10).text(this.formatCurrency(subtotal, row.currency), 485, summaryTop);
+    doc.roundedRect(42, 484, 274, 120, 10).fillAndStroke('#F9FBFF', '#D7E3F5');
+    doc.fillColor('#4F6285').font('Helvetica-Bold').fontSize(10).text('Payment Details', 56, 500);
+    doc.fillColor('#334A71').font('Helvetica').fontSize(9)
+      .text(`Gateway: Cashfree`, 56, 520)
+      .text(`Status: ${paymentStatusLabel}`, 56, 536)
+      .text(`Cashfree Order ID: ${row.cfOrderId || 'N/A'}`, 56, 552, { width: 246 })
+      .text(`Payment Time: ${invoiceDateTime}`, 56, 574, { width: 246 });
 
-    doc.fillColor('#D6E4FA').font('Helvetica').fontSize(10).text('Tax', 390, summaryTop + 18);
-    doc.fillColor('#FFFFFF').font('Helvetica').fontSize(10).text(this.formatCurrency(tax, row.currency), 485, summaryTop + 18);
+    doc.roundedRect(334, 484, 220, 120, 10).fill('#0F1C3E');
+    doc.fillColor('#A9C9FF').font('Helvetica').fontSize(10).text('Subtotal', 348, 504);
+    doc.fillColor('#FFFFFF').font('Helvetica').fontSize(10).text(this.formatCurrency(subtotal, row.currency), 474, 504, {
+      width: 70,
+      align: 'right',
+    });
+    doc.fillColor('#A9C9FF').font('Helvetica').fontSize(10).text('Tax', 348, 524);
+    doc.fillColor('#FFFFFF').font('Helvetica').fontSize(10).text(this.formatCurrency(tax, row.currency), 474, 524, {
+      width: 70,
+      align: 'right',
+    });
+    doc.moveTo(348, 546).lineTo(540, 546).strokeColor('#2A4C8C').lineWidth(1).stroke();
+    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(12).text('Total Paid', 348, 556);
+    doc.fillColor('#8FE4FF').font('Helvetica-Bold').fontSize(12).text(totalPaidText, 454, 556, {
+      width: 86,
+      align: 'right',
+    });
 
-    doc.moveTo(390, summaryTop + 38).lineTo(554, summaryTop + 38).strokeColor('#2A4370').stroke();
-    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(12).text('Total Paid', 390, summaryTop + 46);
-    doc.fillColor('#9BE6FF').font('Helvetica-Bold').fontSize(12).text(this.formatCurrency(total, row.currency), 485, summaryTop + 46);
+    doc.moveTo(42, 644).lineTo(554, 644).strokeColor('#D7E3F5').lineWidth(1).stroke();
+    doc.fillColor('#516587').font('Helvetica').fontSize(9).text('Thank you for choosing Muhdikhai Plus.', 42, 660);
+    doc.fillColor('#516587').font('Helvetica').fontSize(9).text('This is a computer-generated invoice and does not require a physical stamp.', 42, 676);
 
-    doc.roundedRect(42, 660, 512, 74, 8).fill('#0B1329');
-    doc.fillColor('#C8D8F0').font('Helvetica-Bold').fontSize(10).text('Payment Details', 54, 676);
-    doc.fillColor('#9DB2D6').font('Helvetica').fontSize(9)
-      .text(`Status: ${row.paymentStatus}`, 54, 694)
-      .text(`Cashfree Order ID: ${row.cfOrderId || 'N/A'}`, 54, 708);
-    doc.fillColor('#9DB2D6').font('Helvetica').fontSize(9)
-      .text('Thank you for supporting Muhdikhai Plus.', 54, 722);
+    doc.fillColor('#8094B8').font('Helvetica-Bold').fontSize(9).text('Authorized Signatory', 402, 660);
+    doc.fillColor('#11223F').font('Helvetica-Bold').fontSize(12).text('Yaduraj Singh', 402, 678);
+    doc.fillColor('#5A7094').font('Helvetica').fontSize(9).text('CEO, Muhdikhai', 402, 696);
 
     const bufferPromise = new Promise<Buffer>((resolve, reject) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
