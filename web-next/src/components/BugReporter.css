@@ -1,25 +1,33 @@
 .floating-bug-btn {
   position: fixed;
-  left: 16px;
-  right: auto;
-  bottom: max(16px, calc(env(safe-area-inset-bottom, 0px) + 12px));
+  right: -2px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: right center;
   z-index: 9999;
-  min-width: 82px;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(14, 18, 30, 0.95);
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 0.82rem;
-  font-weight: 600;
+  min-width: 80px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(10, 14, 32, 0.92);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease;
+  backdrop-filter: blur(12px);
+  transition: all 200ms var(--ease-out);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
 }
 
 .floating-bug-btn:hover {
-  border-color: rgba(255, 255, 255, 0.34);
-  background: rgba(20, 24, 38, 0.98);
+  right: 0;
+  border-color: var(--neon-pink);
+  background: #12182b;
+  color: #fff;
+  box-shadow: 0 0 30px rgba(255, 0, 85, 0.15);
 }
 
 .bug-reporter-overlay {
@@ -263,12 +271,12 @@
 
 @media (max-width: 768px) {
   .floating-bug-btn {
-    left: 10px;
-    right: auto;
-    bottom: max(10px, calc(env(safe-area-inset-bottom, 0px) + 8px));
-    min-width: 74px;
-    height: 34px;
-    font-size: 0.78rem;
+    right: -1px;
+    min-width: 70px;
+    height: 28px;
+    font-size: 0.65rem;
+    padding: 0 8px;
+    border-radius: 6px 6px 0 0;
   }
 
   .bug-reporter-overlay {
