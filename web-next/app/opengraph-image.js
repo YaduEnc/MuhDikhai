@@ -47,15 +47,15 @@ export default function OpengraphImage() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           <div style={{ fontSize: '78px', fontWeight: 800, letterSpacing: '-0.05em', lineHeight: 1 }}>
-            Real College Random Chat
+            Vibe-First Random Chat
           </div>
           <div style={{ fontSize: '34px', color: 'rgba(232, 241, 255, 0.88)', lineHeight: 1.28 }}>
-            Login fast. Match instantly. Chat, call, and meet new people.
+            Match instantly. Filter by vibe. Join the anonymous vibe registry.
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '14px' }}>
-          {['Vibe-first rooms', 'Chat + Calls', 'Campus beta'].map((label) => (
+          {['Filtered by Vibe', 'Encrypted Calls', 'Global Sanctuary'].map((label) => (
             <div
               key={label}
               style={{

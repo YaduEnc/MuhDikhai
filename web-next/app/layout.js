@@ -7,9 +7,9 @@ const siteUrl =
   process.env.NEXT_PUBLIC_APP_URL ||
   'https://broyouok.vercel.app'
 
-const marketingTitle = 'MuhDikhai | Real College Random Chat'
+const marketingTitle = 'MuhDikhai | The Anonymous Vibe Registry'
 const marketingDescription =
-  'Meet new people from campus in vibe-first random chat rooms. Fast login, clean profiles, instant matching, chat and calls.'
+  'Instant matches. Real people. Filtered by vibe. Experience the unfiltered mayhem of human randomness with end-to-end security.'
 
 export const metadata = {
   metadataBase: new URL(siteUrl),
@@ -31,7 +31,7 @@ export const metadata = {
         url: '/opengraph-image',
         width: 1200,
         height: 630,
-        alt: 'MuhDikhai - Real college random chat rooms',
+        alt: 'MuhDikhai - The Anonymous Vibe Registry',
       },
     ],
   },
