@@ -660,7 +660,6 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
       } catch (err) {
         console.error('Session refresh failed:', err)
         handleSignOut()
-        throw err
       }
     }
     return res

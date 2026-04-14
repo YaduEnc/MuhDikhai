@@ -602,7 +602,6 @@ function App({ routeMode = 'app' }) {
       } catch (err) {
         console.error('Session refresh failed:', err)
         handleSignOut()
-        throw err
       }
     }
     return res
