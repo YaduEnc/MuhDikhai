@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import path from 'path';
 import axios from 'axios';
 import PDFDocument from 'pdfkit';
 import database from '../config/database';
@@ -397,12 +398,15 @@ class PaymentService {
   }
 
   private formatCurrency(amount: number, currency: string): string {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency,
+    // We use the Rupee symbol directly here.
+    // PDFKit will render it correctly once we use the Roboto font.
+    const symbol = currency === 'INR' ? '₹' : (currency === 'USD' ? '$' : currency);
+    const formatted = new Intl.NumberFormat('en-IN', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+    
+    return `${symbol}${formatted}`;
   }
 
   private buildInvoiceFileName(orderId: string): string {
@@ -497,107 +501,145 @@ class PaymentService {
 
     const doc = new PDFDocument({
       size: 'A4',
-      margin: 42,
+      margin: 40,
       info: {
         Title: `Muhdikhai Invoice ${invoiceId}`,
         Author: 'Muhdikhai Billing',
       },
     });
 
+    // Register fonts to support Rupee symbol and professional typography
+    const fontDir = path.join(process.cwd(), 'assets/fonts');
+    const regularFont = path.join(fontDir, 'Roboto-Regular.ttf');
+    const boldFont = path.join(fontDir, 'Roboto-Bold.ttf');
+    
+    doc.registerFont('Primary', regularFont);
+    doc.registerFont('Primary-Bold', boldFont);
+
     const chunks: Buffer[] = [];
     doc.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
 
+    // Clean background
     doc.rect(0, 0, doc.page.width, doc.page.height).fill('#FFFFFF');
 
-    doc.rect(0, 0, doc.page.width, 124).fill('#0F1C3E');
-    doc.rect(0, 120, doc.page.width, 4).fill('#1FB6FF');
+    // Header section with premium brand colors
+    doc.rect(0, 0, doc.page.width, 140).fill('#0F172A'); // Midnight Slate
+    doc.rect(0, 137, doc.page.width, 3).fill('#3B82F6'); // Electric Blue accent line
 
-    doc.fillColor('#A8C8FF').font('Helvetica-Bold').fontSize(11).text('MUHDIKHAI', 42, 28);
-    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(30).text('TAX INVOICE', 42, 46);
-    doc
-      .fillColor('#D9E6FF')
-      .font('Helvetica')
-      .fontSize(10)
-      .text('Premium subscription billing statement', 42, 88);
+    // Brand Label
+    doc.fillColor('#94A3B8').font('Primary-Bold').fontSize(10).text('MUHDIKHAI PLATFORM', 40, 35);
+    doc.fillColor('#FFFFFF').font('Primary-Bold').fontSize(32).text('TAX INVOICE', 40, 52);
+    doc.fillColor('#64748B').font('Primary').fontSize(11).text('Official statement of premium activation', 40, 95);
 
-    doc.roundedRect(390, 28, 164, 78, 10).fill('#1A2E60');
-    doc.fillColor('#A9C9FF').font('Helvetica-Bold').fontSize(9).text('PAYMENT STATUS', 402, 42);
-    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(16).text(paymentStatusLabel, 402, 56);
-    doc.fillColor('#8FE4FF').font('Helvetica-Bold').fontSize(14).text(totalPaidText, 402, 80);
+    // Dynamic Status Badge
+    const isPaid = row.paymentStatus === 'SUCCESS';
+    const badgeColor = isPaid ? '#10B981' : '#F59E0B'; // Emerald vs Amber
+    const badgeText = isPaid ? 'PAID' : 'PENDING';
+    
+    doc.roundedRect(410, 35, 145, 80, 12).fill('#1E293B');
+    doc.fillColor('#64748B').font('Primary-Bold').fontSize(9).text('PAYMENT STATUS', 425, 48);
+    
+    // Status Indicator Dot
+    doc.circle(425, 72, 4).fill(badgeColor);
+    doc.fillColor(badgeColor).font('Primary-Bold').fontSize(18).text(badgeText, 435, 62);
+    
+    doc.fillColor('#FFFFFF').font('Primary-Bold').fontSize(14).text(totalPaidText, 425, 88);
 
-    const drawMetaCard = (x: number, title: string, value: string) => {
-      doc.roundedRect(x, 144, 160, 64, 8).fillAndStroke('#F4F8FF', '#D6E2F4');
-      doc.fillColor('#5A6A87').font('Helvetica-Bold').fontSize(9).text(title, x + 12, 157);
-      doc.fillColor('#182642').font('Helvetica-Bold').fontSize(11).text(value, x + 12, 174, { width: 136 });
+    // Meta Info Grid (3 columns)
+    const metaY = 160;
+    const drawMetaItem = (x: number, title: string, value: string) => {
+      doc.fillColor('#64748B').font('Primary-Bold').fontSize(8).text(title.toUpperCase(), x, metaY);
+      doc.fillColor('#0F172A').font('Primary-Bold').fontSize(11).text(value, x, metaY + 14, { width: 160 });
     };
 
-    drawMetaCard(42, 'Invoice No.', invoiceId);
-    drawMetaCard(218, 'Invoice Date', invoiceDate);
-    drawMetaCard(394, 'Order ID', row.orderId);
+    drawMetaItem(40, 'Invoice No.', invoiceId);
+    drawMetaItem(220, 'Invoice Date', invoiceDate);
+    drawMetaItem(400, 'Order ID', row.orderId);
 
-    doc.roundedRect(42, 226, 248, 130, 10).fillAndStroke('#FFFFFF', '#D7E3F5');
-    doc.fillColor('#4F6285').font('Helvetica-Bold').fontSize(10).text('Billed To', 56, 242);
-    doc.fillColor('#101E37').font('Helvetica-Bold').fontSize(12).text(row.userName, 56, 262);
-    doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text(row.userEmail, 56, 280, { width: 220 });
+    // Separator
+    doc.moveTo(40, 210).lineTo(555, 210).strokeColor('#E2E8F0').lineWidth(1).stroke();
+
+    // Parties Grid
+    const partyY = 230;
+    
+    // Billed To (Customer)
+    doc.fillColor('#64748B').font('Primary-Bold').fontSize(9).text('BILLED TO', 40, partyY);
+    doc.fillColor('#0F172A').font('Primary-Bold').fontSize(14).text(row.userName, 40, partyY + 18);
+    doc.fillColor('#475569').font('Primary').fontSize(10).text(row.userEmail, 40, partyY + 38);
     if (row.userPhone) {
-      doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text(`Phone: ${row.userPhone}`, 56, 296, { width: 220 });
+      doc.fillColor('#475569').font('Primary').fontSize(10).text(`Ph: ${row.userPhone}`, 40, partyY + 38 + 16);
     }
-    doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text(`Customer ID: ${row.userId}`, 56, 314, { width: 220 });
+    doc.fillColor('#94A3B8').font('Primary').fontSize(8).text(`UID: ${row.userId}`, 40, partyY + 38 + 36);
 
-    doc.roundedRect(306, 226, 248, 130, 10).fillAndStroke('#FFFFFF', '#D7E3F5');
-    doc.fillColor('#4F6285').font('Helvetica-Bold').fontSize(10).text('Issued By', 320, 242);
-    doc.fillColor('#101E37').font('Helvetica-Bold').fontSize(12).text('Muhdikhai', 320, 262);
-    doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text('support@muhdikhai.in', 320, 280, { width: 220 });
-    doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text('batchit.yaduraj.me', 320, 296, { width: 220 });
-    doc.fillColor('#4B5F82').font('Helvetica').fontSize(10).text('CEO: Yaduraj Singh', 320, 314, { width: 220 });
+    // Issued By
+    const rightColX = 320;
+    doc.fillColor('#64748B').font('Primary-Bold').fontSize(9).text('ISSUED BY', rightColX, partyY);
+    doc.fillColor('#0F172A').font('Primary-Bold').fontSize(14).text('Muhdikhai Platform', rightColX, partyY + 18);
+    doc.fillColor('#475569').font('Primary').fontSize(10).text('Legal & Billing Dept', rightColX, partyY + 38);
+    doc.fillColor('#475569').font('Primary').fontSize(10).text('billing@muhdikhai.me', rightColX, partyY + 38 + 16);
+    doc.fillColor('#475569').font('Primary').fontSize(10).text('Mumbai, India', rightColX, partyY + 38 + 32);
 
-    const tableY = 382;
-    doc.roundedRect(42, tableY, 512, 30, 8).fill('#EEF4FF');
-    doc.fillColor('#273C60').font('Helvetica-Bold').fontSize(10);
-    doc.text('Description', 56, tableY + 10);
-    doc.text('Qty', 372, tableY + 10);
-    doc.text('Unit Price', 412, tableY + 10);
-    doc.text('Amount', 493, tableY + 10);
+    // Items table header
+    const tableHeaderY = 360;
+    doc.rect(40, tableHeaderY, 515, 30).fill('#F8FAFC');
+    doc.fillColor('#475569').font('Primary-Bold').fontSize(9);
+    doc.text('DESCRIPTION', 55, tableHeaderY + 11);
+    doc.text('QTY', 360, tableHeaderY + 11);
+    doc.text('UNIT PRICE', 410, tableHeaderY + 11);
+    doc.text('TOTAL', 500, tableHeaderY + 11);
 
-    doc.roundedRect(42, tableY + 34, 512, 52, 8).fillAndStroke('#FFFFFF', '#D7E3F5');
-    doc.fillColor('#162644').font('Helvetica').fontSize(10).text(planDescription, 56, tableY + 52, { width: 300 });
-    doc.text('1', 378, tableY + 52);
-    doc.text(this.formatCurrency(subtotal, row.currency), 412, tableY + 52);
-    doc.text(this.formatCurrency(subtotal, row.currency), 493, tableY + 52);
+    // Item Row
+    const itemRowY = tableHeaderY + 35;
+    doc.fillColor('#0F172A').font('Primary-Bold').fontSize(11).text(planDescription, 55, itemRowY);
+    doc.font('Primary').fontSize(11).text('1', 360, itemRowY);
+    doc.text(this.formatCurrency(subtotal, row.currency), 410, itemRowY);
+    doc.font('Primary-Bold').text(this.formatCurrency(subtotal, row.currency), 500, itemRowY);
+    
+    // Horizontal line after items
+    doc.moveTo(40, itemRowY + 25).lineTo(555, itemRowY + 25).strokeColor('#F1F5F9').lineWidth(1).stroke();
 
-    doc.roundedRect(42, 484, 274, 120, 10).fillAndStroke('#F9FBFF', '#D7E3F5');
-    doc.fillColor('#4F6285').font('Helvetica-Bold').fontSize(10).text('Payment Details', 56, 500);
-    doc.fillColor('#334A71').font('Helvetica').fontSize(9)
-      .text(`Gateway: Cashfree`, 56, 520)
-      .text(`Status: ${paymentStatusLabel}`, 56, 536)
-      .text(`Cashfree Order ID: ${row.cfOrderId || 'N/A'}`, 56, 552, { width: 246 })
-      .text(`Payment Time: ${invoiceDateTime}`, 56, 574, { width: 246 });
+    // Bottom Grid: Payment details & Summary
+    const footerY = 480;
 
-    doc.roundedRect(334, 484, 220, 120, 10).fill('#0F1C3E');
-    doc.fillColor('#A9C9FF').font('Helvetica').fontSize(10).text('Subtotal', 348, 504);
-    doc.fillColor('#FFFFFF').font('Helvetica').fontSize(10).text(this.formatCurrency(subtotal, row.currency), 474, 504, {
-      width: 70,
-      align: 'right',
-    });
-    doc.fillColor('#A9C9FF').font('Helvetica').fontSize(10).text('Tax', 348, 524);
-    doc.fillColor('#FFFFFF').font('Helvetica').fontSize(10).text(this.formatCurrency(tax, row.currency), 474, 524, {
-      width: 70,
-      align: 'right',
-    });
-    doc.moveTo(348, 546).lineTo(540, 546).strokeColor('#2A4C8C').lineWidth(1).stroke();
-    doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(12).text('Total Paid', 348, 556);
-    doc.fillColor('#8FE4FF').font('Helvetica-Bold').fontSize(12).text(totalPaidText, 454, 556, {
-      width: 86,
-      align: 'right',
-    });
+    // Payment Meta
+    doc.roundedRect(40, footerY, 260, 110, 10).fillAndStroke('#F8FAFC', '#F1F5F9');
+    doc.fillColor('#64748B').font('Primary-Bold').fontSize(9).text('PAYMENT DETAILS', 55, footerY + 15);
+    
+    const drawPayDetail = (label: string, value: string, y: number) => {
+      doc.fillColor('#94A3B8').font('Primary').fontSize(8).text(label, 55, y);
+      doc.fillColor('#1E293B').font('Primary-Bold').fontSize(9).text(value, 115, y, { width: 175 });
+    };
 
-    doc.moveTo(42, 644).lineTo(554, 644).strokeColor('#D7E3F5').lineWidth(1).stroke();
-    doc.fillColor('#516587').font('Helvetica').fontSize(9).text('Thank you for choosing Muhdikhai Plus.', 42, 660);
-    doc.fillColor('#516587').font('Helvetica').fontSize(9).text('This is a computer-generated invoice and does not require a physical stamp.', 42, 676);
+    drawPayDetail('Gateway', 'Cashfree', footerY + 35);
+    drawPayDetail('TXN ID', row.cfOrderId || 'N/A', footerY + 50);
+    drawPayDetail('Method', 'UPI/Cards', footerY + 65);
+    drawPayDetail('Timestamp', invoiceDateTime, footerY + 80);
 
-    doc.fillColor('#8094B8').font('Helvetica-Bold').fontSize(9).text('Authorized Signatory', 402, 660);
-    doc.fillColor('#11223F').font('Helvetica-Bold').fontSize(12).text('Yaduraj Singh', 402, 678);
-    doc.fillColor('#5A7094').font('Helvetica').fontSize(9).text('CEO, Muhdikhai', 402, 696);
+    // Summary Box
+    doc.roundedRect(320, footerY, 235, 110, 10).fill('#0F172A');
+    
+    const drawSummaryLine = (label: string, value: string, y: number, isTotal = false) => {
+      doc.fillColor(isTotal ? '#FFFFFF' : '#94A3B8').font(isTotal ? 'Primary-Bold' : 'Primary').fontSize(isTotal ? 12 : 10).text(label, 335, y);
+      doc.fillColor(isTotal ? '#3B82F6' : '#FFFFFF').font(isTotal ? 'Primary-Bold' : 'Primary-Bold').fontSize(isTotal ? 14 : 10).text(value, 420, y, { align: 'right', width: 120 });
+    };
+
+    drawSummaryLine('Subtotal', this.formatCurrency(subtotal, row.currency), footerY + 20);
+    drawSummaryLine('Taxes', this.formatCurrency(tax, row.currency), footerY + 40);
+    
+    doc.moveTo(335, footerY + 65).lineTo(540, footerY + 65).strokeColor('#1E293B').lineWidth(1).stroke();
+    
+    drawSummaryLine('Amount Paid', totalPaidText, footerY + 78, true);
+
+    // Footer
+    const lastY = 640;
+    doc.moveTo(40, lastY).lineTo(555, lastY).strokeColor('#F1F5F9').lineWidth(1).stroke();
+    doc.fillColor('#94A3B8').font('Primary').fontSize(9).text('Thank you for being a part of Muhdikhai Premium.', 40, lastY + 15);
+    doc.text('This is an electronically generated document. No signature required.', 40, lastY + 28);
+
+    // Signatory
+    doc.fillColor('#64748B').font('Primary-Bold').fontSize(8).text('AUTHORIZED BY', 440, lastY + 15);
+    doc.fillColor('#0F172A').font('Primary-Bold').fontSize(12).text('Yaduraj Singh', 440, lastY + 30);
+    doc.fillColor('#94A3B8').font('Primary').fontSize(8).text('CEO & Founder', 440, lastY + 45);
 
     const bufferPromise = new Promise<Buffer>((resolve, reject) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
