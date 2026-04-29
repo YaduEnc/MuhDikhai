@@ -445,6 +445,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
             })
             playPartnerLeftDissolve()
           }
+          setCallOverlayState({ status: 'idle', partner: null, type: 'random', isInitiator: false })
           setSocketPhase('partner-left')
         })
         socket.on('typing:start', (payload) => {
@@ -498,7 +499,10 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
           setUnreadCounts(prev => ({ ...prev, [senderId]: (prev[senderId] || 0) + 1 }))
         })
 
-        socket.on('disconnect', () => setSocketState((prev) => ({ ...prev, status: 'disconnected' })))
+        socket.on('disconnect', () => {
+          setCallOverlayState({ status: 'idle', partner: null, type: 'random', isInitiator: false })
+          setSocketState((prev) => ({ ...prev, status: 'disconnected' }))
+        })
 
         // Global Call Signaling
         socket.on('webrtc:call-request', (data) => {
@@ -619,6 +623,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
     setRoom(null)
     setActiveHaveli(null)
     setChatMessages([])
+    setCallOverlayState({ status: 'idle', partner: null, type: 'random', isInitiator: false })
     socketPhaseRef.current = 'idle'
     setSocketState({ status: 'disconnected', phase: 'idle', socket: null })
   }
@@ -641,6 +646,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
     setIsTransitioning(false)
     setRoom(null)
     setChatMessages([])
+    setCallOverlayState({ status: 'idle', partner: null, type: 'random', isInitiator: false })
     setSocketPhase('idle')
   }
 
@@ -1106,6 +1112,34 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
     playHangupTone()
   }
 
+  const handleReportUserFromCall = async ({ reportedId, reason, details }) => {
+    if (!reportedId) throw new Error('No user selected for report')
+
+    const roomId = roomRef.current?.roomId || roomRef.current?.id || null
+    const payload = {
+      reportedId,
+      reason,
+      details: [
+        details?.trim() || '',
+        roomId ? `roomId=${roomId}` : '',
+        `callType=${callOverlayStateRef.current.type || 'unknown'}`,
+      ].filter(Boolean).join('\n'),
+    }
+
+    const res = await authedFetch(`${BACKEND_URL}/api/v1/reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const json = await res.json().catch(() => null)
+    if (!res.ok) {
+      throw new Error(json?.error || json?.message || 'Failed to submit report')
+    }
+
+    return json
+  }
+
   const isSignedIn = Boolean(session?.user)
   const isProfileComplete = hasCompleteProfile(session?.user)
   const isAnyChat = Boolean(showChat || socketState.phase === 'friend-chat' || socketState.phase === 'haveli-room' || activeHaveli)
@@ -1402,6 +1436,7 @@ function RealtimeClientApp({ autoMatchOnMount = false }) {
           onAccept={handleAcceptCall}
           onDecline={handleEndCall}
           onEnd={handleEndCall}
+          onReport={handleReportUserFromCall}
         />
       )}
 

@@ -321,7 +321,8 @@ const MATCH_OR_ENQUEUE_LUA = `
 -- KEYS: [1..N] = inverse queue keys to check, [N+1..M] = my enqueue keys
 -- ARGV: [1] = my userId, [2] = my JSON data, [3] = number of inverse keys,
 --       [4] = heartbeat key, [5] = heartbeat TTL, [6] = user_rooms hash key,
---       [7] = queue counter key, [8] = key prefix (e.g. 'plasticworld:')
+--       [7] = queue counter key, [8] = key prefix (e.g. 'plasticworld:'),
+--       [9] = allow enqueue fallback (1 = enqueue on miss, 0 = match-only)
 
 local myUserId = ARGV[1]
 local myData = ARGV[2]
@@ -331,6 +332,7 @@ local heartbeatTTL = tonumber(ARGV[5])
 local userRoomsKey = ARGV[6]
 local queueCounterKey = ARGV[7]
 local prefix = ARGV[8]
+local allowEnqueueFallback = tonumber(ARGV[9]) == 1
 
 -- Phase 1: Try to find a valid partner from inverse queues
 for i = 1, numInverseKeys do
@@ -385,6 +387,12 @@ for i = 1, numInverseKeys do
   for k = #skipList, 1, -1 do
     redis.call('RPUSH', key, skipList[k])
   end
+end
+
+-- Existing queued users retried by the stream consumer should only probe for
+-- a match. Re-enqueuing them here duplicates list entries and queue counters.
+if not allowEnqueueFallback then
+  return {'NO_MATCH', ''}
 end
 
 -- Phase 2: No match found — enqueue myself
@@ -533,10 +541,12 @@ export const socketAuth = async (socket: AuthenticatedSocket, next: (err?: Exten
  */
 async function atomicMatchOrEnqueue(
   pub: any,
-  user: QueuedUser
+  user: QueuedUser,
+  options?: { allowEnqueueFallback?: boolean }
 ): Promise<{ matched: true; partnerData: string } | { matched: false }> {
   const { userId, gender, preference, topics } = user;
   const myData = JSON.stringify(user);
+  const allowEnqueueFallback = options?.allowEnqueueFallback !== false;
 
   // Build inverse keys (where we look for a partner)
   const inverseKeys: string[] = [];
@@ -576,7 +586,8 @@ async function atomicMatchOrEnqueue(
     '30',                            // ARGV[5] heartbeat TTL
     'random:user_rooms',             // ARGV[6]
     'matchq:counter:queue',          // ARGV[7]
-    keyPrefix                        // ARGV[8] key prefix
+    keyPrefix,                       // ARGV[8] key prefix
+    allowEnqueueFallback ? '1' : '0' // ARGV[9]
   );
 
   if (result && result[0] === 'MATCHED') {
@@ -704,8 +715,11 @@ async function streamSweepConsumer(
           continue;
         }
 
-        // Try atomic match
-        const matchResult = await atomicMatchOrEnqueue(pub, candidate);
+        // Try atomic match without re-enqueuing: the candidate is already in
+        // the queue from their original join request.
+        const matchResult = await atomicMatchOrEnqueue(pub, candidate, {
+          allowEnqueueFallback: false,
+        });
 
         if (matchResult.matched) {
           const partner: QueuedUser = JSON.parse(matchResult.partnerData);
@@ -726,8 +740,8 @@ async function streamSweepConsumer(
 
           await finalizeMatch(io, pub, candidate, partner, topic);
         }
-        // If not matched, the Lua script already re-enqueued them,
-        // so we don't need to do anything.
+        // If not matched, leave the existing queue entry untouched. The user
+        // is already waiting in their queue buckets from the original join.
 
         // ACK the entry regardless
         await pub.xack(streamKey, groupName, entryId);

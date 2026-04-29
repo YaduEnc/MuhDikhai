@@ -1,8 +1,80 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useWebRTC } from '../hooks/useWebRTC'
-import { playIncomingDrop, playOutgoingTick } from '../utils/soundEngine'
 import { calculateAuraLevel } from '../utils/aura'
 import { getAvatarUrl } from '../utils/avatar'
+
+const REPORT_REASONS = [
+    { value: 'abuse', label: 'Abuse or harassment' },
+    { value: 'nudity', label: 'Sexual or explicit content' },
+    { value: 'spam', label: 'Spam or scam' },
+    { value: 'hate', label: 'Hate speech' },
+    { value: 'impersonation', label: 'Impersonation' },
+    { value: 'other', label: 'Other unsafe behavior' },
+]
+
+function formatDuration(totalSeconds) {
+    const safe = Math.max(0, totalSeconds)
+    const mins = Math.floor(safe / 60)
+    const secs = safe % 60
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
+function ReportModal({ partnerName, onClose, onSubmit, isSubmitting, status }) {
+    const [reason, setReason] = useState(REPORT_REASONS[0].value)
+    const [details, setDetails] = useState('')
+
+    return (
+        <div className="call-modal-scrim" onClick={onClose}>
+            <div className="call-report-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="call-report-header">
+                    <div>
+                        <span className="call-report-eyebrow">Safety</span>
+                        <h3>Report {partnerName || 'this caller'}</h3>
+                    </div>
+                    <button className="call-report-close" onClick={onClose} aria-label="Close report form">×</button>
+                </div>
+
+                <label className="call-report-field">
+                    <span>Reason</span>
+                    <select value={reason} onChange={(event) => setReason(event.target.value)}>
+                        {REPORT_REASONS.map((item) => (
+                            <option key={item.value} value={item.value}>{item.label}</option>
+                        ))}
+                    </select>
+                </label>
+
+                <label className="call-report-field">
+                    <span>Details</span>
+                    <textarea
+                        rows={4}
+                        value={details}
+                        onChange={(event) => setDetails(event.target.value)}
+                        placeholder="Add a few details so moderation knows what happened."
+                    />
+                </label>
+
+                {status?.message && (
+                    <div className={`call-report-status ${status.type || ''}`}>
+                        {status.message}
+                    </div>
+                )}
+
+                <div className="call-report-actions">
+                    <button className="call-report-btn secondary" onClick={onClose} disabled={isSubmitting}>
+                        Cancel
+                    </button>
+                    <button
+                        className="call-report-btn danger"
+                        onClick={() => onSubmit({ reason, details })}
+                        disabled={isSubmitting}
+                    >
+                        {isSubmitting ? 'Sending...' : 'Submit report'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
 
 export default function CallOverlay({
     socket,
@@ -11,11 +83,9 @@ export default function CallOverlay({
     partner,
     onAccept,
     onDecline,
-    onEnd
+    onEnd,
+    onReport,
 }) {
-    // callState = { status: 'requesting' | 'incoming' | 'active', type: 'random' | 'friend' }
-
-    // For friend calls, we use recipientId. For random, we use roomId.
     const roomId = partner?.roomId || partner?.id
     const recipientId = callState.type === 'friend' ? partner?.id : null
 
@@ -38,28 +108,55 @@ export default function CallOverlay({
     } = useWebRTC(socket, roomId, session?.user?.id, recipientId)
 
     const [showDeviceSettings, setShowDeviceSettings] = useState(false)
+    const [callSeconds, setCallSeconds] = useState(0)
+    const [showReportModal, setShowReportModal] = useState(false)
+    const [reportSubmitting, setReportSubmitting] = useState(false)
+    const [reportStatus, setReportStatus] = useState({ type: '', message: '' })
 
-    // Helper: Flip Camera logic
+    const networkBadge = callTelemetry.connectionBadge || { label: 'Syncing', tone: 'neutral', detail: 'Negotiating media path' }
+    const shouldShowReconnectBanner = callState.status === 'active'
+        && (callTelemetry.connectionState === 'disconnected' || callTelemetry.connectionState === 'failed' || callTelemetry.connectionState === 'connecting')
+
+    const reconnectText = useMemo(() => {
+        if (callTelemetry.connectionState === 'failed') {
+            return 'Connection dropped. Trying to rebuild the video path.'
+        }
+        if (callTelemetry.connectionState === 'connecting') {
+            return 'Negotiating call route...'
+        }
+        return 'Signal dipped. Reconnecting your call...'
+    }, [callTelemetry.connectionState])
+
+    useEffect(() => {
+        if (callState.status !== 'active') {
+            setCallSeconds(0)
+            return
+        }
+
+        const startedAt = Date.now()
+        const timer = window.setInterval(() => {
+            setCallSeconds(Math.floor((Date.now() - startedAt) / 1000))
+        }, 1000)
+
+        return () => window.clearInterval(timer)
+    }, [callState.status])
+
+    useEffect(() => {
+        if (callState.status !== 'requesting' || !callState.isInitiator || localStream) return
+        prepareLocalMedia()
+    }, [callState.status, callState.isInitiator, localStream, prepareLocalMedia])
+
     const handleFlipCamera = () => {
         if (!availableVideoDevices || availableVideoDevices.length < 2) return
 
-        let currentIndex = availableVideoDevices.findIndex(d => d.deviceId === selectedVideoDevice)
+        let currentIndex = availableVideoDevices.findIndex((device) => device.deviceId === selectedVideoDevice)
         if (currentIndex === -1) currentIndex = 0
 
         const nextIndex = (currentIndex + 1) % availableVideoDevices.length
         const nextDeviceId = availableVideoDevices[nextIndex].deviceId
-
         switchDevice('video', nextDeviceId)
     }
 
-    // Sync WebRTC with call status
-    useEffect(() => {
-        if (callState.status === 'requesting' && callState.isInitiator && !localStream) {
-            prepareLocalMedia()
-        }
-    }, [callState.status, callState.isInitiator, localStream, prepareLocalMedia])
-
-    // Special handler for acceptance
     const handleAccept = async () => {
         const success = await prepareLocalMedia()
         if (success) {
@@ -69,17 +166,36 @@ export default function CallOverlay({
         }
     }
 
-    // Effect to handle P2P start when state becomes active
     useEffect(() => {
-        if (callState.status === 'active' && localStream) {
-            // If we are the initiator, we should start the offer
-            // How do we know if we are the initiator?
-            // Let's assume onInitiate was called.
-            if (callState.isInitiator) {
-                establishConnection(true)
-            }
+        if (callState.status === 'active' && localStream && callState.isInitiator) {
+            establishConnection(true)
         }
     }, [callState.status, localStream, callState.isInitiator, establishConnection])
+
+    const submitReport = async ({ reason, details }) => {
+        if (typeof onReport !== 'function' || !partner?.id) return
+        setReportSubmitting(true)
+        setReportStatus({ type: '', message: '' })
+        try {
+            await onReport({
+                reportedId: partner.id,
+                reason,
+                details,
+            })
+            setReportStatus({ type: 'success', message: 'Report submitted. Our moderation queue has it now.' })
+            window.setTimeout(() => {
+                setShowReportModal(false)
+                setReportStatus({ type: '', message: '' })
+            }, 1400)
+        } catch (error) {
+            setReportStatus({
+                type: 'error',
+                message: error?.message || 'Could not send the report right now.',
+            })
+        } finally {
+            setReportSubmitting(false)
+        }
+    }
 
     if (callState.status === 'idle') return null
 
@@ -147,10 +263,30 @@ export default function CallOverlay({
 
                 {callState.status === 'active' && (
                     <div className="call-active-view">
+                        <div className="call-topbar">
+                            <div className="call-topbar-center">
+                                <div className="call-timer-chip">{formatDuration(callSeconds)}</div>
+                                <div className={`call-network-chip tone-${networkBadge.tone}`} title={networkBadge.detail}>
+                                    <span className="call-network-dot" />
+                                    <span>{networkBadge.label}</span>
+                                </div>
+                            </div>
+                            <button className="call-report-trigger" onClick={() => setShowReportModal(true)}>
+                                Report user
+                            </button>
+                        </div>
+
+                        {shouldShowReconnectBanner && (
+                            <div className="call-reconnect-banner">
+                                <span className="call-reconnect-pulse" />
+                                <span>{reconnectText}</span>
+                            </div>
+                        )}
+
                         <div className="call-video-grid">
                             <div className="call-video-tile remote">
                                 {remoteStream ? (
-                                    <video autoPlay playsInline ref={el => { if (el) el.srcObject = remoteStream }} />
+                                    <video autoPlay playsInline ref={(element) => { if (element) element.srcObject = remoteStream }} />
                                 ) : (
                                     <div className="call-video-placeholder">Connecting...</div>
                                 )}
@@ -158,7 +294,7 @@ export default function CallOverlay({
                             </div>
                             <div className="call-video-tile local">
                                 {localStream ? (
-                                    <video autoPlay playsInline muted ref={el => { if (el) el.srcObject = localStream }} />
+                                    <video autoPlay playsInline muted ref={(element) => { if (element) element.srcObject = localStream }} />
                                 ) : (
                                     <div className="call-video-placeholder">Your Camera</div>
                                 )}
@@ -171,17 +307,15 @@ export default function CallOverlay({
                                 {isMuted ? '🔇' : '🎤'}
                             </button>
                             <button className={`ctrl-btn ${isVideoOff ? 'off' : ''}`} onClick={toggleVideo} title="Toggle Video">
-                                {isVideoOff ? '' : '🎥'}
+                                {isVideoOff ? '🚫' : '🎥'}
                             </button>
 
-                            {/* Flip Camera Button (Only shows if >1 camera exists) */}
                             {availableVideoDevices?.length > 1 && (
                                 <button className="ctrl-btn flip-btn" onClick={handleFlipCamera} title="Flip Camera">
                                     🔄
                                 </button>
                             )}
 
-                            {/* Device Settings Button */}
                             <button
                                 className={`ctrl-btn settings-btn ${showDeviceSettings ? 'active' : ''}`}
                                 onClick={() => setShowDeviceSettings(!showDeviceSettings)}
@@ -190,12 +324,11 @@ export default function CallOverlay({
                                 ⚙️
                             </button>
 
-                            <button className="ctrl-btn end" onClick={() => { stopLocalMedia(); onEnd(); }} title="End Call">
+                            <button className="ctrl-btn end" onClick={() => { stopLocalMedia(); onEnd() }} title="End Call">
                                 📞
                             </button>
                         </div>
 
-                        {/* Settings Popover */}
                         {showDeviceSettings && (
                             <div className="device-settings-popover">
                                 <h4>Device Settings</h4>
@@ -203,12 +336,12 @@ export default function CallOverlay({
                                     <label>Camera:</label>
                                     <select
                                         value={selectedVideoDevice || ''}
-                                        onChange={(e) => switchDevice('video', e.target.value)}
+                                        onChange={(event) => switchDevice('video', event.target.value)}
                                         disabled={isVideoOff}
                                     >
-                                        {availableVideoDevices.map(device => (
+                                        {availableVideoDevices.map((device, index) => (
                                             <option key={device.deviceId} value={device.deviceId}>
-                                                {device.label || `Camera ${availableVideoDevices.indexOf(device) + 1}`}
+                                                {device.label || `Camera ${index + 1}`}
                                             </option>
                                         ))}
                                     </select>
@@ -217,12 +350,12 @@ export default function CallOverlay({
                                     <label>Microphone:</label>
                                     <select
                                         value={selectedAudioDevice || ''}
-                                        onChange={(e) => switchDevice('audio', e.target.value)}
+                                        onChange={(event) => switchDevice('audio', event.target.value)}
                                         disabled={isMuted}
                                     >
-                                        {availableAudioDevices.map(device => (
+                                        {availableAudioDevices.map((device, index) => (
                                             <option key={device.deviceId} value={device.deviceId}>
-                                                {device.label || `Microphone ${availableAudioDevices.indexOf(device) + 1}`}
+                                                {device.label || `Microphone ${index + 1}`}
                                             </option>
                                         ))}
                                     </select>
@@ -241,6 +374,20 @@ export default function CallOverlay({
                     </div>
                 )}
             </div>
+
+            {showReportModal && (
+                <ReportModal
+                    partnerName={partner?.name}
+                    onClose={() => {
+                        if (reportSubmitting) return
+                        setShowReportModal(false)
+                        setReportStatus({ type: '', message: '' })
+                    }}
+                    onSubmit={submitReport}
+                    isSubmitting={reportSubmitting}
+                    status={reportStatus}
+                />
+            )}
         </div>
     )
 }
