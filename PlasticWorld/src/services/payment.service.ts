@@ -496,7 +496,6 @@ class PaymentService {
     const planDescription = plan
       ? `${plan.name} - ${plan.validityDays} days`
       : `${row.planCode} subscription`;
-    const paymentStatusLabel = row.paymentStatus === 'SUCCESS' ? 'PAID' : row.paymentStatus;
     const totalPaidText = this.formatCurrency(total, row.currency);
 
     const doc = new PDFDocument({

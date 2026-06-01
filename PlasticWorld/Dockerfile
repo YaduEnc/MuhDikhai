@@ -37,6 +37,8 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application from builder
 COPY --chown=nodejs:nodejs --from=builder /app/dist ./dist
+# Copy SQL migrations so db:migrate:prod works inside the production image
+COPY --chown=nodejs:nodejs src/migrations ./src/migrations
 
 # Create logs directory
 RUN mkdir -p logs && chown nodejs:nodejs logs
