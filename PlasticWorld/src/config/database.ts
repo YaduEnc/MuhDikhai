@@ -9,12 +9,20 @@ class Database {
    */
   public async connect(): Promise<void> {
     try {
+      // Managed hosts (Render, Railway, Neon, …) hand out a single connection
+      // URL rather than discrete host/port/user vars, so prefer it when present.
+      const connectionString = process.env.DATABASE_URL;
+
       const config: PoolConfig = {
-        host: process.env.DB_HOST || 'localhost',
-        port: parseInt(process.env.DB_PORT || '5432', 10),
-        database: process.env.DB_NAME || 'plasticworld_db',
-        user: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD || 'postgres',
+        ...(connectionString
+          ? { connectionString }
+          : {
+              host: process.env.DB_HOST || 'localhost',
+              port: parseInt(process.env.DB_PORT || '5432', 10),
+              database: process.env.DB_NAME || 'plasticworld_db',
+              user: process.env.DB_USER || 'postgres',
+              password: process.env.DB_PASSWORD || 'postgres',
+            }),
         ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
         min: parseInt(process.env.DB_POOL_MIN || '2', 10),
         max: parseInt(process.env.DB_POOL_MAX || '10', 10),
@@ -22,12 +30,30 @@ class Database {
         connectionTimeoutMillis: 10000, // Increased to 10 seconds
       };
 
-      logger.info('Attempting PostgreSQL connection', {
-        host: config.host,
-        port: config.port,
-        database: config.database,
-        user: config.user,
-      });
+      // Describe the target for logs without ever surfacing the password.
+      const target = ((): { host?: string; port?: string | number; database?: string; user?: string } => {
+        if (!connectionString) {
+          return {
+            host: config.host,
+            port: config.port,
+            database: config.database,
+            user: config.user,
+          };
+        }
+        try {
+          const parsed = new URL(connectionString);
+          return {
+            host: parsed.hostname,
+            port: parsed.port || 5432,
+            database: parsed.pathname.replace(/^\//, ''),
+            user: parsed.username,
+          };
+        } catch {
+          return { host: 'unparseable DATABASE_URL' };
+        }
+      })();
+
+      logger.info('Attempting PostgreSQL connection', target);
 
       this.pool = new Pool(config);
 
@@ -48,19 +74,14 @@ class Database {
         logger.info('Connection test successful');
 
         logger.info('PostgreSQL connected successfully', {
-          host: config.host,
-          port: config.port,
-          database: config.database,
+          ...target,
           timestamp: result.rows[0].now,
         });
       } catch (error) {
         logger.error('PostgreSQL connection failed', {
           error: error instanceof Error ? error.message : 'Unknown error',
           stack: error instanceof Error ? error.stack : undefined,
-          host: config.host,
-          port: config.port,
-          database: config.database,
-          user: config.user,
+          ...target,
         });
         throw error;
       }

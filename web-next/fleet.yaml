@@ -1,0 +1,9 @@
+fleet: homelab
+
+services:
+  web-next:
+    image: nginx:1.27   # or build: . once you add a Dockerfile
+    placement: flexible
+    resources: { ram: 512Mi, cpu: 0.5 }
+    health: { path: /healthz }
+    # domain: web-next.yourdomain.dev

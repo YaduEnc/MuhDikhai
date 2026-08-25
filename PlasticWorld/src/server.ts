@@ -55,6 +55,41 @@ const gracefulShutdown = async (signal: string) => {
 };
 
 /**
+ * Retry a startup dependency with backoff.
+ *
+ * Managed private networks (Railway's *.railway.internal, and friends) are not
+ * reliably resolvable the instant a container boots, so a first-attempt DNS
+ * failure is expected rather than fatal. A transient database blip should not
+ * permanently kill the service either.
+ */
+const connectWithRetry = async (
+  label: string,
+  connect: () => Promise<void>,
+  attempts = 10,
+  baseDelayMs = 1000
+): Promise<void> => {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await connect();
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+
+      if (attempt === attempts) {
+        console.error(`❌ ${label} failed after ${attempts} attempts: ${message}`);
+        throw error;
+      }
+
+      const delay = Math.min(baseDelayMs * attempt, 8000);
+      console.warn(
+        `⚠️  ${label} attempt ${attempt}/${attempts} failed (${message}); retrying in ${delay}ms`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+};
+
+/**
  * Initialize server
  */
 const startServer = async () => {
@@ -70,13 +105,13 @@ const startServer = async () => {
     // Connect to database
     console.log('🗄️  Connecting to PostgreSQL...');
     logger.info('Connecting to PostgreSQL...');
-    await database.connect();
+    await connectWithRetry('PostgreSQL connection', () => database.connect());
     console.log('✅ PostgreSQL connected');
 
     // Connect to Redis
     console.log('💾 Connecting to Redis...');
     logger.info('Connecting to Redis...');
-    await redisClient.connect();
+    await connectWithRetry('Redis connection', () => redisClient.connect());
     console.log('✅ Redis connected');
 
     // Start HTTP server
@@ -146,6 +181,10 @@ const startServer = async () => {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
     });
+    // Writes to stdout/stderr are asynchronous when piped, which is how a
+    // container gets collected. Exiting immediately truncates them and the
+    // platform reports a crash with no logs at all — give them time to flush.
+    await new Promise((resolve) => setTimeout(resolve, 500));
     process.exit(1);
   }
 };

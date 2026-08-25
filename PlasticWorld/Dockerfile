@@ -1,5 +1,7 @@
 # Multi-stage build for production
-FROM node:18-alpine AS builder
+# Node 24: geoip-lite@2.0.0 declares engines >=24.0.0 and throws on import
+# under older runtimes. Node 18 also reached end-of-life in April 2025.
+FROM node:24-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -17,7 +19,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:24-alpine AS production
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
@@ -40,8 +42,13 @@ COPY --chown=nodejs:nodejs --from=builder /app/dist ./dist
 # Copy SQL migrations so db:migrate:prod works inside the production image
 COPY --chown=nodejs:nodejs src/migrations ./src/migrations
 
-# Create logs directory
-RUN mkdir -p logs && chown nodejs:nodejs logs
+# Create logs and upload directories.
+# public/ is not copied into the image, but several modules create or write
+# subdirectories of public/uploads at import time. They must exist AND be owned
+# by the non-root runtime user, or the require throws EACCES and the whole API
+# fails to boot. This is also the mount point for the uploads volume.
+RUN mkdir -p logs public/uploads/bug_screenshots && \
+    chown -R nodejs:nodejs logs public
 
 # Switch to nodejs user
 USER nodejs

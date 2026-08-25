@@ -8,10 +8,21 @@ import { authenticate, isAdmin } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Ensure upload directory exists
+// Ensure upload directory exists.
+// This runs at import time, so an unhandled throw here takes down the entire
+// API rather than just this route — which is exactly what happened when the
+// container's non-root user could not create /app/public. Degrade instead:
+// screenshot uploads fail later with a clear error, the rest of the API boots.
 const UPLOADS_DIR = path.join(__dirname, '../../public/uploads/bug_screenshots');
-if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+try {
+    if (!fs.existsSync(UPLOADS_DIR)) {
+        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    }
+} catch (error) {
+    logger.error('Could not create bug screenshot directory; uploads will fail', {
+        dir: UPLOADS_DIR,
+        error: error instanceof Error ? error.message : 'Unknown error',
+    });
 }
 
 /**

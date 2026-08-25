@@ -11,11 +11,26 @@ class RedisClient {
    */
   public async connect(): Promise<void> {
     try {
+      // Managed hosts (Render Key Value, Railway, …) expose a single URL rather
+      // than discrete host/port vars. `rediss://` URLs enable TLS automatically.
+      const connectionString = process.env.REDIS_URL;
+
       const options: RedisOptions = {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-        password: process.env.REDIS_PASSWORD || undefined,
+        ...(connectionString
+          ? {
+              // ioredis defaults to IPv4-only lookups. Railway's private network
+              // (*.railway.internal) resolves AAAA records only, so the default
+              // silently fails to connect there. 0 = accept either family.
+              family: parseInt(process.env.REDIS_IP_FAMILY || '0', 10),
+            }
+          : {
+              host: process.env.REDIS_HOST || 'localhost',
+              port: parseInt(process.env.REDIS_PORT || '6379', 10),
+              password: process.env.REDIS_PASSWORD || undefined,
+            }),
         db: parseInt(process.env.REDIS_DB || '0', 10),
+        // The matchmaking Lua scripts prepend this prefix by hand, so it must
+        // stay identical across every client.
         keyPrefix: process.env.REDIS_KEY_PREFIX || 'plasticworld:',
         retryStrategy: (times: number) => {
           const delay = Math.min(times * 50, 2000);
@@ -26,14 +41,30 @@ class RedisClient {
         lazyConnect: false,
       };
 
+      const createClient = () =>
+        connectionString ? new Redis(connectionString, options) : new Redis(options);
+
+      // Describe the target for logs without ever surfacing the password.
+      const target = ((): { host?: string; port?: string | number; db?: number } => {
+        if (!connectionString) {
+          return { host: options.host, port: options.port, db: options.db };
+        }
+        try {
+          const parsed = new URL(connectionString);
+          return { host: parsed.hostname, port: parsed.port || 6379, db: options.db };
+        } catch {
+          return { host: 'unparseable REDIS_URL', db: options.db };
+        }
+      })();
+
       // Main client for general operations
-      this.client = new Redis(options);
+      this.client = createClient();
 
       // Subscriber client for pub/sub
-      this.subscriber = new Redis(options);
+      this.subscriber = createClient();
 
       // Publisher client for pub/sub
-      this.publisher = new Redis(options);
+      this.publisher = createClient();
 
       // Event handlers for main client
       this.client.on('connect', () => {
@@ -41,11 +72,7 @@ class RedisClient {
       });
 
       this.client.on('ready', () => {
-        logger.info('Redis client ready', {
-          host: options.host,
-          port: options.port,
-          db: options.db,
-        });
+        logger.info('Redis client ready', target);
       });
 
       this.client.on('error', (error: Error) => {
@@ -63,11 +90,7 @@ class RedisClient {
       // Wait for connection
       await this.client.ping();
 
-      logger.info('Redis connected successfully', {
-        host: options.host,
-        port: options.port,
-        db: options.db,
-      });
+      logger.info('Redis connected successfully', target);
     } catch (error) {
       logger.error('Failed to connect to Redis', {
         error: error instanceof Error ? error.message : 'Unknown error',

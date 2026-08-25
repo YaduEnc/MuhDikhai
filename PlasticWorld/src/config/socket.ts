@@ -143,6 +143,7 @@ const disconnectTimeouts = new Map<string, NodeJS.Timeout>();
 
 interface QueuedUser {
   userId: string;
+  mode: 'text' | 'video';
   topics: string[];
   gender: string;
   preference: 'male' | 'female' | 'everyone';
@@ -165,11 +166,11 @@ const roomMedia = new Map<string, Set<string>>();
 
 /**
  * Build the Redis list key for a partitioned queue bucket.
- * Format: `matchq:<gender>:<preference>[:<topic>]`
- * e.g. `matchq:male:female:anime`  or  `matchq:female:everyone`
+ * Format: `matchq:<mode>:<gender>:<preference>[:<topic>]`
+ * e.g. `matchq:video:male:female:anime` or `matchq:text:female:everyone`
  */
-function queueKey(gender: string, preference: string, topic?: string): string {
-  const base = `matchq:${gender}:${preference}`;
+function queueKey(mode: 'text' | 'video', gender: string, preference: string, topic?: string): string {
+  const base = `matchq:${mode}:${gender}:${preference}`;
   return topic ? `${base}:${topic}` : base;
 }
 
@@ -177,37 +178,37 @@ function queueKey(gender: string, preference: string, topic?: string): string {
  * Given a user's gender + preference, return the inverse queue key(s)
  * we should try to pop from.
  */
-function inverseQueueKeys(gender: string, preference: string, topic?: string): string[] {
+function inverseQueueKeys(mode: 'text' | 'video', gender: string, preference: string, topic?: string): string[] {
   const keys: string[] = [];
 
   if (preference === 'everyone') {
     if (topic) {
-      keys.push(queueKey('male', 'everyone', topic));
-      keys.push(queueKey('female', 'everyone', topic));
-      keys.push(queueKey('non-binary', 'everyone', topic));
-      keys.push(queueKey('other', 'everyone', topic));
-      keys.push(queueKey('prefer_not_to_say', 'everyone', topic));
-      keys.push(queueKey('male', gender, topic));
-      keys.push(queueKey('female', gender, topic));
-      keys.push(queueKey('non-binary', gender, topic));
-      keys.push(queueKey('other', gender, topic));
-      keys.push(queueKey('prefer_not_to_say', gender, topic));
+      keys.push(queueKey(mode, 'male', 'everyone', topic));
+      keys.push(queueKey(mode, 'female', 'everyone', topic));
+      keys.push(queueKey(mode, 'non-binary', 'everyone', topic));
+      keys.push(queueKey(mode, 'other', 'everyone', topic));
+      keys.push(queueKey(mode, 'prefer_not_to_say', 'everyone', topic));
+      keys.push(queueKey(mode, 'male', gender, topic));
+      keys.push(queueKey(mode, 'female', gender, topic));
+      keys.push(queueKey(mode, 'non-binary', gender, topic));
+      keys.push(queueKey(mode, 'other', gender, topic));
+      keys.push(queueKey(mode, 'prefer_not_to_say', gender, topic));
     }
-    keys.push(queueKey('male', 'everyone'));
-    keys.push(queueKey('female', 'everyone'));
-    keys.push(queueKey('non-binary', 'everyone'));
-    keys.push(queueKey('other', 'everyone'));
-    keys.push(queueKey('prefer_not_to_say', 'everyone'));
-    keys.push(queueKey('male', gender));
-    keys.push(queueKey('female', gender));
-    keys.push(queueKey('non-binary', gender));
-    keys.push(queueKey('other', gender));
-    keys.push(queueKey('prefer_not_to_say', gender));
+    keys.push(queueKey(mode, 'male', 'everyone'));
+    keys.push(queueKey(mode, 'female', 'everyone'));
+    keys.push(queueKey(mode, 'non-binary', 'everyone'));
+    keys.push(queueKey(mode, 'other', 'everyone'));
+    keys.push(queueKey(mode, 'prefer_not_to_say', 'everyone'));
+    keys.push(queueKey(mode, 'male', gender));
+    keys.push(queueKey(mode, 'female', gender));
+    keys.push(queueKey(mode, 'non-binary', gender));
+    keys.push(queueKey(mode, 'other', gender));
+    keys.push(queueKey(mode, 'prefer_not_to_say', gender));
   } else {
     if (topic) {
-      keys.push(queueKey(preference, gender, topic));
+      keys.push(queueKey(mode, preference, gender, topic));
     }
-    keys.push(queueKey(preference, gender));
+    keys.push(queueKey(mode, preference, gender));
   }
 
   return [...new Set(keys)];
@@ -544,7 +545,7 @@ async function atomicMatchOrEnqueue(
   user: QueuedUser,
   options?: { allowEnqueueFallback?: boolean }
 ): Promise<{ matched: true; partnerData: string } | { matched: false }> {
-  const { userId, gender, preference, topics } = user;
+  const { userId, mode, gender, preference, topics } = user;
   const myData = JSON.stringify(user);
   const allowEnqueueFallback = options?.allowEnqueueFallback !== false;
 
@@ -552,10 +553,10 @@ async function atomicMatchOrEnqueue(
   const inverseKeys: string[] = [];
   if (topics && topics.length > 0) {
     for (const topic of topics) {
-      inverseKeys.push(...inverseQueueKeys(gender, preference, topic));
+      inverseKeys.push(...inverseQueueKeys(mode, gender, preference, topic));
     }
   }
-  inverseKeys.push(...inverseQueueKeys(gender, preference));
+  inverseKeys.push(...inverseQueueKeys(mode, gender, preference));
   // Deduplicate
   const uniqueInverseKeys = [...new Set(inverseKeys)];
 
@@ -563,10 +564,10 @@ async function atomicMatchOrEnqueue(
   const myKeys: string[] = [];
   if (topics && topics.length > 0) {
     for (const topic of topics) {
-      myKeys.push(queueKey(gender, preference, topic));
+      myKeys.push(queueKey(mode, gender, preference, topic));
     }
   }
-  myKeys.push(queueKey(gender, preference));
+  myKeys.push(queueKey(mode, gender, preference));
   const uniqueMyKeys = [...new Set(myKeys)];
 
   // All KEYS = inverse keys + my enqueue keys
@@ -625,6 +626,7 @@ async function finalizeMatch(
   pipeline.hset('random:rooms', roomId, JSON.stringify({
     id: roomId,
     users: [userA.userId, userB.userId],
+    mode: userA.mode,
     topic: topic || undefined,
   }));
   // Remove heartbeats and explicit locks (they're matched now)
@@ -646,8 +648,8 @@ async function finalizeMatch(
   io.in(`user:${userB.userId}`).socketsJoin(roomId);
 
   // Notify both users
-  io.to(`user:${userA.userId}`).emit('random:matched', { roomId, partner: profileB, topic });
-  io.to(`user:${userB.userId}`).emit('random:matched', { roomId, partner: profileA, topic });
+  io.to(`user:${userA.userId}`).emit('random:matched', { roomId, partner: profileB, topic, mode: userA.mode });
+  io.to(`user:${userB.userId}`).emit('random:matched', { roomId, partner: profileA, topic, mode: userB.mode });
 
   // Fire-and-forget DB recording (non-blocking)
   Promise.all([
@@ -944,7 +946,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     /**
      * Random chat: join the gentle queue
      */
-    socket.on('random:join', async (payload?: { topics?: string[]; preference?: 'male' | 'female' | 'everyone' }) => {
+    socket.on('random:join', async (payload?: { topics?: string[]; preference?: 'male' | 'female' | 'everyone'; mode?: 'text' | 'video' }) => {
       let lockMeAcquired = false;
       let queuedForDeferredMatch = false;
       const pub = redisClient.getClient();
@@ -970,6 +972,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
 
         const userTopics = payload?.topics || [];
         const preference = payload?.preference || 'everyone';
+        const mode = payload?.mode === 'text' ? 'text' : 'video';
         const userGender = freshUser.gender || 'prefer_not_to_say';
 
         // 1. If user already has an active room, rejoin it
@@ -984,7 +987,12 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
               const partnerId = room.users.find((id: string) => id !== userId);
               const partner = partnerId ? await userService.getPublicUserProfile(partnerId) : null;
               socket.join(existingRoomId);
-              socket.emit('random:matched', { roomId: existingRoomId, partner, topic: room.topic });
+              socket.emit('random:matched', {
+                roomId: existingRoomId,
+                partner,
+                topic: room.topic,
+                mode: room.mode || mode,
+              });
               return;
             }
           }
@@ -1016,6 +1024,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
 
         const me: QueuedUser = { 
           userId, 
+          mode,
           topics: userTopics, 
           gender: userGender, 
           preference,

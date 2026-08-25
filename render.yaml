@@ -1,0 +1,109 @@
+# Render Blueprint — MuhDikhai backend (PlasticWorld)
+#
+# Provisions three resources in one project:
+#   1. muhdikhai-api  — the Node/Socket.io server, built from PlasticWorld/Dockerfile
+#   2. muhdikhai-kv   — Key Value (Valkey 8) for matchmaking queues + the Socket.io adapter
+#   3. muhdikhai-db   — PostgreSQL
+#
+# Deploy: Render Dashboard → New → Blueprint → pick this repo.
+# Secrets marked `sync: false` are NOT stored in git; Render prompts for them
+# on first deploy. Fill them in from your rotated production credentials.
+
+services:
+  - type: web
+    name: muhdikhai-api
+    runtime: docker
+    # Only build when backend files change; the Next.js frontend lives elsewhere.
+    rootDir: PlasticWorld
+    region: singapore
+    plan: starter # Free spins down after inactivity, which kills every WebSocket.
+    healthCheckPath: /health
+    # Runs after build, before traffic shifts to the new instance.
+    preDeployCommand: npm run db:migrate:prod
+
+    # multer writes uploads here and express.static serves them back, so this
+    # must survive redeploys.
+    disk:
+      name: uploads
+      mountPath: /app/public/uploads
+      sizeGB: 5
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: API_VERSION
+        value: v1
+
+      # ── Postgres ────────────────────────────────────────────────
+      - key: DATABASE_URL
+        fromDatabase:
+          name: muhdikhai-db
+          property: connectionString
+      - key: DB_SSL
+        value: "false" # Internal Render network; no TLS needed.
+
+      # ── Key Value / Valkey ──────────────────────────────────────
+      - key: REDIS_URL
+        fromService:
+          name: muhdikhai-kv
+          type: keyvalue
+          property: connectionString
+      # The matchmaking Lua scripts build key names with this prefix by hand.
+      # Changing it orphans every in-flight queue entry.
+      - key: REDIS_KEY_PREFIX
+        value: "plasticworld:"
+
+      # ── Auth ────────────────────────────────────────────────────
+      - key: JWT_SECRET
+        generateValue: true # Render generates a strong random value.
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+
+      # ── Frontend origin ─────────────────────────────────────────
+      # Comma-separated. Must match your deployed frontend exactly, or CORS
+      # and the Socket.io handshake will both fail.
+      - key: CORS_ORIGIN
+        sync: false
+
+      # ── Payments (Cashfree) ─────────────────────────────────────
+      - key: CASHFREE_ENV
+        value: production
+      - key: CASHFREE_CLIENT_ID
+        sync: false
+      - key: CASHFREE_CLIENT_SECRET
+        sync: false
+      - key: CASHFREE_WEBHOOK_SECRET
+        sync: false
+      - key: CASHFREE_RETURN_URL
+        sync: false
+
+      # ── Misc ────────────────────────────────────────────────────
+      - key: LOG_LEVEL
+        value: info
+      # Optional. Only set this once you attach a custom domain — it is the
+      # origin baked into public /uploads URLs. Left unset, resolvePublicOrigin
+      # derives it from x-forwarded-host, which Render populates correctly.
+      # Do NOT wire it to `fromService property: host`: that is the *private*
+      # network hostname and would produce URLs browsers cannot reach.
+      - key: BACKEND_PUBLIC_URL
+        sync: false
+
+  - type: keyvalue
+    name: muhdikhai-kv
+    region: singapore
+    plan: starter # Free tier has no persistence; queues vanish on restart.
+    ipAllowList: [] # Empty = internal-only access. Do not expose publicly.
+    maxmemoryPolicy: noeviction # Never evict matchmaking queues or locks.
+
+databases:
+  - name: muhdikhai-db
+    databaseName: plasticworld_db
+    user: postgres
+    region: singapore
+    plan: basic-256mb
